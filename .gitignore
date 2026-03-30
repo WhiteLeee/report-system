@@ -1,5 +1,84 @@
-node_modules
-.next
-data
+# =========================
+# Dependencies
+# =========================
+node_modules/
+
+# =========================
+# Next.js / Build outputs
+# =========================
+.next/
+out/
+dist/
+build/
+coverage/
+
+# =========================
+# Logs
+# =========================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 *.log
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Keep example env file
+!.env.example
+
+# =========================
+# Local data / database
+# =========================
+data/
+*.sqlite
+*.sqlite3
+*.db
+
+# =========================
+# Temporary / cache
+# =========================
+tmp/
+temp/
+.tmp/
+.cache/
+
+# =========================
+# Test artifacts
+# =========================
+playwright-report/
+test-results/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# Codex / local agent files
+# =========================
+.codex/
+
+# =========================
+# TypeScript
+# =========================
+*.tsbuildinfo
+
+# =========================
+# OS files
+# =========================
 .DS_Store
+Thumbs.db
+
+# =========================
+# Generated / uploads
+# =========================
+uploads/
+generated/
