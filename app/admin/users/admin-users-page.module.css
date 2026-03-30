@@ -1,0 +1,245 @@
+.workspaceCard,
+.modalCard {
+  overflow: hidden;
+}
+
+.workspaceHeader,
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.workspaceBody,
+.modalBody {
+  padding: 18px 24px 24px;
+}
+
+.workspaceTitle,
+.modalTitle {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.1;
+  font-family: var(--font-display);
+}
+
+.workspaceCopy,
+.modalCopy {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.tableShell {
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.userTable {
+  width: 100%;
+  min-width: 1120px;
+  border-collapse: collapse;
+}
+
+.userTable th,
+.userTable td {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.userTable thead {
+  background: rgba(244, 239, 230, 0.92);
+}
+
+.userTable thead th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.userRow {
+  background: rgba(255, 255, 255, 0.62);
+  transition: background-color 150ms ease;
+}
+
+.userRow:hover {
+  background: rgba(255, 252, 246, 0.96);
+}
+
+.userTable tbody tr:nth-child(even) {
+  background: rgba(250, 247, 241, 0.76);
+}
+
+.userTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.cellValue,
+.permissionText,
+.scopeText,
+.cellMeta {
+  display: block;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.cellValue {
+  font-weight: 600;
+}
+
+.permissionText,
+.scopeText,
+.cellMeta {
+  color: var(--muted);
+}
+
+.permissionText,
+.scopeText {
+  max-width: 220px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.roleBadge,
+.statusBadge {
+  width: fit-content;
+}
+
+.roleBadge {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.activeBadge {
+  border-color: rgba(48, 88, 65, 0.18);
+  background: var(--reviewed-bg);
+  color: var(--reviewed-text);
+}
+
+.disabledBadge {
+  border-color: rgba(170, 63, 42, 0.18);
+  background: rgba(170, 63, 42, 0.12);
+  color: #8a3525;
+}
+
+.actionCell {
+  white-space: nowrap;
+}
+
+.inlineActionButton {
+  min-width: 88px;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.modalBackdrop,
+.modalCloseArea {
+  position: absolute;
+  inset: 0;
+}
+
+.modalBackdrop {
+  background: rgba(22, 18, 14, 0.52);
+  backdrop-filter: blur(8px);
+}
+
+.modalCloseArea {
+  z-index: 0;
+}
+
+.modalCard {
+  position: relative;
+  z-index: 1;
+  width: min(920px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  box-shadow: 0 28px 72px rgba(22, 18, 14, 0.24);
+}
+
+.modalBody,
+.userForm,
+.singleActionForm,
+.editSections,
+.editSection {
+  display: grid;
+  gap: 18px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.formActions,
+.inlineActions,
+.statusRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.formActions {
+  justify-content: flex-end;
+}
+
+.editSection {
+  padding-top: 18px;
+  border-top: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.editSection:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.editSectionTitle {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+@media (max-width: 860px) {
+  .workspaceHeader,
+  .modalHeader,
+  .formActions,
+  .inlineActions,
+  .statusRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .formGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .modalOverlay {
+    padding: 16px;
+  }
+
+  .modalCard {
+    width: min(100%, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+  }
+}

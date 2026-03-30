@@ -1,0 +1,16 @@
+{
+  "tenantId": "demo-tenant",
+  "tenantName": "示例客户",
+  "brandName": "示例报告系统",
+  "baseUrl": "https://report.example.com",
+  "logoUrl": "",
+  "primaryColor": "#8b5a2b",
+  "primaryColorStrong": "#6b421d",
+  "defaultTimezone": "Asia/Shanghai",
+  "dataDir": "./data",
+  "dbPath": "./data/report-system.sqlite",
+  "adminUsername": "admin",
+  "adminPassword": "ChangeMe123!",
+  "adminDisplayName": "系统管理员",
+  "supportedPayloadVersions": [2]
+}

@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1774346313366,
+      "tag": "0000_wild_zaran",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1774430050406,
+      "tag": "0001_flashy_rick_jones",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1774584384475,
+      "tag": "0002_funny_excalibur",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1774593835207,
+      "tag": "0003_gigantic_lilith",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1774675177895,
+      "tag": "0004_windy_titanium_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1774689600000,
+      "tag": "0005_solid_vision_detail",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1774771200000,
+      "tag": "0006_curious_master_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1774850557883,
+      "tag": "0007_perfect_newton_destine",
+      "breakpoints": true
+    }
+  ]
+}

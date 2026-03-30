@@ -1,0 +1,433 @@
+.workspaceHero {
+  padding: 24px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg, rgba(255, 250, 242, 0.96), rgba(240, 231, 216, 0.94)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
+  box-shadow: var(--shadow);
+}
+
+.heroSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.statCard {
+  min-height: 138px;
+}
+
+.statCardInner {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 138px;
+  padding: 22px;
+}
+
+.statLabel,
+.statNote {
+  display: block;
+  color: var(--muted);
+}
+
+.statValue {
+  margin-top: 10px;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1;
+  font-weight: 800;
+}
+
+.statNote {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.filterSidebar {
+  overflow: hidden;
+}
+
+.workspaceSection {
+  display: block;
+}
+
+.workspacePanel {
+  overflow: hidden;
+}
+
+.workspacePanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px 24px 18px;
+  border-bottom: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.workspacePanelBody {
+  padding: 18px 24px 24px;
+}
+
+.filterDisclosure {
+  display: grid;
+  gap: 0;
+  margin-bottom: 18px;
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(248, 244, 236, 0.88));
+}
+
+.filterDisclosure[open] .filterToggleLabel {
+  content: "";
+}
+
+.filterDisclosureSummary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.filterDisclosureSummary::-webkit-details-marker {
+  display: none;
+}
+
+.filterDisclosureTitle {
+  display: block;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.filterDisclosureCopy {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.filterDisclosureMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.filterToggleLabel {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 49, 37, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filterDisclosure[open] .filterToggleLabel {
+  color: var(--brand);
+}
+
+.filterDisclosure[open] .filterToggleLabel::before {
+  content: "收起筛选";
+}
+
+.filterDisclosure:not([open]) .filterToggleLabel::before {
+  content: "展开筛选";
+}
+
+.filterDisclosureBody {
+  padding: 0 20px 20px;
+  border-top: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.filterFormPanel {
+  display: grid;
+  gap: 16px;
+  padding-top: 18px;
+}
+
+.sidebarForm {
+  display: grid;
+  gap: 0;
+}
+
+.filterFormRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.sidebarGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  flex: 1 1 auto;
+}
+
+.control {
+  height: 44px;
+  min-height: 44px;
+  font-size: 14px;
+}
+
+.filterActions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.filterButton {
+  min-height: 40px;
+  height: 40px;
+  padding: 0 16px;
+  flex: 0 1 auto;
+}
+
+.compactField label {
+  font-size: 13px;
+}
+
+.sidebarNote {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.metaBadge {
+  width: fit-content;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filterFooter {
+  display: block;
+  padding-top: 16px;
+  border-top: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.reportStack {
+  display: grid;
+  gap: 0;
+}
+
+.reportTableWrap {
+  overflow-x: auto;
+}
+
+.listTitle {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.1;
+  font-family: var(--font-display);
+}
+
+.listCopy {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.reportTableShell {
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.reportTable {
+  width: 100%;
+  min-width: 940px;
+  border-collapse: collapse;
+}
+
+.reportTable th,
+.reportTable td {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.reportTable thead {
+  background: rgba(244, 239, 230, 0.92);
+}
+
+.reportTable thead th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reportTableRow {
+  background: rgba(255, 255, 255, 0.62);
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.reportTableRow:hover {
+  background: rgba(255, 252, 246, 0.96);
+}
+
+.reportTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.reportTable tbody tr:nth-child(even) {
+  background: rgba(250, 247, 241, 0.76);
+}
+
+.reportTypeBadge {
+  width: fit-content;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cellValue,
+.cellMeta {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cellValue {
+  font-weight: 600;
+}
+
+.cellMeta {
+  color: var(--muted);
+}
+
+.reportEmptyState {
+  margin-top: 0;
+}
+
+.actionCell {
+  white-space: nowrap;
+}
+
+.progressCell {
+  display: flex;
+  align-items: center;
+}
+
+.inlineActionButton {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.typeCol {
+  width: 14%;
+}
+
+.rangeCol {
+  width: 18%;
+}
+
+.storeCol,
+.imageCol,
+.issueCol {
+  width: 9%;
+}
+
+.progressCol {
+  width: 16%;
+}
+
+.submitterCol {
+  width: 14%;
+}
+
+.updatedCol {
+  width: 15%;
+}
+
+.actionCol {
+  width: 11%;
+}
+
+@media (max-width: 1180px) {
+  .reportTable {
+    min-width: 1040px;
+  }
+}
+
+@media (max-width: 860px) {
+  .statsGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspacePanelHeader,
+  .filterDisclosureSummary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filterDisclosureMeta {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 700px) {
+  .workspaceHero {
+    padding: 22px;
+  }
+
+  .filterFormRow {
+    flex-wrap: wrap;
+  }
+
+  .sidebarGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filterActions {
+    justify-content: stretch;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filterButton {
+    flex: 1 1 auto;
+  }
+
+  .reportListShellInner {
+    padding: 0 20px 20px;
+  }
+}
+
+@media (max-width: 520px) {
+  .sidebarGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

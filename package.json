@@ -1,0 +1,43 @@
+{
+  "name": "report-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VisionAgent report publishing and customer-facing viewer.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "node --import tsx --test tests/report-review.integration.test.ts",
+    "tenant:init": "tsx scripts/bootstrap-single-tenant.ts",
+    "auth:seed": "tsx scripts/seed-auth.ts",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "db:migrate": "tsx backend/database/migrate.ts",
+    "db:studio": "drizzle-kit studio --config drizzle.config.ts",
+    "db:reset:local": "tsx scripts/db-reset-local.ts"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.2.4",
+    "better-sqlite3": "^12.4.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.1",
+    "lucide-react": "^1.7.0",
+    "next": "^16.1.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.10",
+    "tailwindcss": "^4.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

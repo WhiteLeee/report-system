@@ -1,0 +1,859 @@
+.breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.detailHero {
+  padding: 24px 28px 20px;
+  overflow: hidden;
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.98fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.heroContent {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding-right: 6px;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(30px, 4.4vw, 44px);
+  line-height: 1;
+  font-family: var(--font-display);
+  letter-spacing: -0.04em;
+}
+
+.heroCopy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.heroInlineMeta,
+.panelHead,
+.detailNav,
+.statsRowCompact,
+.issueListHead,
+.timelineHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.heroStatGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.heroStatLink {
+  display: block;
+  min-width: 0;
+}
+
+.heroStatLink:hover .heroStatCard {
+  border-color: rgba(141, 98, 58, 0.28);
+  box-shadow: 0 18px 34px rgba(41, 34, 24, 0.12);
+}
+
+.heroStatCard,
+.panelCard,
+.resultListPanel,
+.modalCard {
+  overflow: hidden;
+}
+
+.heroStatCard {
+  min-height: 108px;
+}
+
+.heroStatCardInner {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 108px;
+  padding: 14px 12px;
+}
+
+.panelBody,
+.detailPanelBody,
+.filterCardBody,
+.workbenchShellBody {
+  padding: 22px;
+}
+
+.detailPanelBody {
+  display: grid;
+  gap: 18px;
+}
+
+.filterForm {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: nowrap;
+}
+
+.filterFieldsRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  flex: 1 1 auto;
+}
+
+.filterField {
+  min-width: 0;
+}
+
+.workbenchHeader,
+.workbenchMetaBadge,
+.workbenchShellBody,
+.filterSection,
+.resultSection {
+  display: grid;
+  gap: 18px;
+}
+
+.filterDisclosure {
+  display: grid;
+  gap: 0;
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(248, 244, 236, 0.88));
+}
+
+.filterDisclosureSummary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.filterDisclosureSummary::-webkit-details-marker {
+  display: none;
+}
+
+.filterDisclosureTitle {
+  display: block;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.filterDisclosureMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.filterToggleLabel {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 49, 37, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filterDisclosure[open] .filterToggleLabel {
+  color: var(--brand);
+}
+
+.filterDisclosure[open] .filterToggleLabel::before {
+  content: "收起筛选";
+}
+
+.filterDisclosure:not([open]) .filterToggleLabel::before {
+  content: "展开筛选";
+}
+
+.filterDisclosureBody {
+  padding: 0 20px 20px;
+  border-top: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.workbenchHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.workbenchTitle {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.1;
+  font-family: var(--font-display);
+}
+
+.workbenchCopy {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.workbenchMetaBadge {
+  width: fit-content;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workbenchDivider {
+  height: 1px;
+  background: rgba(56, 49, 37, 0.1);
+}
+
+.summaryLabel,
+.summaryNote,
+.ghostText,
+.factItem span {
+  display: block;
+  color: var(--muted);
+}
+
+.summaryValue {
+  margin-top: 6px;
+  font-size: clamp(22px, 2.6vw, 30px);
+  line-height: 1;
+  font-weight: 800;
+}
+
+.summaryNote {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.progressStrip {
+  margin-top: 12px;
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.progressLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.progressTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(56, 49, 37, 0.08);
+  overflow: hidden;
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand), var(--brand-strong));
+}
+
+.workbenchGrid {
+  display: block;
+}
+
+.workbenchShell {
+  overflow: hidden;
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow);
+}
+
+.filterPanel,
+.resultPanel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.filterPanel {
+  padding: 0;
+}
+
+.resultPanel {
+  padding: 0;
+}
+
+.resultListPanel,
+.modalCard {
+  min-width: 0;
+}
+
+.infoBadge,
+.chipBadge,
+.tagBadge,
+.statusBadge {
+  width: fit-content;
+}
+
+.infoBadge {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.panelHead {
+  justify-content: space-between;
+}
+
+.resultHint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.filterActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.resultList,
+.issueStack,
+.storeProgressList,
+.timelineList {
+  display: grid;
+  gap: 14px;
+}
+
+.resultTableShell {
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.resultTableWrap {
+  overflow-x: auto;
+}
+
+.resultTable {
+  width: 100%;
+  min-width: 1040px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.resultTable th,
+.resultTable td {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.resultTable thead {
+  background: rgba(244, 239, 230, 0.92);
+}
+
+.resultTable thead th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.resultTableRow {
+  background: rgba(255, 255, 255, 0.62);
+  transition: background-color 150ms ease;
+}
+
+.resultTableRow:hover {
+  background: rgba(255, 252, 246, 0.96);
+}
+
+.resultTable tbody tr:nth-child(even) {
+  background: rgba(250, 247, 241, 0.76);
+}
+
+.resultTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.paginationBar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: nowrap;
+  padding: 14px 18px;
+  border-top: 1px solid var(--line);
+  background: rgba(250, 247, 241, 0.72);
+}
+
+.pageSizeForm,
+.paginationActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.pageSizeLabel,
+.paginationSummary {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.pageSizeSelect {
+  width: 104px;
+  min-width: 104px;
+  height: 36px;
+  min-height: 36px;
+}
+
+.resultInfoCell {
+  display: block;
+  min-width: 0;
+}
+
+.resultInfoText,
+.resultScopeCell,
+.resultIssueCell {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.resultInfoTitle {
+  display: block;
+  font-size: 16px;
+  line-height: 1.45;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.resultInfoMeta,
+.resultActionCell {
+  white-space: nowrap;
+}
+
+.resultInfoMeta {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resultScopeText,
+.resultTimeText {
+  display: block;
+}
+
+.resultScopeText {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.resultTimeText {
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.resultTable th:nth-child(4),
+.resultTable td:nth-child(4),
+.resultTable th:nth-child(5),
+.resultTable td:nth-child(5),
+.resultTable th:nth-child(6),
+.resultTable td:nth-child(6),
+.resultTable th:nth-child(7),
+.resultTable td:nth-child(7) {
+  white-space: nowrap;
+}
+
+.inlineActionButton {
+  width: 104px;
+  min-width: 104px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 14px;
+}
+
+.resultStoreCol {
+  width: 24%;
+}
+
+.resultCameraCol {
+  width: 22%;
+}
+
+.resultScopeCol {
+  width: 24%;
+}
+
+.resultTimeCol {
+  width: 110px;
+}
+
+.resultIssueCol {
+  width: 88px;
+}
+
+.resultStatusCol {
+  width: 110px;
+}
+
+.resultActionCol {
+  width: 132px;
+}
+
+.resultRow {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  background: rgba(248, 244, 236, 0.74);
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.resultRow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgba(41, 34, 24, 0.12);
+  border-color: rgba(141, 98, 58, 0.28);
+}
+
+.resultRowActive {
+  border-color: rgba(141, 98, 58, 0.32);
+  background: rgba(255, 250, 242, 0.98);
+}
+
+.resultThumb {
+  width: 132px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 14px;
+  background: rgba(141, 98, 58, 0.08);
+}
+
+.resultRowContent {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.resultRowTop,
+.storeProgressItem,
+.issueListHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.resultRowTitle {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.18;
+}
+
+.resultRowCopy,
+.mutedInline,
+.storeProgressItem p,
+.timelineItem p,
+.issueListItem p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.detailPreviewWrap {
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+}
+
+.detailPreview {
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  background: rgba(141, 98, 58, 0.08);
+}
+
+.detailCardSection {
+  display: grid;
+  gap: 14px;
+}
+
+.detailFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.factItem {
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+}
+
+.factItem strong {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.detailNav {
+  justify-content: space-between;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.modalBackdrop,
+.modalCloseArea {
+  position: absolute;
+  inset: 0;
+}
+
+.modalBackdrop {
+  background: rgba(22, 18, 14, 0.48);
+  backdrop-filter: blur(8px);
+}
+
+.modalCloseArea {
+  z-index: 0;
+}
+
+.modalCard {
+  position: relative;
+  z-index: 1;
+  width: min(1040px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  box-shadow: 0 28px 72px rgba(22, 18, 14, 0.24);
+}
+
+.modalHeader,
+.modalHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modalHeader {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.modalHeaderActions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.disabledNavButton {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.56;
+  cursor: not-allowed;
+}
+
+.issueListItem,
+.timelineItem {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.issueListItem p,
+.timelineItem p,
+.storeProgressItem p {
+  margin-top: 8px;
+}
+
+.reviewForm {
+  display: grid;
+  gap: 14px;
+}
+
+.reviewActions,
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.statsRowCompact {
+  gap: 8px;
+  margin-top: 0;
+}
+
+.auxiliaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.storeProgressItem {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.storeProgressItem:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.storeProgressItem:first-child {
+  padding-top: 0;
+}
+
+.storeProgressSide {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.timelineItem {
+  display: grid;
+  gap: 10px;
+}
+
+.timelineHead {
+  justify-content: space-between;
+}
+
+.timelineNote {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(141, 98, 58, 0.08);
+  line-height: 1.7;
+}
+
+@media (max-width: 1180px) {
+  .heroGrid,
+  .auxiliaryGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .heroContent {
+    padding-right: 0;
+  }
+
+  .filterForm {
+    flex-wrap: wrap;
+  }
+
+  .filterFieldsRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+}
+
+@media (max-width: 860px) {
+  .panelHead,
+  .detailNav,
+  .resultRowTop,
+  .storeProgressItem,
+  .reviewActions,
+  .modalHeader,
+  .workbenchHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .detailFacts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resultRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resultThumb {
+    width: 100%;
+    height: 180px;
+  }
+
+  .modalOverlay {
+    padding: 16px;
+  }
+
+  .modalCard {
+    width: min(100%, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+  }
+
+  .filterFieldsRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .heroStatGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .heroStatGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

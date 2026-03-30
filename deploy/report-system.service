@@ -1,0 +1,16 @@
+[Unit]
+Description=Report System
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/report-system
+EnvironmentFile=/etc/report-system/report-system.env
+ExecStart=/usr/bin/env npm run start
+Restart=always
+RestartSec=5
+User=report
+Group=report
+
+[Install]
+WantedBy=multi-user.target
