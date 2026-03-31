@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { buildRequestContext, getSessionUserFromRequest, hasPermission } from "@/backend/auth/session";
-import { createReportReviewService } from "@/backend/report/report.module";
-import type { ResultReviewState } from "@/backend/report/report.types";
+import { createReportService, createReportReviewService } from "@/backend/report/report.module";
+import { RectificationSplitError } from "@/backend/rectification/rectification.service";
+import { createRectificationService } from "@/backend/rectification/rectification.module";
+import type { ResultReviewState, ReviewSelectedIssue } from "@/backend/report/report.types";
 
 const reviewService = createReportReviewService();
+const reportService = createReportService();
+const rectificationService = createRectificationService();
 
 async function readPayload(request: Request): Promise<Record<string, string>> {
   const contentType = request.headers.get("content-type") || "";
@@ -16,6 +20,41 @@ async function readPayload(request: Request): Promise<Record<string, string>> {
   }
   const formData = await request.formData().catch(() => new FormData());
   return Object.fromEntries(Array.from(formData.entries()).map(([key, value]) => [key, String(value)]));
+}
+
+function parseSelectedIssues(raw: string): ReviewSelectedIssue[] {
+  if (!raw.trim()) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+          return null;
+        }
+        const id = Number((item as { id?: unknown }).id);
+        const title = String((item as { title?: unknown }).title || "").trim();
+        if (!Number.isInteger(id) || id <= 0 || !title) {
+          return null;
+        }
+        return { id, title };
+      })
+      .filter((item): item is ReviewSelectedIssue => Boolean(item));
+  } catch {
+    return [];
+  }
+}
+
+function readMetadataString(metadata: unknown, key: string): string {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return "";
+  }
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : "";
 }
 
 export async function POST(
@@ -43,6 +82,67 @@ export async function POST(
   }
   const operatorName = currentUser?.displayName || String(payload.operator_name || "report-system").trim() || "report-system";
   const note = String(payload.note || "").trim();
+  const selectedIssues = parseSelectedIssues(String(payload.selected_issues_json || ""));
+  const shouldCorrected = String(payload.should_corrected || "").trim();
+  const requestContext = buildRequestContext(currentUser);
+
+  let createdRectificationOrders: Array<{ id: number; huiyunying_order_id: string | null; status: string }> = [];
+
+  if (normalizedReviewStatus === "completed") {
+    if (!shouldCorrected) {
+      return Response.json({ success: false, error: "整改截止日期不能为空。" }, { status: 400 });
+    }
+    if (selectedIssues.length === 0) {
+      return Response.json({ success: false, error: "请至少勾选一个问题后再提交复核。" }, { status: 400 });
+    }
+
+    const report = reportService.getReportDetail(reportId, requestContext);
+    const resultDetail = report?.results.find((result) => result.id === imageId) ?? null;
+    if (!report || !resultDetail) {
+      return Response.json({ success: false, error: "Review target not found." }, { status: 404 });
+    }
+
+    const store = report.stores.find((item) => item.store_id === resultDetail.store_id) ?? null;
+    const storeCode =
+      readMetadataString(resultDetail.metadata, "store_code") ||
+      readMetadataString(store?.metadata, "store_code") ||
+      "";
+    const imageUrl = readMetadataString(resultDetail.metadata, "display_url") || resultDetail.url;
+
+    try {
+      createdRectificationOrders = (
+        await rectificationService.createOrdersForReview({
+          reportId,
+          resultId: imageId,
+          storeId: resultDetail.store_id,
+          storeCode,
+          storeName: resultDetail.store_name,
+          imageUrls: imageUrl ? [imageUrl] : [],
+          selectedIssues,
+          shouldCorrected,
+          note,
+          createdBy: operatorName,
+          context: requestContext
+        })
+      ).map((order) => ({
+        id: order.id,
+        huiyunying_order_id: order.huiyunying_order_id,
+        status: order.status
+      }));
+    } catch (error) {
+      if (error instanceof RectificationSplitError) {
+        return Response.json({ success: false, error: error.message }, { status: 400 });
+      }
+      return Response.json(
+        {
+          success: false,
+          error: "创建慧运营整改单失败。",
+          detail: error instanceof Error ? error.message : "Unknown error"
+        },
+        { status: 502 }
+      );
+    }
+  }
 
   const result = reviewService.updateImageReviewStatus(
     reportId,
@@ -50,7 +150,8 @@ export async function POST(
     normalizedReviewStatus,
     operatorName,
     note,
-    buildRequestContext(currentUser)
+    requestContext,
+    selectedIssues
   );
   if (!result) {
     return Response.json({ success: false, error: "Review target not found." }, { status: 404 });
@@ -61,6 +162,14 @@ export async function POST(
     returnTo && returnTo.startsWith("/") ? returnTo : `/reports/${reportId}#image-${imageId}`,
     request.url
   );
+
+  if (result.recent_log?.id && createdRectificationOrders.length > 0) {
+    rectificationService.attachReviewLog(
+      createdRectificationOrders.map((order) => order.id),
+      result.recent_log.id
+    );
+  }
+
   const isJsonRequest = (request.headers.get("content-type") || "").includes("application/json");
   if (!isJsonRequest) {
     return NextResponse.redirect(redirectUrl, 303);
@@ -76,6 +185,9 @@ export async function POST(
     progress_state: result.progress_state,
     completed_result_count: result.completed_result_count,
     total_result_count: result.total_result_count,
+    should_corrected: shouldCorrected || null,
+    selected_issues: selectedIssues,
+    rectification_orders: createdRectificationOrders,
     recent_log: result.recent_log,
     updated_at: result.updated_at
   });

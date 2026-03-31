@@ -5,6 +5,9 @@ import styles from "./admin-users-page.module.css";
 import { requirePermission } from "@/backend/auth/session";
 import { createAuthService } from "@/backend/auth/auth.module";
 import { roleCodes } from "@/backend/auth/auth.types";
+import { createMasterDataService } from "@/backend/master-data/master-data.module";
+import type { MasterDataEnterpriseSummary } from "@/backend/master-data/master-data.types";
+import type { MasterDataOrganization } from "@/backend/master-data/master-data.types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,16 +19,94 @@ import { DashboardHeader } from "@/ui/dashboard-header";
 export const dynamic = "force-dynamic";
 
 const authService = createAuthService();
+const masterDataService = createMasterDataService();
+
+interface ScopeOption {
+  value: string;
+  label: string;
+  meta?: string;
+}
 
 function statusBadgeClass(status: string): string {
   return status === "active" ? styles.activeBadge : styles.disabledBadge;
 }
 
-function parseCommaValues(value: string): string[] {
-  return String(value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+function flattenOrganizations(rows: MasterDataOrganization[], depth = 0): Array<MasterDataOrganization & { depth: number }> {
+  return rows.flatMap((row) => [
+    { ...row, depth },
+    ...flattenOrganizations(row.child || [], depth + 1)
+  ]);
+}
+
+function sortOrganizationTree(nodes: MasterDataOrganization[]): MasterDataOrganization[] {
+  return [...nodes]
+    .sort((left, right) => {
+      const countDiff = right.current_store_count - left.current_store_count;
+      if (countDiff !== 0) {
+        return countDiff;
+      }
+      return left.organize_name.localeCompare(right.organize_name, "zh-CN");
+    })
+    .map((node) => ({
+      ...node,
+      child: sortOrganizationTree(node.child)
+    }));
+}
+
+function enterpriseOptionsFromContext(
+  currentUser: Awaited<ReturnType<typeof requirePermission>>,
+  enterprises: MasterDataEnterpriseSummary[]
+): ScopeOption[] {
+  if (enterprises.length > 0) {
+    return enterprises.map((enterprise) => ({
+      value: enterprise.enterprise_id,
+      label: enterprise.enterprise_name || enterprise.enterprise_id,
+      meta: `${enterprise.organize_count} 个组织 · ${enterprise.store_count} 家门店`
+    }));
+  }
+
+  return currentUser.enterpriseScopeIds.map((enterpriseId) => ({
+    value: enterpriseId,
+    label: enterpriseId
+  }));
+}
+
+function renderScopePicker(
+  title: string,
+  fieldName: string,
+  options: ScopeOption[],
+  selectedValues: string[],
+  emptyCopy: string
+) {
+  return (
+    <section className={styles.scopeField}>
+      <div className={styles.scopeFieldHeader}>
+        <h4 className={styles.scopeFieldTitle}>{title}</h4>
+        <p className={styles.scopeFieldCopy}>勾选授权范围；不勾选表示全部可见。</p>
+      </div>
+      {options.length > 0 ? (
+        <div className={styles.scopePicker}>
+          {options.map((option) => (
+            <label className={styles.scopeOption} key={`${fieldName}-${option.value}`}>
+              <input
+                className={styles.scopeCheckbox}
+                defaultChecked={selectedValues.includes(option.value)}
+                name={fieldName}
+                type="checkbox"
+                value={option.value}
+              />
+              <span className={styles.scopeOptionBody}>
+                <span className={styles.scopeOptionLabel}>{option.label}</span>
+                {option.meta ? <span className={styles.scopeOptionMeta}>{option.meta}</span> : null}
+              </span>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <div className={styles.scopeEmpty}>{emptyCopy}</div>
+      )}
+    </section>
+  );
 }
 
 export default async function AdminUsersPage({
@@ -41,6 +122,15 @@ export default async function AdminUsersPage({
   const editingUser = Number.isInteger(editingUserId) ? users.find((user) => user.id === editingUserId) ?? null : null;
   const isCreateDialogOpen = dialog === "create";
   const isEditDialogOpen = dialog === "edit" && !!editingUser;
+  const enterprises = masterDataService.listEnterprises(currentUser);
+  const enterpriseOptions = enterpriseOptionsFromContext(currentUser, enterprises);
+  const organizationOptions = enterpriseOptions.flatMap((enterprise) =>
+    flattenOrganizations(masterDataService.listOrganizations(enterprise.value, currentUser)).map((organization) => ({
+      value: organization.organize_code,
+      label: `${"  ".repeat(organization.depth)}${organization.organize_name}`,
+      meta: `${enterprise.label} · ${organization.current_store_count} 家门店`
+    }))
+  );
 
   return (
     <main className="page-shell">
@@ -75,7 +165,6 @@ export default async function AdminUsersPage({
                       <th>权限</th>
                       <th>企业范围</th>
                       <th>组织范围</th>
-                      <th>门店范围</th>
                       <th>状态</th>
                       <th>更新时间</th>
                       <th>操作</th>
@@ -117,11 +206,6 @@ export default async function AdminUsersPage({
                             title={user.organizationScopeIds.join(", ") || "全部组织"}
                           >
                             {user.organizationScopeIds.join(", ") || "全部组织"}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={styles.scopeText} title={user.storeScopeIds.join(", ") || "全部门店"}>
-                            {user.storeScopeIds.join(", ") || "全部门店"}
                           </span>
                         </td>
                         <td>
@@ -186,18 +270,10 @@ export default async function AdminUsersPage({
                       ))}
                     </NativeSelect>
                   </div>
-                  <div className="field">
-                    <label htmlFor="enterpriseScopeIds">企业范围</label>
-                    <Input id="enterpriseScopeIds" name="enterpriseScopeIds" placeholder="多个 enterprise_id 用英文逗号分隔" />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="organizationScopeIds">组织范围</label>
-                    <Input id="organizationScopeIds" name="organizationScopeIds" placeholder="多个 organize_code 用英文逗号分隔" />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="storeScopeIds">门店范围</label>
-                    <Input id="storeScopeIds" name="storeScopeIds" placeholder="多个 store_id 用英文逗号分隔" />
-                  </div>
+                </div>
+                <div className={styles.scopeGrid}>
+                  {renderScopePicker("企业范围", "enterpriseScopeIds", enterpriseOptions, [], "当前没有可选择的企业范围。")}
+                  {renderScopePicker("组织范围", "organizationScopeIds", organizationOptions, [], "当前没有可选择的组织范围。")}
                 </div>
                 <div className={styles.formActions}>
                   <Button asChild size="sm" variant="secondary">
@@ -219,106 +295,115 @@ export default async function AdminUsersPage({
           <Link aria-label="关闭编辑用户弹窗" className={styles.modalCloseArea} href="/admin/users" />
           <Card className={styles.modalCard}>
             <CardHeader className={styles.modalHeader}>
-              <div>
-                <CardTitle className={styles.modalTitle}>编辑用户</CardTitle>
-                <CardDescription className={styles.modalCopy}>
-                  {editingUser.username} / {editingUser.displayName}
-                </CardDescription>
+              <div className={styles.userHeaderBlock}>
+                <div>
+                  <CardTitle className={styles.modalTitle}>编辑用户</CardTitle>
+                  <CardDescription className={styles.modalCopy}>
+                    统一维护角色、组织授权和账号状态。
+                  </CardDescription>
+                </div>
+                <div className={styles.userIdentityCard}>
+                  <div>
+                    <div className={styles.userIdentityTitle}>{editingUser.displayName}</div>
+                    <div className={styles.userIdentityMeta}>账号：{editingUser.username}</div>
+                  </div>
+                  <Badge className={cn(styles.statusBadge, statusBadgeClass(editingUser.status))} variant="secondary">
+                    {editingUser.status}
+                  </Badge>
+                </div>
               </div>
               <Button asChild size="sm" variant="secondary">
                 <Link href="/admin/users">关闭</Link>
               </Button>
             </CardHeader>
             <CardContent className={styles.modalBody}>
-              <div className={styles.editSections}>
-                <section className={styles.editSection}>
-                  <h3 className={styles.editSectionTitle}>角色与范围</h3>
-                  <form action={`/admin/users/${editingUser.id}/role`} className={styles.singleActionForm} method="post">
-                    <div className="field">
-                      <label htmlFor={`roleCode-${editingUser.id}`}>角色</label>
-                      <NativeSelect defaultValue={editingUser.roles[0] || "viewer"} id={`roleCode-${editingUser.id}`} name="roleCode">
-                        {roleCodes.map((roleCode) => (
-                          <option key={roleCode} value={roleCode}>
-                            {roleCode}
-                          </option>
-                        ))}
-                      </NativeSelect>
+              <div className={styles.editLayout}>
+                <div className={styles.sideRail}>
+                  <section className={styles.editCard}>
+                    <div className={styles.editCardHeader}>
+                      <h3 className={styles.editSectionTitle}>角色</h3>
+                      <p className={styles.editSectionCopy}>一个用户当前只保留一个主角色。</p>
                     </div>
-                    <div className={styles.inlineActions}>
-                      <Button size="sm" type="submit" variant="secondary">
-                        更新角色
-                      </Button>
-                    </div>
-                  </form>
-
-                  <form action={`/admin/users/${editingUser.id}/scopes`} className={styles.userForm} method="post">
-                    <div className={styles.formGrid}>
+                    <form action={`/admin/users/${editingUser.id}/role`} className={styles.cardForm} method="post">
                       <div className="field">
-                        <label htmlFor={`enterpriseScopeIds-${editingUser.id}`}>企业范围</label>
+                        <label htmlFor={`roleCode-${editingUser.id}`}>角色类型</label>
+                        <NativeSelect defaultValue={editingUser.roles[0] || "viewer"} id={`roleCode-${editingUser.id}`} name="roleCode">
+                          {roleCodes.map((roleCode) => (
+                            <option key={roleCode} value={roleCode}>
+                              {roleCode}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      </div>
+                      <div className={styles.cardActions}>
+                        <Button size="sm" type="submit">更新角色</Button>
+                      </div>
+                    </form>
+                  </section>
+
+                  <section className={styles.editCard}>
+                    <div className={styles.editCardHeader}>
+                      <h3 className={styles.editSectionTitle}>账号操作</h3>
+                      <p className={styles.editSectionCopy}>重置密码和启停账号放在同一个控制区。</p>
+                    </div>
+                    <form action={`/admin/users/${editingUser.id}/password`} className={styles.cardForm} method="post">
+                      <div className="field">
+                        <label htmlFor={`password-${editingUser.id}`}>新密码</label>
                         <Input
-                          defaultValue={editingUser.enterpriseScopeIds.join(",")}
-                          id={`enterpriseScopeIds-${editingUser.id}`}
-                          name="enterpriseScopeIds"
-                          placeholder="enterprise_id,enterprise_id"
+                          id={`password-${editingUser.id}`}
+                          minLength={8}
+                          name="password"
+                          placeholder="新密码，至少 8 位"
+                          required
+                          type="password"
                         />
                       </div>
-                      <div className="field">
-                        <label htmlFor={`organizationScopeIds-${editingUser.id}`}>组织范围</label>
-                        <Input
-                          defaultValue={editingUser.organizationScopeIds.join(",")}
-                          id={`organizationScopeIds-${editingUser.id}`}
-                          name="organizationScopeIds"
-                          placeholder="organize_code,organize_code"
-                        />
+                      <div className={styles.cardActions}>
+                        <Button size="sm" type="submit" variant="secondary">
+                          重置密码
+                        </Button>
                       </div>
-                      <div className="field">
-                        <label htmlFor={`storeScopeIds-${editingUser.id}`}>门店范围</label>
-                        <Input
-                          defaultValue={editingUser.storeScopeIds.join(",")}
-                          id={`storeScopeIds-${editingUser.id}`}
-                          name="storeScopeIds"
-                          placeholder="store_id,store_id"
-                        />
+                    </form>
+
+                    <form action={`/admin/users/${editingUser.id}/status`} className={styles.statusPanel} method="post">
+                      <input name="status" type="hidden" value={editingUser.status === "active" ? "disabled" : "active"} />
+                      <div className={styles.statusMeta}>
+                        <span className={styles.statusLabel}>当前状态</span>
+                        <Badge className={cn(styles.statusBadge, statusBadgeClass(editingUser.status))} variant="secondary">
+                          {editingUser.status}
+                        </Badge>
                       </div>
-                    </div>
-                    <div className={styles.inlineActions}>
-                      <Button size="sm" type="submit" variant="secondary">
-                        更新范围
-                      </Button>
-                    </div>
-                  </form>
-                </section>
-
-                <section className={styles.editSection}>
-                  <h3 className={styles.editSectionTitle}>账号操作</h3>
-                  <form action={`/admin/users/${editingUser.id}/password`} className={styles.singleActionForm} method="post">
-                    <div className="field">
-                      <label htmlFor={`password-${editingUser.id}`}>新密码</label>
-                      <Input
-                        id={`password-${editingUser.id}`}
-                        minLength={8}
-                        name="password"
-                        placeholder="新密码，至少 8 位"
-                        required
-                        type="password"
-                      />
-                    </div>
-                    <div className={styles.inlineActions}>
-                      <Button size="sm" type="submit" variant="secondary">
-                        重置密码
-                      </Button>
-                    </div>
-                  </form>
-
-                  <form action={`/admin/users/${editingUser.id}/status`} className={styles.singleActionForm} method="post">
-                    <input name="status" type="hidden" value={editingUser.status === "active" ? "disabled" : "active"} />
-                    <div className={styles.statusRow}>
-                      <Badge className={cn(styles.statusBadge, statusBadgeClass(editingUser.status))} variant="secondary">
-                        {editingUser.status}
-                      </Badge>
                       <Button size="sm" type="submit" variant="secondary">
                         {editingUser.status === "active" ? "禁用账号" : "启用账号"}
                       </Button>
+                    </form>
+                  </section>
+                </div>
+
+                <section className={`${styles.editCard} ${styles.scopeCard}`}>
+                  <div className={styles.editCardHeader}>
+                    <h3 className={styles.editSectionTitle}>范围授权</h3>
+                    <p className={styles.editSectionCopy}>只配置企业和组织范围。组织授权会自动展开到该组织下的门店。</p>
+                  </div>
+                  <form action={`/admin/users/${editingUser.id}/scopes`} className={styles.cardForm} method="post">
+                    <div className={styles.scopeGrid}>
+                      {renderScopePicker(
+                        "企业范围",
+                        "enterpriseScopeIds",
+                        enterpriseOptions,
+                        editingUser.enterpriseScopeIds,
+                        "当前没有可选择的企业范围。"
+                      )}
+                      {renderScopePicker(
+                        "组织范围",
+                        "organizationScopeIds",
+                        organizationOptions,
+                        editingUser.organizationScopeIds,
+                        "当前没有可选择的组织范围。"
+                      )}
+                    </div>
+                    <div className={styles.cardActions}>
+                      <Button size="sm" type="submit">更新范围</Button>
                     </div>
                   </form>
                 </section>

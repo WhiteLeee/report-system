@@ -179,13 +179,42 @@ npm run tenant:init -- \
 3. 初始化 SQLite 所需目录
 4. 自动执行 `npm run db:migrate`
 
-### 6.4 开发模式
+### 6.4 本地快速重置
+
+如果你在开发/测试过程中，需要“保留当前租户配置，但把 `.env.local`、`config/tenant.json` 和数据库一起重建”，直接执行：
+
+```bash
+npm run reinit:local
+```
+
+该命令会：
+
+1. 读取当前项目已有租户配置作为默认值
+2. 重写 `.env.local`
+3. 重写 `config/tenant.json`
+4. 删除并重建本地数据库
+5. 自动执行 `npm run db:migrate`
+6. 自动执行 `npm run auth:seed`
+
+如果需要临时覆盖某些参数，也可以追加：
+
+```bash
+npm run reinit:local -- --tenant-id dlb --tenant-name 德伦堡
+```
+
+如果只想先预览会执行什么：
+
+```bash
+npm run reinit:local -- --dry-run
+```
+
+### 6.5 开发模式
 
 ```bash
 npm run dev
 ```
 
-### 6.5 生产模式
+### 6.6 生产模式
 
 ```bash
 npm run build
@@ -196,7 +225,7 @@ npm run start
 - [http://localhost:3000](http://localhost:3000)
 - 报告列表页：[http://localhost:3000/reports](http://localhost:3000/reports)
 
-### 6.5 生产部署示例命令
+### 6.7 生产部署示例命令
 
 适用于单机 Linux 服务部署，`report-system` 作为客户侧在线报告系统运行：
 
@@ -221,7 +250,7 @@ PORT=3000 npm run start
 - [.env.example](/Users/wick/Desktop/ZhiQing%20Selection/SourceCode/report-system/.env.example)
 - [config/tenant.example.json](/Users/wick/Desktop/ZhiQing%20Selection/SourceCode/report-system/config/tenant.example.json)
 
-### 6.6 复检联调测试
+### 6.8 复检联调测试
 
 ```bash
 npm test
@@ -245,6 +274,7 @@ npm run db:generate
 npm run db:migrate
 npm run db:studio
 npm run db:reset:local
+npm run reinit:local
 npm test
 ```
 
@@ -253,6 +283,7 @@ npm test
 - `db:migrate`：执行 migration
 - `db:studio`：打开 Drizzle Studio
 - `db:reset:local`：重建本地 SQLite 数据库
+- `reinit:local`：重建当前租户配置与本地数据库，适合测试阶段快速回到初始状态
 
 ## 7.1 `payload_version` 运行时兼容策略
 

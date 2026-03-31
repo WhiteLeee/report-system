@@ -5,8 +5,17 @@ import { getSessionUserFromRequest, hasPermission } from "@/backend/auth/session
 
 const authService = createAuthService();
 
-function readScopeList(value: FormDataEntryValue | null): string[] {
-  return String(value || "")
+function readScopeList(formData: FormData, fieldName: string): string[] {
+  const values = formData
+    .getAll(fieldName)
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+
+  if (values.length > 0) {
+    return values;
+  }
+
+  return String(formData.get(fieldName) || "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
@@ -30,9 +39,9 @@ export async function POST(
   const formData = await request.formData().catch(() => new FormData());
   authService.replaceUserScopes(
     numericUserId,
-    readScopeList(formData.get("enterpriseScopeIds")),
-    readScopeList(formData.get("organizationScopeIds")),
-    readScopeList(formData.get("storeScopeIds"))
+    readScopeList(formData, "enterpriseScopeIds"),
+    readScopeList(formData, "organizationScopeIds"),
+    readScopeList(formData, "storeScopeIds")
   );
 
   return NextResponse.redirect(new URL("/admin/users", request.url), 303);

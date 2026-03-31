@@ -10,8 +10,17 @@ function roleCodeFromForm(value: string): RoleCode {
   return value === "admin" || value === "reviewer" ? value : "viewer";
 }
 
-function readScopeList(value: FormDataEntryValue | null): string[] {
-  return String(value || "")
+function readScopeList(formData: FormData, fieldName: string): string[] {
+  const values = formData
+    .getAll(fieldName)
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+
+  if (values.length > 0) {
+    return values;
+  }
+
+  return String(formData.get(fieldName) || "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
@@ -30,9 +39,9 @@ export async function POST(request: Request): Promise<Response> {
       displayName: String(formData.get("displayName") || "").trim(),
       password: String(formData.get("password") || "").trim(),
       roleCode: roleCodeFromForm(String(formData.get("roleCode") || "viewer").trim()),
-      enterpriseScopeIds: readScopeList(formData.get("enterpriseScopeIds")),
-      organizationScopeIds: readScopeList(formData.get("organizationScopeIds")),
-      storeScopeIds: readScopeList(formData.get("storeScopeIds"))
+      enterpriseScopeIds: readScopeList(formData, "enterpriseScopeIds"),
+      organizationScopeIds: readScopeList(formData, "organizationScopeIds"),
+      storeScopeIds: readScopeList(formData, "storeScopeIds")
     });
   } catch (error) {
     return Response.json(

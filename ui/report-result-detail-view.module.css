@@ -29,7 +29,9 @@
 .alertHead,
 .timelineHead,
 .reviewActions,
-.imageModalHeader {
+.imageModalHeader,
+.selectionToolbar,
+.issueChecklistLabel {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -188,6 +190,11 @@
   padding-top: 8px;
 }
 
+.reviewIssueSelector {
+  display: grid;
+  gap: 14px;
+}
+
 .alertPanel {
   padding: 16px 18px;
   border-radius: 16px;
@@ -198,6 +205,70 @@
 .alertHead {
   color: #dc2626;
   font-weight: 800;
+}
+
+.selectionSummary {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(220, 38, 38, 0.14);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(127, 29, 29, 0.9);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.selectionToolbar {
+  flex-wrap: wrap;
+}
+
+.selectionAction {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.selectionAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.issueChecklist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.issueChecklistItem {
+  margin: 0;
+}
+
+.issueChecklistLabel {
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.issueCheckbox {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: #ef4444;
+  cursor: pointer;
+}
+
+.issueChecklistText {
+  flex: 1;
+  min-width: 0;
 }
 
 .issueSummaryList,
@@ -321,6 +392,173 @@
   flex-wrap: wrap;
 }
 
+.reviewError {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(239, 68, 68, 0.16);
+  background: rgba(254, 242, 242, 0.92);
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.reviewModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+}
+
+.reviewModalBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(22, 18, 14, 0.52);
+  backdrop-filter: blur(8px);
+}
+
+.reviewModalCard {
+  position: relative;
+  z-index: 1;
+  width: min(1120px, calc(100vw - 56px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 24px 26px;
+  border-radius: 24px;
+  background: rgba(255, 252, 246, 0.98);
+  box-shadow: 0 28px 72px rgba(22, 18, 14, 0.24);
+  display: grid;
+  gap: 18px;
+}
+
+.processingOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.processingBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(22, 18, 14, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.processingCard {
+  position: relative;
+  z-index: 1;
+  min-width: min(420px, calc(100vw - 48px));
+  max-width: 480px;
+  padding: 24px 28px;
+  border-radius: 22px;
+  background: rgba(255, 252, 246, 0.98);
+  box-shadow: 0 24px 64px rgba(22, 18, 14, 0.24);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.processingContent {
+  display: grid;
+  gap: 6px;
+}
+
+.processingSpinner {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 999px;
+  border: 3px solid rgba(141, 98, 58, 0.16);
+  border-top-color: #9a622e;
+  animation: processingSpin 0.9s linear infinite;
+}
+
+@keyframes processingSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.reviewModalHeader,
+.previewOrderHead,
+.reviewModalActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reviewModalBody {
+  display: grid;
+  gap: 14px;
+}
+
+.reviewModalLayout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.reviewModalImagePanel {
+  position: sticky;
+  top: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.reviewModalImageFrame {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.reviewModalImage {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: rgba(141, 98, 58, 0.08);
+}
+
+.previewOrderCard {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.previewMeta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.previewDescription {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(44, 37, 28, 0.96);
+  color: rgba(255, 250, 242, 0.96);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
 .imageModalOverlay {
   position: fixed;
   inset: 0;
@@ -398,9 +636,20 @@
   .overviewIdentity,
   .timelineHead,
   .reviewActions,
-  .imageModalHeader {
+  .imageModalHeader,
+  .reviewModalHeader,
+  .previewOrderHead,
+  .reviewModalActions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .reviewModalLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reviewModalImagePanel {
+    position: static;
   }
 
   .overviewIcon {
@@ -419,7 +668,8 @@
     padding: 16px;
   }
 
-  .imageModalCard {
+  .imageModalCard,
+  .reviewModalCard {
     width: min(100%, calc(100vw - 32px));
     max-height: calc(100vh - 32px);
   }

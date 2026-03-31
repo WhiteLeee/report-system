@@ -168,6 +168,41 @@ export const reportReviewLogTable = sqliteTable(
   })
 );
 
+export const reportRectificationOrderTable = sqliteTable(
+  "report_rectification_order",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    reportId: integer("report_id").notNull().references(() => reportTable.id, { onDelete: "cascade" }),
+    resultId: integer("result_id").notNull().references(() => reportImageTable.id, { onDelete: "cascade" }),
+    sourceReviewLogId: integer("source_review_log_id").references(() => reportReviewLogTable.id, {
+      onDelete: "set null"
+    }),
+    storeId: text("store_id"),
+    storeCode: text("store_code"),
+    storeName: text("store_name"),
+    huiYunYingOrderId: text("huiyunying_order_id"),
+    requestDescription: text("request_description").notNull().default(""),
+    selectedIssuesJson: text("selected_issues_json").notNull().default("[]"),
+    imageUrlsJson: text("image_urls_json").notNull().default("[]"),
+    requestPayloadJson: text("request_payload_json").notNull().default("{}"),
+    responsePayloadJson: text("response_payload_json").notNull().default("{}"),
+    status: text("status").notNull().default("created"),
+    ifCorrected: text("if_corrected"),
+    shouldCorrected: text("should_corrected"),
+    realCorrectedTime: text("real_corrected_time"),
+    lastSyncedAt: text("last_synced_at"),
+    createdBy: text("created_by").notNull().default(""),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    resultIdx: index("idx_report_rectification_order_result").on(table.resultId, table.createdAt),
+    reportIdx: index("idx_report_rectification_order_report").on(table.reportId, table.createdAt),
+    orderIdx: index("idx_report_rectification_order_hyy").on(table.huiYunYingOrderId, table.updatedAt),
+    statusIdx: index("idx_report_rectification_order_status").on(table.status, table.updatedAt)
+  })
+);
+
 export const reportSourceSnapshotTable = sqliteTable(
   "report_source_snapshot",
   {
@@ -265,6 +300,22 @@ export const masterDataSyncLogTable = sqliteTable(
     idempotencyUnique: uniqueIndex("master_data_sync_log_idempotency_unique").on(table.idempotencyKey),
     enterpriseIdx: index("idx_master_data_sync_log_enterprise").on(table.enterpriseId, table.createdAt),
     statusIdx: index("idx_master_data_sync_log_status").on(table.status, table.createdAt)
+  })
+);
+
+export const systemSettingTable = sqliteTable(
+  "system_setting",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    settingKey: text("setting_key").notNull(),
+    category: text("category").notNull().default("general"),
+    valueJson: text("value_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    settingKeyUnique: uniqueIndex("system_setting_key_unique").on(table.settingKey),
+    categoryIdx: index("idx_system_setting_category").on(table.category, table.settingKey)
   })
 );
 

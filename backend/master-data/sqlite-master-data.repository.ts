@@ -48,7 +48,32 @@ function applyOrganizationScope<T extends { organize_code: string }>(rows: T[], 
   if (organizationScopeIds.length === 0) {
     return rows;
   }
-  return rows.filter((row) => organizationScopeIds.includes(row.organize_code));
+  const parentMap = new Map<string, string>();
+  const childrenMap = new Map<string, string[]>();
+  rows.forEach((row) => {
+    const parentCode =
+      "parent_code" in row && typeof row.parent_code === "string"
+        ? row.parent_code
+        : "";
+    parentMap.set(row.organize_code, parentCode);
+    if (!childrenMap.has(parentCode)) {
+      childrenMap.set(parentCode, []);
+    }
+    childrenMap.get(parentCode)?.push(row.organize_code);
+  });
+
+  const allowedCodes = new Set<string>();
+  const queue = [...organizationScopeIds];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || allowedCodes.has(current)) {
+      continue;
+    }
+    allowedCodes.add(current);
+    (childrenMap.get(current) || []).forEach((childCode) => queue.push(childCode));
+  }
+
+  return rows.filter((row) => allowedCodes.has(row.organize_code));
 }
 
 function applyStoreScope<T extends { store_id: string }>(rows: T[], context: RequestContext): T[] {
@@ -57,6 +82,44 @@ function applyStoreScope<T extends { store_id: string }>(rows: T[], context: Req
     return rows;
   }
   return rows.filter((row) => storeScopeIds.includes(row.store_id));
+}
+
+function resolveOrganizationScopeCodes(enterpriseId: string, context: RequestContext): Set<string> | null {
+  const organizationScopeIds = normalizeScopeIds(context.organizationScopeIds);
+  if (organizationScopeIds.length === 0) {
+    return null;
+  }
+
+  const rows = db
+    .select({
+      organizeCode: organizationMasterTable.organizeCode,
+      parentCode: organizationMasterTable.parentCode
+    })
+    .from(organizationMasterTable)
+    .where(and(eq(organizationMasterTable.enterpriseId, enterpriseId), eq(organizationMasterTable.isActive, 1)))
+    .all();
+
+  const childrenMap = new Map<string, string[]>();
+  rows.forEach((row) => {
+    const parentCode = String(row.parentCode || "").trim();
+    if (!childrenMap.has(parentCode)) {
+      childrenMap.set(parentCode, []);
+    }
+    childrenMap.get(parentCode)?.push(row.organizeCode);
+  });
+
+  const allowedCodes = new Set<string>();
+  const queue = [...organizationScopeIds];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || allowedCodes.has(current)) {
+      continue;
+    }
+    allowedCodes.add(current);
+    (childrenMap.get(current) || []).forEach((childCode) => queue.push(childCode));
+  }
+
+  return allowedCodes;
 }
 
 function toOrganizationTree(rows: Array<typeof organizationMasterTable.$inferSelect>): MasterDataOrganization[] {
@@ -362,7 +425,10 @@ export class SqliteMasterDataRepository implements MasterDataRepository {
         }
       );
 
-    rows = applyOrganizationScope(rows, context);
+    const allowedOrganizationCodes = resolveOrganizationScopeCodes(filters.enterpriseId, context);
+    if (allowedOrganizationCodes) {
+      rows = rows.filter((row) => allowedOrganizationCodes.has(row.organize_code));
+    }
     rows = applyStoreScope(rows, context);
     if (filters.keyword) {
       const keyword = filters.keyword.toLowerCase();

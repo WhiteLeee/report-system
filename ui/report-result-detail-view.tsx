@@ -7,11 +7,11 @@ import styles from "./report-result-detail-view.module.css";
 
 import type { SessionUser } from "@/backend/auth/auth.types";
 import type { ReportDetail, ReportInspection, ReportIssue } from "@/backend/report/report.types";
+import type { RectificationOrderRecord } from "@/backend/rectification/rectification.types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Textarea } from "@/components/ui/textarea";
 import {
   buildScopeStoreIds,
   buildSearch,
@@ -24,6 +24,7 @@ import {
 import { DashboardHeader } from "@/ui/dashboard-header";
 import { ReviewStatusBadge } from "@/ui/review-status-badge";
 import { formatDisplayDate, formatResultReviewState } from "@/ui/report-view";
+import { ResultReviewWorkflow } from "@/ui/result-review-workflow";
 
 function formatCompactDate(value: string | null | undefined): string {
   const normalized = String(value || "").trim();
@@ -235,12 +236,48 @@ function renderMarkdownBlocks(content: string): ReactNode[] {
   return blocks;
 }
 
+function formatRectificationState(order: RectificationOrderRecord): string {
+  if (order.if_corrected === "1") {
+    return "已整改";
+  }
+  if (order.if_corrected === "2") {
+    return "待审核";
+  }
+  if (order.if_corrected === "0") {
+    return "未整改";
+  }
+  if (order.status === "sync_failed") {
+    return "同步失败";
+  }
+  return "已下发";
+}
+
+function readSelectedIssueIds(reviewPayload: ReportDetail["results"][number]["review_payload"]): number[] {
+  if (!reviewPayload || typeof reviewPayload !== "object" || Array.isArray(reviewPayload)) {
+    return [];
+  }
+  const selectedIssues = (reviewPayload as Record<string, unknown>).selected_issues;
+  if (!Array.isArray(selectedIssues)) {
+    return [];
+  }
+  return selectedIssues
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return 0;
+      }
+      return Number(item.id);
+    })
+    .filter((value) => Number.isInteger(value) && value > 0);
+}
+
 export function ReportResultDetailView({
   activeInspectionId,
   activePanel,
   currentUser,
   filters,
+  maxRectificationDescriptionLength,
   previewImage,
+  rectificationOrders,
   report,
   resultId
 }: {
@@ -248,7 +285,9 @@ export function ReportResultDetailView({
   activePanel: string;
   currentUser: SessionUser;
   filters: DetailFilters;
+  maxRectificationDescriptionLength: number;
   previewImage: boolean;
+  rectificationOrders: RectificationOrderRecord[];
   report: ReportDetail;
   resultId: number;
 }) {
@@ -285,6 +324,7 @@ export function ReportResultDetailView({
   const currentCameraAlias = readMetadataString(selectedResult.metadata, "camera_alias") || "未标注摄像头";
   const currentStoreName = selectedResult.store_name || "未绑定门店";
   const currentStoreCode = selectedStore?.store_id || selectedResult.store_id || "";
+  const initialSelectedIssueIds = readSelectedIssueIds(selectedResult.review_payload);
   const inspectionTabs = selectedInspections.map((inspection) => ({
     inspection,
     issues: getInspectionIssues(selectedIssues, inspection)
@@ -393,65 +433,18 @@ export function ReportResultDetailView({
 
             {resolvedPanel === "review" ? (
               <div className={styles.reviewWorkspace}>
-                <div className={styles.alertPanel}>
-                  <div className={styles.alertHead}>
-                    <strong>当前结果概况</strong>
-                    <Badge className={styles.metaPill} variant="outline">
-                      {selectedIssues.length} 个问题
-                    </Badge>
-                  </div>
-                  {selectedIssues.length > 0 ? (
-                    <ul className={styles.issueSummaryList}>
-                      {selectedIssues.map((issue) => (
-                        <li key={issue.id}>{issue.title}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className={styles.analysisCopy}>当前结果没有关联问题项，可以直接补充备注后完成复核。</p>
-                  )}
-                </div>
+                <ResultReviewWorkflow
+                  actionUrl={`/api/reports/${report.id}/images/${selectedResult.id}/review-status`}
+                  canReview={canReview}
+                  currentImageUrl={currentImageUrl}
+                  currentPath={currentPath}
+                  initialReviewState={selectedResult.review_state}
+                  initialSelectedIssueIds={initialSelectedIssueIds}
+                  issues={selectedIssues.map((issue) => ({ id: issue.id, title: issue.title }))}
+                  maxDescriptionLength={maxRectificationDescriptionLength}
+                />
 
                 <div className={styles.reviewGrid}>
-                  <div className={styles.reviewBlock}>
-                    <h3 className={styles.blockTitle}>复核备注</h3>
-                    {canReview ? (
-                      <form
-                        action={`/api/reports/${report.id}/images/${selectedResult.id}/review-status`}
-                        className={styles.reviewForm}
-                        method="post"
-                      >
-                        <input name="return_to" type="hidden" value={currentPath} />
-                        <div className="field">
-                          <label htmlFor="note">备注内容</label>
-                          <Textarea id="note" name="note" placeholder="例如：已与门店确认问题属实，建议本周完成整改后再次复核。" />
-                        </div>
-                        <div className={styles.reviewActions}>
-                          <Button
-                            disabled={selectedResult.review_state === "pending"}
-                            name="review_status"
-                            size="sm"
-                            type="submit"
-                            value="pending"
-                            variant="secondary"
-                          >
-                            退回待复核
-                          </Button>
-                          <Button
-                            disabled={selectedResult.review_state === "completed"}
-                            name="review_status"
-                            size="sm"
-                            type="submit"
-                            value="completed"
-                          >
-                            确认已复核
-                          </Button>
-                        </div>
-                      </form>
-                    ) : (
-                      <EmptyState>你当前只有查看权限，无法更新复核状态。</EmptyState>
-                    )}
-                  </div>
-
                   <div className={styles.reviewBlock}>
                     <h3 className={styles.blockTitle}>最近记录</h3>
                     {selectedLogs.length > 0 ? (
@@ -471,6 +464,38 @@ export function ReportResultDetailView({
                       </div>
                     ) : (
                       <EmptyState>当前结果还没有复核记录。</EmptyState>
+                    )}
+                  </div>
+
+                  <div className={styles.reviewBlock}>
+                    <h3 className={styles.blockTitle}>整改单记录</h3>
+                    {rectificationOrders.length > 0 ? (
+                      <div className={styles.timelineList}>
+                        {rectificationOrders.map((order) => (
+                          <article className={styles.timelineItem} key={order.id}>
+                            <div className={styles.timelineHead}>
+                              <strong>
+                                整改单 {order.huiyunying_order_id || `#${order.id}`}
+                              </strong>
+                              <span>{formatRectificationState(order)}</span>
+                            </div>
+                            <p>要求整改日期：{order.should_corrected || "-"}</p>
+                            <p>创建时间：{formatDisplayDate(order.created_at)}</p>
+                            {order.real_corrected_time ? (
+                              <p>整改完成时间：{formatDisplayDate(order.real_corrected_time)}</p>
+                            ) : null}
+                            {order.selected_issues.length > 0 ? (
+                              <ul className={styles.issueSummaryList}>
+                                {order.selected_issues.map((issue) => (
+                                  <li key={`${order.id}-${issue.id}`}>{issue.title}</li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState>当前结果还没有下发整改单。</EmptyState>
                     )}
                   </div>
                 </div>

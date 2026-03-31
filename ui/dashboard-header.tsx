@@ -29,8 +29,10 @@ export function DashboardHeader({
         </div>
         <nav className={styles.appNav}>
           <Link href="/reports">报告列表</Link>
+          <Link href="/rectifications">整改单</Link>
           <Link href="/master-data">门店主数据</Link>
           {isAdmin ? <Link href="/admin/users">用户管理</Link> : null}
+          {isAdmin ? <Link href="/admin/settings">系统设置</Link> : null}
         </nav>
         <form action="/api/auth/logout" className={styles.logoutForm} method="post">
           <Button className={styles.logoutButton} type="submit" variant="secondary" size="sm">

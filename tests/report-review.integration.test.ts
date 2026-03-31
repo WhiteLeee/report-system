@@ -34,8 +34,9 @@ let reviewRoute: typeof import("../app/api/reports/[reportId]/images/[imageId]/r
 let reviewLogsRoute: typeof import("../app/api/reports/[reportId]/review-logs/route");
 let authService: typeof import("../backend/auth/auth.module");
 let reportServiceModule: typeof import("../backend/report/report.module");
+let systemSettingsModule: typeof import("../backend/system-settings/system-settings.module");
+let rectificationModule: typeof import("../backend/rectification/rectification.module");
 let ReportDetailView: typeof import("../ui/report-detail-view").ReportDetailView;
-let ReportResultDetailView: typeof import("../ui/report-result-detail-view").ReportResultDetailView;
 
 const publishPayload = {
   source_system: "vision-agent",
@@ -140,8 +141,9 @@ before(async () => {
   const [
     authModule,
     reportModule,
+    importedSystemSettingsModule,
+    importedRectificationModule,
     reportDetailViewModule,
-    reportResultDetailViewModule,
     importedLoginRoute,
     importedPublishRoute,
     importedReportRoute,
@@ -150,8 +152,9 @@ before(async () => {
   ] = await Promise.all([
     import("../backend/auth/auth.module"),
     import("../backend/report/report.module"),
+    import("../backend/system-settings/system-settings.module"),
+    import("../backend/rectification/rectification.module"),
     import("../ui/report-detail-view"),
-    import("../ui/report-result-detail-view"),
     import("../app/api/auth/login/route"),
     import("../app/api/reports/publish/route"),
     import("../app/api/reports/[reportId]/route"),
@@ -160,14 +163,28 @@ before(async () => {
   ]);
   authService = authModule;
   reportServiceModule = reportModule;
+  systemSettingsModule = importedSystemSettingsModule;
+  rectificationModule = importedRectificationModule;
   ReportDetailView = reportDetailViewModule.ReportDetailView;
-  ReportResultDetailView = reportResultDetailViewModule.ReportResultDetailView;
   loginRoute = importedLoginRoute;
   publishRoute = importedPublishRoute;
   reportRoute = importedReportRoute;
   reviewRoute = importedReviewRoute;
   reviewLogsRoute = importedReviewLogsRoute;
   authService.createAuthService().ensureBootstrap();
+  systemSettingsModule.createSystemSettingsService().saveHuiYunYingApiSettings({
+    uri: "https://huiyunying.example.com",
+    route: "/route",
+    appid: "appid-demo",
+    secret: "secret-demo",
+    rateLimitCount: 30,
+    rateLimitWindowMs: 60000,
+    rectificationCreateRoute: "/route/ri/open/item/create",
+    rectificationListRoute: "/route/ri/open/item/list",
+    rectificationDescriptionMaxLength: 500,
+    defaultShouldCorrectedDays: 0,
+    rectificationSyncIntervalMs: 600000
+  });
 });
 
 after(() => {
@@ -175,6 +192,27 @@ after(() => {
 });
 
 test("image review status updates persist and render recent logs", async () => {
+  const originalFetch = globalThis.fetch;
+  const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    fetchCalls.push({ url, init });
+    if (url.includes("/sign")) {
+      return new Response("token-123", {
+        status: 200,
+        headers: { "content-type": "text/plain" }
+      });
+    }
+    if (url.includes("/route/ri/open/item/create")) {
+      return new Response(JSON.stringify({ status: 200, data: true, disqualifiedId: 9001 }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  try {
   const loginResp = await loginRoute.POST(
     new Request("http://127.0.0.1:3000/api/auth/login", {
       method: "POST",
@@ -216,7 +254,9 @@ test("image review status updates persist and render recent logs", async () => {
       method: "POST",
       headers: { "content-type": "application/json", cookie: sessionCookie },
       body: JSON.stringify({
-        review_status: "completed"
+        review_status: "completed",
+        selected_issues_json: JSON.stringify([{ id: 1, title: "货架未摆满" }]),
+        should_corrected: "2026-04-05"
       })
     }),
     {
@@ -232,6 +272,8 @@ test("image review status updates persist and render recent logs", async () => {
     progress_state: string;
     completed_result_count: number;
     total_result_count: number;
+    selected_issues: Array<{ id: number; title: string }>;
+    rectification_orders: Array<{ id: number; huiyunying_order_id: string | null; status: string }>;
     recent_log: { operator_name: string } | null;
   };
   assert.equal(reviewJson.changed, true);
@@ -241,7 +283,12 @@ test("image review status updates persist and render recent logs", async () => {
   assert.equal(reviewJson.progress_state, "completed");
   assert.equal(reviewJson.completed_result_count, 1);
   assert.equal(reviewJson.total_result_count, 1);
+  assert.equal(reviewJson.selected_issues.length, 1);
+  assert.equal(reviewJson.selected_issues[0].title, "货架未摆满");
+  assert.equal(reviewJson.rectification_orders.length, 1);
+  assert.equal(reviewJson.rectification_orders[0].huiyunying_order_id, "9001");
   assert.equal(reviewJson.recent_log?.operator_name, "系统管理员");
+  assert.equal(fetchCalls.length, 2);
 
   const updatedDetailResp = await reportRoute.GET(new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }), {
     params: Promise.resolve({ reportId: String(reportId) })
@@ -250,7 +297,7 @@ test("image review status updates persist and render recent logs", async () => {
     report: {
       progress_state: string;
       images: Array<{ id: number; review_state: string }>;
-      review_logs: Array<{ operator_name: string; to_status: string }>;
+      review_logs: Array<{ operator_name: string; to_status: string; metadata: { selected_issues?: Array<{ id: number; title: string }> } }>;
     };
   };
   assert.equal(updatedDetailJson.report.progress_state, "completed");
@@ -258,6 +305,7 @@ test("image review status updates persist and render recent logs", async () => {
   assert.equal(updatedDetailJson.report.review_logs.length, 1);
   assert.equal(updatedDetailJson.report.review_logs[0].operator_name, "系统管理员");
   assert.equal(updatedDetailJson.report.review_logs[0].to_status, "completed");
+  assert.equal(updatedDetailJson.report.review_logs[0].metadata.selected_issues?.length, 1);
 
   const logsResp = await reviewLogsRoute.GET(new Request(`http://127.0.0.1:3000/api/reports/${reportId}/review-logs?limit=20`, { headers: { cookie: sessionCookie } }), {
     params: Promise.resolve({ reportId: String(reportId) })
@@ -278,20 +326,50 @@ test("image review status updates persist and render recent logs", async () => {
   assert.ok(pageHtml.includes("系统管理员"));
   assert.ok(pageHtml.includes("结果清单"));
 
-  const resultPageJsx = ReportResultDetailView({
-    activeInspectionId: "",
-    activePanel: "review",
-    currentUser: authService.createAuthService().getSessionUser(sessionCookie.split(";")[0].split("=")[1])!,
-    filters: { organization: "", storeId: "", reviewStatus: "", page: 1, pageSize: 30 },
-    previewImage: false,
-    report: reportServiceModule.createReportService().getReportDetail(reportId)!,
-    resultId: imageId
-  });
-  const resultPageHtml = renderToStaticMarkup(resultPageJsx as ReactElement);
-  assert.ok(resultPageHtml.includes("最近记录"));
-  assert.ok(resultPageHtml.includes("确认已复核"));
-  assert.ok(resultPageHtml.includes("货架完整性"));
-  assert.ok(resultPageHtml.includes("返回列表"));
+  const rectificationOrders = rectificationModule.createRectificationService().listByResultId(imageId);
+  assert.equal(rectificationOrders.length, 1);
+  assert.equal(rectificationOrders[0].huiyunying_order_id, "9001");
+  assert.equal(rectificationOrders[0].selected_issues.length, 1);
+  assert.equal(rectificationOrders[0].selected_issues[0].title, "货架未摆满");
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.includes("/sign")) {
+      return new Response("token-123", {
+        status: 200,
+        headers: { "content-type": "text/plain" }
+      });
+    }
+    if (url.includes("/route/ri/open/item/list")) {
+      return new Response(
+        JSON.stringify({
+          status: 200,
+          data: [
+            {
+              disqualifiedId: 9001,
+              ifCorrected: "1",
+              storeCode: "demo001",
+              description: "1. 货架未摆满",
+              realCorrectedTime: "2026-04-02 12:00:00"
+            }
+          ]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      );
+    }
+    throw new Error(`Unexpected sync fetch url: ${url}`);
+  }) as typeof fetch;
+
+  const syncedOrders = await rectificationModule.createRectificationService().syncOrdersByResultId(imageId);
+  assert.equal(syncedOrders.length, 1);
+  assert.equal(syncedOrders[0].if_corrected, "1");
+  assert.equal(syncedOrders[0].status, "corrected");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("publish rejects unsupported payload_version with 422", async () => {
@@ -319,4 +397,92 @@ test("publish rejects unsupported payload_version with 422", async () => {
   assert.equal(publishJson.error, "Unsupported payload_version.");
   assert.equal(publishJson.received_payload_version, 3);
   assert.deepEqual(publishJson.supported_payload_versions, [2]);
+});
+
+test("review submit treats huiyunying business failure as 502", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.includes("/sign")) {
+      return new Response("token-123", {
+        status: 200,
+        headers: { "content-type": "text/plain" }
+      });
+    }
+    if (url.includes("/route/ri/open/item/create")) {
+      return new Response(JSON.stringify({ status: -20000, message: "链接不是一个有效的图片类型的链接!" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const loginResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "ChangeMe123!");
+          return formData;
+        })()
+      })
+    );
+    const sessionCookie = loginResp.headers.get("set-cookie") || "";
+
+    const publishResp = await publishRoute.POST(
+      new Request("http://127.0.0.1:3000/api/reports/publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...publishPayload,
+          idempotency_key: "review-test-business-fail",
+          published_at: "2026-03-26 10:00:00",
+          report: {
+            ...publishPayload.report,
+            report_meta: {
+              ...publishPayload.report.report_meta,
+              start_date: "2026-03-26",
+              end_date: "2026-03-26",
+              generated_at: "2026-03-26 10:00:00"
+            }
+          }
+        })
+      })
+    );
+    const publishJson = (await publishResp.json()) as { report_id: number };
+    const reportId = publishJson.report_id;
+
+    const detailResp = await reportRoute.GET(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
+      { params: Promise.resolve({ reportId: String(reportId) }) }
+    );
+    const detailJson = (await detailResp.json()) as { report: { images: Array<{ id: number }> } };
+    const imageId = detailJson.report.images[0].id;
+
+    const reviewResp = await reviewRoute.POST(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({
+          review_status: "completed",
+          selected_issues_json: JSON.stringify([{ id: 1, title: "货架未摆满" }]),
+          should_corrected: "2026-04-05"
+        })
+      }),
+      {
+        params: Promise.resolve({ reportId: String(reportId), imageId: String(imageId) })
+      }
+    );
+
+    assert.equal(reviewResp.status, 502);
+    const reviewJson = (await reviewResp.json()) as { success: boolean; detail: string };
+    assert.equal(reviewJson.success, false);
+    assert.match(reviewJson.detail, /链接不是一个有效的图片类型的链接/);
+    assert.equal(rectificationModule.createRectificationService().listByResultId(imageId).length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

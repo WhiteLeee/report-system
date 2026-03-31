@@ -170,7 +170,7 @@
 .modalCard {
   position: relative;
   z-index: 1;
-  width: min(920px, calc(100vw - 48px));
+  width: min(1080px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   overflow: auto;
   box-shadow: 0 28px 72px rgba(22, 18, 14, 0.24);
@@ -185,10 +185,201 @@
   gap: 18px;
 }
 
+.userHeaderBlock {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.userIdentityCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(56, 49, 37, 0.08);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 244, 236, 0.92) 100%);
+}
+
+.userIdentityTitle {
+  color: #1f1912;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.userIdentityMeta {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .formGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.scopeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.editLayout {
+  display: grid;
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.sideRail {
+  display: grid;
+  gap: 18px;
+}
+
+.editCard {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(56, 49, 37, 0.08);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(249, 246, 240, 0.92) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.scopeCard {
+  min-height: 100%;
+}
+
+.editCardHeader {
+  display: grid;
+  gap: 6px;
+}
+
+.scopeField {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.scopeFieldHeader {
+  display: grid;
+  gap: 4px;
+}
+
+.scopeFieldTitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.scopeFieldCopy {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.scopePicker {
+  display: grid;
+  gap: 8px;
+  min-height: 280px;
+  max-height: 420px;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.scopeOption {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(56, 49, 37, 0.08);
+  border-radius: 14px;
+  background: rgba(250, 247, 241, 0.78);
+  cursor: pointer;
+}
+
+.scopeCheckbox {
+  margin-top: 2px;
+  accent-color: #8b5a2b;
+}
+
+.scopeOptionBody {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.scopeOptionLabel {
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.scopeOptionMeta {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.scopeEmpty {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  padding: 16px;
+  border: 1px dashed rgba(56, 49, 37, 0.14);
+  border-radius: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.cardForm {
+  display: grid;
+  gap: 14px;
+}
+
+.cardActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.editSectionCopy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.statusPanel {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.statusMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.statusLabel {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .formActions,
@@ -215,7 +406,7 @@
 
 .editSectionTitle {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.2;
   font-weight: 700;
 }
@@ -232,6 +423,20 @@
 
   .formGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scopeGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cardActions,
+  .statusMeta {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .modalOverlay {

@@ -1,14 +1,18 @@
 import { notFound } from "next/navigation";
 
 import { buildRequestContext, requirePermission } from "@/backend/auth/session";
+import { createRectificationService } from "@/backend/rectification/rectification.module";
 import { createReportService } from "@/backend/report/report.module";
 import type { ReviewFilterState } from "@/backend/report/report.types";
+import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
 import { DETAIL_PAGE_SIZE_OPTIONS, type DetailFilters } from "@/ui/report-detail-helpers";
 import { ReportResultDetailView } from "@/ui/report-result-detail-view";
 
 export const dynamic = "force-dynamic";
 
 const reportService = createReportService();
+const rectificationService = createRectificationService();
+const systemSettingsService = createSystemSettingsService();
 
 function normalizeReviewStatus(value: string): ReviewFilterState {
   return value === "pending" || value === "in_progress" || value === "completed" ? value : "";
@@ -60,6 +64,8 @@ export default async function ReportResultDetailPage({
     typeof resolvedSearchParams.inspection === "string" ? resolvedSearchParams.inspection : "";
   const activePanel = typeof resolvedSearchParams.panel === "string" ? resolvedSearchParams.panel : "";
   const previewImage = typeof resolvedSearchParams.preview === "string" && resolvedSearchParams.preview === "1";
+  const rectificationOrders = await rectificationService.syncOrdersByResultId(resultId);
+  const huiYunYingApiSettings = systemSettingsService.getHuiYunYingApiSettings();
 
   return (
     <ReportResultDetailView
@@ -67,7 +73,9 @@ export default async function ReportResultDetailPage({
       activePanel={activePanel}
       currentUser={currentUser}
       filters={filters}
+      maxRectificationDescriptionLength={huiYunYingApiSettings.rectificationDescriptionMaxLength}
       previewImage={previewImage}
+      rectificationOrders={rectificationOrders}
       report={report}
       resultId={resultId}
     />

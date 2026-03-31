@@ -3,13 +3,15 @@ import { and, desc, eq, gte, inArray, like, lte, or } from "drizzle-orm";
 import type { RequestContext } from "@/backend/auth/request-context";
 import { db } from "@/backend/database/client";
 import {
+  organizationMasterTable,
   reportImageTable,
   reportInspectionTable,
   reportIssueTable,
   reportReviewLogTable,
   reportSourceSnapshotTable,
   reportStoreTable,
-  reportTable
+  reportTable,
+  storeMasterProfileTable
 } from "@/backend/database/schema";
 import { normalizePublishedReport } from "@/backend/report/report-publish-normalizer";
 import type { ReportRepository } from "@/backend/report/report.repository";
@@ -29,6 +31,7 @@ import type {
   ReportSummary,
   ResultReviewState,
   ReviewProgressSummary,
+  ReviewSelectedIssue,
   ReviewResultUpdateResult
 } from "@/backend/report/report.types";
 import type { JsonValue } from "@/backend/shared/json";
@@ -212,6 +215,20 @@ function normalizeScopeIds(values: string[] | undefined): string[] {
   return Array.from(new Set((values || []).map((item) => item.trim()).filter(Boolean)));
 }
 
+function normalizeSelectedIssues(values: ReviewSelectedIssue[] | undefined): ReviewSelectedIssue[] {
+  return Array.from(
+    new Map(
+      (values || [])
+        .map((item) => ({
+          id: Number(item.id),
+          title: String(item.title || "").trim()
+        }))
+        .filter((item) => Number.isInteger(item.id) && item.id > 0 && item.title)
+        .map((item) => [item.id, item] as const)
+    ).values()
+  );
+}
+
 function canAccessEnterprise(context: RequestContext, enterpriseId: string): boolean {
   const enterpriseScopeIds = normalizeScopeIds(context.enterpriseScopeIds);
   if (enterpriseScopeIds.length === 0) {
@@ -220,44 +237,115 @@ function canAccessEnterprise(context: RequestContext, enterpriseId: string): boo
   return enterpriseScopeIds.includes(enterpriseId);
 }
 
-function filterStoresByScope(stores: ReportStore[], context: RequestContext): ReportStore[] {
+function resolveScopedStoreIds(context: RequestContext, enterpriseId?: string): string[] | null {
   const storeScopeIds = normalizeScopeIds(context.storeScopeIds);
-  if (storeScopeIds.length === 0) {
+  if (storeScopeIds.length > 0) {
+    return storeScopeIds;
+  }
+
+  const organizationScopeIds = normalizeScopeIds(context.organizationScopeIds);
+  if (organizationScopeIds.length === 0) {
+    return null;
+  }
+
+  const organizationWhere = [eq(organizationMasterTable.isActive, 1)];
+  if (enterpriseId) {
+    organizationWhere.push(eq(organizationMasterTable.enterpriseId, enterpriseId));
+  }
+  const organizationRows = db
+    .select({
+      enterpriseId: organizationMasterTable.enterpriseId,
+      organizeCode: organizationMasterTable.organizeCode,
+      parentCode: organizationMasterTable.parentCode
+    })
+    .from(organizationMasterTable)
+    .where(and(...organizationWhere))
+    .all()
+    .filter((row) => canAccessEnterprise(context, row.enterpriseId));
+
+  const childrenMap = new Map<string, string[]>();
+  organizationRows.forEach((row) => {
+    const parentCode = String(row.parentCode || "").trim();
+    if (!childrenMap.has(parentCode)) {
+      childrenMap.set(parentCode, []);
+    }
+    childrenMap.get(parentCode)?.push(row.organizeCode);
+  });
+
+  const allowedOrganizationCodes = new Set<string>();
+  const queue = [...organizationScopeIds];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || allowedOrganizationCodes.has(current)) {
+      continue;
+    }
+    allowedOrganizationCodes.add(current);
+    (childrenMap.get(current) || []).forEach((childCode) => queue.push(childCode));
+  }
+
+  if (allowedOrganizationCodes.size === 0) {
+    return [];
+  }
+
+  const storeWhere = [eq(storeMasterProfileTable.isActive, 1)];
+  if (enterpriseId) {
+    storeWhere.push(eq(storeMasterProfileTable.enterpriseId, enterpriseId));
+  }
+
+  return Array.from(
+    new Set(
+      db
+        .select({
+          enterpriseId: storeMasterProfileTable.enterpriseId,
+          storeId: storeMasterProfileTable.storeId,
+          organizeCode: storeMasterProfileTable.organizeCode
+        })
+        .from(storeMasterProfileTable)
+        .where(and(...storeWhere))
+        .all()
+        .filter(
+          (row) =>
+            canAccessEnterprise(context, row.enterpriseId) &&
+            allowedOrganizationCodes.has(String(row.organizeCode || "").trim())
+        )
+        .map((row) => row.storeId)
+    )
+  );
+}
+
+function filterStoresByScope(stores: ReportStore[], scopedStoreIds: string[] | null): ReportStore[] {
+  if (!scopedStoreIds) {
     return stores;
   }
-  return stores.filter((store) => storeScopeIds.includes(store.store_id));
+  return stores.filter((store) => scopedStoreIds.includes(store.store_id));
 }
 
-function filterResultsByScope(results: ReportResult[], context: RequestContext): ReportResult[] {
-  const storeScopeIds = normalizeScopeIds(context.storeScopeIds);
-  if (storeScopeIds.length === 0) {
+function filterResultsByScope(results: ReportResult[], scopedStoreIds: string[] | null): ReportResult[] {
+  if (!scopedStoreIds) {
     return results;
   }
-  return results.filter((result) => result.store_id && storeScopeIds.includes(result.store_id));
+  return results.filter((result) => result.store_id && scopedStoreIds.includes(result.store_id));
 }
 
-function filterIssuesByScope(issues: ReportIssue[], context: RequestContext): ReportIssue[] {
-  const storeScopeIds = normalizeScopeIds(context.storeScopeIds);
-  if (storeScopeIds.length === 0) {
+function filterIssuesByScope(issues: ReportIssue[], scopedStoreIds: string[] | null): ReportIssue[] {
+  if (!scopedStoreIds) {
     return issues;
   }
-  return issues.filter((issue) => issue.store_id && storeScopeIds.includes(issue.store_id));
+  return issues.filter((issue) => issue.store_id && scopedStoreIds.includes(issue.store_id));
 }
 
-function filterLogsByScope(logs: ReportReviewLog[], context: RequestContext): ReportReviewLog[] {
-  const storeScopeIds = normalizeScopeIds(context.storeScopeIds);
-  if (storeScopeIds.length === 0) {
+function filterLogsByScope(logs: ReportReviewLog[], scopedStoreIds: string[] | null): ReportReviewLog[] {
+  if (!scopedStoreIds) {
     return logs;
   }
-  return logs.filter((log) => log.store_id && storeScopeIds.includes(log.store_id));
+  return logs.filter((log) => log.store_id && scopedStoreIds.includes(log.store_id));
 }
 
-function filterInspectionsByScope(inspections: ReportInspection[], context: RequestContext): ReportInspection[] {
-  const storeScopeIds = normalizeScopeIds(context.storeScopeIds);
-  if (storeScopeIds.length === 0) {
+function filterInspectionsByScope(inspections: ReportInspection[], scopedStoreIds: string[] | null): ReportInspection[] {
+  if (!scopedStoreIds) {
     return inspections;
   }
-  return inspections.filter((inspection) => inspection.store_id && storeScopeIds.includes(inspection.store_id));
+  return inspections.filter((inspection) => inspection.store_id && scopedStoreIds.includes(inspection.store_id));
 }
 
 function summarizeStores(stores: ReportStore[]): Pick<ReportSummary, "completed_store_count" | "pending_store_count" | "in_progress_store_count"> {
@@ -560,9 +648,12 @@ export class SqliteReportRepository implements ReportRepository {
       .map(toReportSummary);
 
     const enterpriseScoped = summaries.filter((summary) => canAccessEnterprise(context, summary.source_enterprise_id));
-    const storeScopeIds = normalizeScopeIds(context.storeScopeIds);
-    if (storeScopeIds.length === 0) {
+    const scopedStoreIds = resolveScopedStoreIds(context);
+    if (!scopedStoreIds) {
       return enterpriseScoped;
+    }
+    if (scopedStoreIds.length === 0) {
+      return [];
     }
 
     const reportIds = enterpriseScoped.map((summary) => summary.id);
@@ -573,7 +664,7 @@ export class SqliteReportRepository implements ReportRepository {
       db
         .select({ reportId: reportStoreTable.reportId })
         .from(reportStoreTable)
-        .where(and(inArray(reportStoreTable.reportId, reportIds), inArray(reportStoreTable.storeId, storeScopeIds)))
+        .where(and(inArray(reportStoreTable.reportId, reportIds), inArray(reportStoreTable.storeId, scopedStoreIds)))
         .all()
         .map((row) => row.reportId)
     );
@@ -639,15 +730,15 @@ export class SqliteReportRepository implements ReportRepository {
       .where(eq(reportSourceSnapshotTable.reportId, reportId))
       .get();
 
-    const visibleStores = filterStoresByScope(stores, context);
-    const visibleResults = filterResultsByScope(results, context);
-    const visibleIssues = filterIssuesByScope(issues, context);
-    const visibleInspections = filterInspectionsByScope(inspections, context);
-    const visibleLogs = filterLogsByScope(reviewLogs, context);
-    const storeScopeIds = normalizeScopeIds(context.storeScopeIds);
+    const scopedStoreIds = resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
+    const visibleStores = filterStoresByScope(stores, scopedStoreIds);
+    const visibleResults = filterResultsByScope(results, scopedStoreIds);
+    const visibleIssues = filterIssuesByScope(issues, scopedStoreIds);
+    const visibleInspections = filterInspectionsByScope(inspections, scopedStoreIds);
+    const visibleLogs = filterLogsByScope(reviewLogs, scopedStoreIds);
 
     if (
-      storeScopeIds.length > 0 &&
+      scopedStoreIds &&
       visibleStores.length === 0 &&
       visibleResults.length === 0 &&
       visibleIssues.length === 0 &&
@@ -664,17 +755,17 @@ export class SqliteReportRepository implements ReportRepository {
 
     return {
       ...toReportSummary(reportRow),
-      progress_state: storeScopeIds.length > 0 ? scopedResultProgress.progress_state : (reportRow.progressState as ProgressState),
+      progress_state: scopedStoreIds ? scopedResultProgress.progress_state : (reportRow.progressState as ProgressState),
       store_count: visibleStores.length,
       image_count: visibleResults.length,
       issue_count: visibleIssues.length,
-      completed_store_count: storeScopeIds.length > 0 ? scopedStoreSummary.completed_store_count : reportRow.completedStoreCount,
-      pending_store_count: storeScopeIds.length > 0 ? scopedStoreSummary.pending_store_count : reportRow.pendingStoreCount,
-      in_progress_store_count: storeScopeIds.length > 0 ? scopedStoreSummary.in_progress_store_count : reportRow.inProgressStoreCount,
-      total_result_count: storeScopeIds.length > 0 ? scopedResultProgress.total_result_count : reportRow.totalResultCount,
-      completed_result_count: storeScopeIds.length > 0 ? scopedResultProgress.completed_result_count : reportRow.completedResultCount,
-      pending_result_count: storeScopeIds.length > 0 ? scopedResultProgress.pending_result_count : reportRow.pendingResultCount,
-      progress_percent: storeScopeIds.length > 0 ? scopedResultProgress.progress_percent : reportRow.progressPercent,
+      completed_store_count: scopedStoreIds ? scopedStoreSummary.completed_store_count : reportRow.completedStoreCount,
+      pending_store_count: scopedStoreIds ? scopedStoreSummary.pending_store_count : reportRow.pendingStoreCount,
+      in_progress_store_count: scopedStoreIds ? scopedStoreSummary.in_progress_store_count : reportRow.inProgressStoreCount,
+      total_result_count: scopedStoreIds ? scopedResultProgress.total_result_count : reportRow.totalResultCount,
+      completed_result_count: scopedStoreIds ? scopedResultProgress.completed_result_count : reportRow.completedResultCount,
+      pending_result_count: scopedStoreIds ? scopedResultProgress.pending_result_count : reportRow.pendingResultCount,
+      progress_percent: scopedStoreIds ? scopedResultProgress.progress_percent : reportRow.progressPercent,
       stores: visibleStores,
       results: visibleResults,
       images: visibleResults,
@@ -691,11 +782,13 @@ export class SqliteReportRepository implements ReportRepository {
     reviewStatus: ResultReviewState,
     operatorName: string,
     note = "",
+    selectedIssues: ReviewSelectedIssue[] = [],
     context: RequestContext = {}
   ): ReviewResultUpdateResult | null {
     const normalizedReviewState = normalizeResultReviewState(reviewStatus);
     const normalizedOperator = operatorName.trim();
     const normalizedNote = note.trim();
+    const normalizedSelectedIssues = normalizeSelectedIssues(selectedIssues);
 
     return db.transaction((tx) => {
       const reportRow = tx
@@ -721,16 +814,16 @@ export class SqliteReportRepository implements ReportRepository {
       if (!resultRow) {
         return null;
       }
-      const storeScopeIds = normalizeScopeIds(context.storeScopeIds);
-      if (storeScopeIds.length > 0) {
+      const scopedStoreIds = resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
+      if (scopedStoreIds) {
         const resultStoreId = String(resultRow.storeId || "").trim();
-        if (!resultStoreId || !storeScopeIds.includes(resultStoreId)) {
+        if (!resultStoreId || !scopedStoreIds.includes(resultStoreId)) {
           return null;
         }
       }
 
       const fromState = (resultRow.reviewState as ResultReviewState) || "pending";
-      if (fromState === normalizedReviewState && !normalizedNote) {
+      if (fromState === normalizedReviewState && !normalizedNote && normalizedSelectedIssues.length === 0) {
         return {
           report_id: reportId,
           result_id: imageId,
@@ -759,7 +852,8 @@ export class SqliteReportRepository implements ReportRepository {
             note: normalizedNote || null,
             updated_by: normalizedOperator,
             updated_at: reviewedAt,
-            state: normalizedReviewState
+            state: normalizedReviewState,
+            selected_issues: normalizedSelectedIssues
           })
         })
         .where(eq(reportImageTable.id, imageId))
@@ -866,7 +960,8 @@ export class SqliteReportRepository implements ReportRepository {
             completed_result_count: reportProgress.completed_result_count,
             total_result_count: reportProgress.total_result_count,
             result_id: imageId,
-            report_id: reportId
+            report_id: reportId,
+            selected_issues: normalizedSelectedIssues
           })
         })
         .returning({ id: reportReviewLogTable.id })
@@ -922,6 +1017,7 @@ export class SqliteReportRepository implements ReportRepository {
       .limit(Math.min(Math.max(1, Math.trunc(limit)), 100))
       .all();
 
-    return filterLogsByScope(query.map(toReportReviewLog), context);
+    const scopedStoreIds = resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
+    return filterLogsByScope(query.map(toReportReviewLog), scopedStoreIds);
   }
 }

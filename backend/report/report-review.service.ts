@@ -1,5 +1,10 @@
 import type { RequestContext } from "@/backend/auth/request-context";
-import type { ReviewResultUpdateResult, ResultReviewState, ReportReviewLog } from "@/backend/report/report.types";
+import type {
+  ReviewResultUpdateResult,
+  ResultReviewState,
+  ReportReviewLog,
+  ReviewSelectedIssue
+} from "@/backend/report/report.types";
 import type { ReportRepository } from "@/backend/report/report.repository";
 
 export class ReportReviewService {
@@ -11,7 +16,8 @@ export class ReportReviewService {
     reviewStatus: ResultReviewState,
     operatorName: string,
     note = "",
-    context: RequestContext = {}
+    context: RequestContext = {},
+    selectedIssues: ReviewSelectedIssue[] = []
   ): ReviewResultUpdateResult | null {
     if (!Number.isInteger(reportId) || reportId <= 0 || !Number.isInteger(imageId) || imageId <= 0) {
       return null;
@@ -26,6 +32,7 @@ export class ReportReviewService {
       reviewStatus,
       normalizedOperator,
       note.trim(),
+      selectedIssues,
       context
     );
   }

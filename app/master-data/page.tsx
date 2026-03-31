@@ -52,6 +52,40 @@ function flattenOrganizations(nodes: MasterDataOrganization[]): Array<{ code: st
   return items;
 }
 
+function sortOrganizationTree(nodes: MasterDataOrganization[]): MasterDataOrganization[] {
+  return [...nodes]
+    .sort((left, right) => {
+      const countDiff = right.current_store_count - left.current_store_count;
+      if (countDiff !== 0) {
+        return countDiff;
+      }
+      return left.organize_name.localeCompare(right.organize_name, "zh-CN");
+    })
+    .map((node) => ({
+      ...node,
+      child: sortOrganizationTree(node.child)
+    }));
+}
+
+function findOrganizationPath(nodes: MasterDataOrganization[], targetCode: string): MasterDataOrganization[] {
+  for (const node of nodes) {
+    if (node.organize_code === targetCode) {
+      return [node];
+    }
+    if (node.child.length > 0) {
+      const childPath = findOrganizationPath(node.child, targetCode);
+      if (childPath.length > 0) {
+        return [node, ...childPath];
+      }
+    }
+  }
+  return [];
+}
+
+function collectOrganizationCodes(node: MasterDataOrganization): string[] {
+  return [node.organize_code, ...node.child.flatMap((child) => collectOrganizationCodes(child))];
+}
+
 function filterOrganizationTree(nodes: MasterDataOrganization[], keyword: string): MasterDataOrganization[] {
   const normalizedKeyword = keyword.trim().toLowerCase();
   if (!normalizedKeyword) {
@@ -114,21 +148,42 @@ function renderDocStatus(value: string): ReactNode {
 
 function renderOrganizationTree(
   nodes: MasterDataOrganization[],
-  buildHref: (organizeCode: string) => string,
-  selectedCode: string
+  options: {
+    buildHref: (organizeCode: string) => string;
+    buildToggleHref: (organizeCode: string, shouldExpand: boolean) => string;
+    selectedCode: string;
+    expandedCodes: Set<string>;
+    forcedOpenCodes: Set<string>;
+  }
 ): ReactNode {
   return (
     <ul className={styles.orgTree}>
       {nodes.map((node) => (
         <li className={styles.orgNode} key={node.organize_code}>
-          <Link
-            className={node.organize_code === selectedCode ? `${styles.orgRow} ${styles.orgRowActive}` : styles.orgRow}
-            href={buildHref(node.organize_code)}
-          >
-            <span className={styles.orgName}>{node.organize_name}</span>
-            <span className={styles.orgCount}>{node.current_store_count}</span>
-          </Link>
-          {node.child.length > 0 ? renderOrganizationTree(node.child, buildHref, selectedCode) : null}
+          <div className={node.organize_code === options.selectedCode ? `${styles.orgRow} ${styles.orgRowActive}` : styles.orgRow}>
+            {node.child.length > 0 ? (
+              <Link
+                aria-label={options.expandedCodes.has(node.organize_code) || options.forcedOpenCodes.has(node.organize_code) ? "收起组织" : "展开组织"}
+                className={styles.orgToggle}
+                href={options.buildToggleHref(
+                  node.organize_code,
+                  !(options.expandedCodes.has(node.organize_code) || options.forcedOpenCodes.has(node.organize_code))
+                )}
+              >
+                {options.expandedCodes.has(node.organize_code) || options.forcedOpenCodes.has(node.organize_code) ? "▾" : "▸"}
+              </Link>
+            ) : (
+              <span className={styles.orgTogglePlaceholder} />
+            )}
+            <Link className={styles.orgLink} href={options.buildHref(node.organize_code)}>
+              <span className={styles.orgName}>{node.organize_name}</span>
+              <span className={styles.orgCount}>{node.current_store_count}</span>
+            </Link>
+          </div>
+          {node.child.length > 0 &&
+          (options.expandedCodes.has(node.organize_code) || options.forcedOpenCodes.has(node.organize_code))
+            ? renderOrganizationTree(node.child, options)
+            : null}
         </li>
       ))}
     </ul>
@@ -148,6 +203,7 @@ export default async function MasterDataPage({
   const keyword = normalizeQueryValue(resolvedSearchParams.keyword);
   const status = normalizeQueryValue(resolvedSearchParams.status);
   const orgKeyword = normalizeQueryValue(resolvedSearchParams.orgKeyword);
+  const expanded = normalizeQueryValue(resolvedSearchParams.expanded);
   const requestedPage = Number.parseInt(normalizeQueryValue(resolvedSearchParams.page) || "1", 10);
   const requestedPageSize = Number.parseInt(normalizeQueryValue(resolvedSearchParams.pageSize) || "20", 10);
 
@@ -159,24 +215,31 @@ export default async function MasterDataPage({
 
   const enterprises = masterDataService.listEnterprises(context);
   const activeEnterprise = enterprise || enterprises[0]?.enterprise_id || "";
-  const organizations = activeEnterprise ? masterDataService.listOrganizations(activeEnterprise, context) : [];
+  const organizations = activeEnterprise ? sortOrganizationTree(masterDataService.listOrganizations(activeEnterprise, context)) : [];
   const organizationOptions = flattenOrganizations(organizations);
   const filteredTree = filterOrganizationTree(organizations, orgKeyword);
   const currentEnterprise = enterprises.find((item) => item.enterprise_id === activeEnterprise) ?? null;
   const latestLogs = activeEnterprise ? masterDataService.listSyncLogs(activeEnterprise, 5, context) : [];
   const latestLog = latestLogs[0] ?? null;
   const storeUniverse = activeEnterprise ? masterDataService.listStores({ enterpriseId: activeEnterprise }, context) : [];
-  const filteredStores = activeEnterprise
-    ? masterDataService.listStores(
-        {
-          enterpriseId: activeEnterprise,
-          organizeCode,
-          keyword,
-          status
-        },
-        context
-      )
-    : [];
+  const selectedPath = organizeCode ? findOrganizationPath(organizations, organizeCode) : [];
+  const selectedNode = selectedPath.at(-1);
+  const selectedCodes = selectedNode ? new Set(collectOrganizationCodes(selectedNode)) : null;
+  const expandedCodes = new Set(expanded.split(",").map((item) => item.trim()).filter(Boolean));
+  const forcedOpenCodes = new Set(selectedPath.slice(0, -1).map((item) => item.organize_code));
+  const filteredStores = storeUniverse.filter((item) => {
+    if (selectedCodes && !selectedCodes.has(item.organize_code)) {
+      return false;
+    }
+    if (status && item.status !== status) {
+      return false;
+    }
+    if (!keyword) {
+      return true;
+    }
+    const normalizedKeyword = keyword.toLowerCase();
+    return item.store_name.toLowerCase().includes(normalizedKeyword) || item.store_code.toLowerCase().includes(normalizedKeyword);
+  });
   const statusOptions = Array.from(new Set(storeUniverse.map((item) => item.status).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : 20;
   const total = filteredStores.length;
@@ -193,6 +256,7 @@ export default async function MasterDataPage({
     keyword,
     status,
     orgKeyword,
+    expanded: Array.from(expandedCodes).join(","),
     pageSize: String(pageSize)
   };
 
@@ -299,13 +363,30 @@ export default async function MasterDataPage({
               {filteredTree.length > 0 ? (
                 renderOrganizationTree(
                   filteredTree,
-                  (nextOrganizeCode) =>
-                    buildQueryString({
-                      ...commonParams,
-                      organizeCode: nextOrganizeCode,
-                      page: "1"
-                    }),
-                  organizeCode
+                  {
+                    buildHref: (nextOrganizeCode) =>
+                      buildQueryString({
+                        ...commonParams,
+                        organizeCode: nextOrganizeCode,
+                        page: "1"
+                      }),
+                    buildToggleHref: (nextOrganizeCode, shouldExpand) => {
+                      const nextExpanded = new Set(expandedCodes);
+                      if (shouldExpand) {
+                        nextExpanded.add(nextOrganizeCode);
+                      } else {
+                        nextExpanded.delete(nextOrganizeCode);
+                      }
+                      return buildQueryString({
+                        ...commonParams,
+                        expanded: Array.from(nextExpanded).join(","),
+                        page: String(page)
+                      });
+                    },
+                    selectedCode: organizeCode,
+                    expandedCodes,
+                    forcedOpenCodes
+                  }
                 )
               ) : (
                 <div className={styles.empty}>暂无组织数据</div>

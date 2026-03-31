@@ -7,6 +7,7 @@ import type {
   ReportPublishPayload,
   ReportReviewLog,
   ReportSummary,
+  ReviewSelectedIssue,
   ReviewResultUpdateResult,
   ResultReviewState
 } from "@/backend/report/report.types";
@@ -22,6 +23,7 @@ export interface ReportRepository {
     reviewStatus: ResultReviewState,
     operatorName: string,
     note?: string,
+    selectedIssues?: ReviewSelectedIssue[],
     context?: RequestContext
   ): ReviewResultUpdateResult | null;
   listReviewLogs(

@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import "./globals.css";
 
 import { getReportSystemConfig } from "@/backend/config/report-system-config";
+import { ensureRectificationSyncManagerStarted } from "@/backend/rectification/rectification-sync.manager";
 
 const siteConfig = getReportSystemConfig();
 
@@ -12,6 +13,8 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+  ensureRectificationSyncManagerStarted();
+
   return (
     <html lang="zh-CN">
       <body

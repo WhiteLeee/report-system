@@ -1,0 +1,302 @@
+.workspaceHero {
+  padding: 24px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg, rgba(255, 250, 242, 0.96), rgba(240, 231, 216, 0.94)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
+  box-shadow: var(--shadow);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.statCard {
+  min-height: 138px;
+}
+
+.statCardInner {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 138px;
+  padding: 22px;
+}
+
+.statLabel,
+.statNote {
+  display: block;
+  color: var(--muted);
+}
+
+.statValue {
+  margin-top: 10px;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1;
+  font-weight: 800;
+}
+
+.statNote {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.workspaceSection {
+  display: block;
+}
+
+.workspacePanel {
+  overflow: hidden;
+}
+
+.workspacePanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px 24px 18px;
+  border-bottom: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.workspacePanelBody {
+  padding: 18px 24px 24px;
+}
+
+.listTitle {
+  font-size: 20px;
+}
+
+.listCopy {
+  margin-top: 8px;
+}
+
+.filterDisclosure {
+  display: grid;
+  gap: 0;
+  margin-bottom: 18px;
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(248, 244, 236, 0.88));
+}
+
+.filterDisclosureSummary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.filterDisclosureSummary::-webkit-details-marker {
+  display: none;
+}
+
+.filterDisclosureTitle {
+  display: block;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.filterDisclosureMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.filterToggleLabel {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 49, 37, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filterDisclosure[open] .filterToggleLabel::before {
+  content: "收起筛选";
+}
+
+.filterDisclosure:not([open]) .filterToggleLabel::before {
+  content: "展开筛选";
+}
+
+.filterDisclosureBody {
+  padding: 0 20px 20px;
+  border-top: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.sidebarForm {
+  display: grid;
+}
+
+.filterFormPanel {
+  display: grid;
+  gap: 16px;
+  padding-top: 18px;
+}
+
+.filterFormRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.sidebarGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  flex: 1 1 auto;
+}
+
+.compactField label {
+  font-size: 13px;
+}
+
+.control {
+  height: 44px;
+  min-height: 44px;
+  font-size: 14px;
+}
+
+.filterActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.filterButton {
+  min-height: 40px;
+  height: 40px;
+  padding: 0 16px;
+}
+
+.tableShell {
+  overflow: hidden;
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 1080px;
+  border-collapse: collapse;
+}
+
+.table thead th {
+  padding: 14px 16px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  background: rgba(244, 237, 223, 0.78);
+}
+
+.table tbody td {
+  padding: 16px;
+  border-top: 1px solid rgba(56, 49, 37, 0.08);
+  vertical-align: middle;
+}
+
+.primaryCell {
+  display: grid;
+  gap: 6px;
+}
+
+.cellMeta {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cellValue {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.inlineActionButton {
+  white-space: nowrap;
+}
+
+.orderCol {
+  width: 190px;
+}
+
+.storeCol {
+  width: 180px;
+}
+
+.enterpriseCol {
+  width: 200px;
+}
+
+.stateCol {
+  width: 130px;
+}
+
+.dateCol {
+  width: 170px;
+}
+
+.operatorCol {
+  width: 110px;
+}
+
+.updatedCol {
+  width: 170px;
+}
+
+.actionCol {
+  width: 120px;
+}
+
+.emptyState {
+  margin-top: 16px;
+}
+
+@media (max-width: 1080px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filterFormRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sidebarGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .workspaceHero,
+  .workspacePanelBody,
+  .workspacePanelHeader {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .statsGrid,
+  .sidebarGrid {
+    grid-template-columns: 1fr;
+  }
+}

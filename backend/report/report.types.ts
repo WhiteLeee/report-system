@@ -121,6 +121,11 @@ export interface ReportReviewLog {
   created_at: string;
 }
 
+export interface ReviewSelectedIssue {
+  id: number;
+  title: string;
+}
+
 export interface ReviewResultUpdateResult {
   report_id: number;
   result_id: number;

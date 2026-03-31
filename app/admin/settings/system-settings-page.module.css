@@ -1,0 +1,97 @@
+.workspaceCard {
+  overflow: hidden;
+}
+
+.workspaceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.workspaceBody {
+  padding: 18px 24px 24px;
+}
+
+.workspaceTitle {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.1;
+  font-family: var(--font-display);
+}
+
+.workspaceCopy {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.settingsForm,
+.settingSection {
+  display: grid;
+  gap: 18px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.settingSection {
+  padding-top: 18px;
+  border-top: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.settingSectionHeader {
+  display: grid;
+  gap: 4px;
+}
+
+.settingSectionTitle {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.settingSectionCopy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.rateLimitRow {
+  display: grid;
+  grid-template-columns: minmax(0, 160px) auto minmax(0, 220px);
+  gap: 14px;
+  align-items: end;
+}
+
+.rateLimitSlash {
+  display: grid;
+  place-items: center;
+  align-self: end;
+  height: 48px;
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 860px) {
+  .formGrid,
+  .rateLimitRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rateLimitSlash {
+    display: none;
+  }
+}
