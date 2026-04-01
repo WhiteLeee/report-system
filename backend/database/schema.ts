@@ -190,6 +190,7 @@ export const reportRectificationOrderTable = sqliteTable(
     ifCorrected: text("if_corrected"),
     shouldCorrected: text("should_corrected"),
     realCorrectedTime: text("real_corrected_time"),
+    rectificationReplyContent: text("rectification_reply_content"),
     lastSyncedAt: text("last_synced_at"),
     createdBy: text("created_by").notNull().default(""),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -200,6 +201,62 @@ export const reportRectificationOrderTable = sqliteTable(
     reportIdx: index("idx_report_rectification_order_report").on(table.reportId, table.createdAt),
     orderIdx: index("idx_report_rectification_order_hyy").on(table.huiYunYingOrderId, table.updatedAt),
     statusIdx: index("idx_report_rectification_order_status").on(table.status, table.updatedAt)
+  })
+);
+
+export const reportRectificationSyncBatchTable = sqliteTable(
+  "report_rectification_sync_batch",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    syncBatchId: text("sync_batch_id").notNull(),
+    triggerSource: text("trigger_source").notNull().default("scheduler"),
+    status: text("status").notNull().default("running"),
+    scannedCount: integer("scanned_count").notNull().default(0),
+    successCount: integer("success_count").notNull().default(0),
+    failedCount: integer("failed_count").notNull().default(0),
+    notFoundCount: integer("not_found_count").notNull().default(0),
+    skippedCount: integer("skipped_count").notNull().default(0),
+    averageResponseTimeMs: integer("average_response_time_ms"),
+    maxResponseTimeMs: integer("max_response_time_ms"),
+    configJson: text("config_json").notNull().default("{}"),
+    summaryJson: text("summary_json").notNull().default("{}"),
+    startedAt: text("started_at").notNull(),
+    finishedAt: text("finished_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    syncBatchUnique: uniqueIndex("report_rectification_sync_batch_unique").on(table.syncBatchId),
+    startedIdx: index("idx_report_rectification_sync_batch_started").on(table.startedAt),
+    statusIdx: index("idx_report_rectification_sync_batch_status").on(table.status, table.startedAt)
+  })
+);
+
+export const reportRectificationSyncLogTable = sqliteTable(
+  "report_rectification_sync_log",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    syncBatchId: text("sync_batch_id").notNull(),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => reportRectificationOrderTable.id, { onDelete: "cascade" }),
+    huiYunYingOrderId: text("huiyunying_order_id"),
+    status: text("status").notNull(),
+    errorType: text("error_type"),
+    errorMessage: text("error_message").notNull().default(""),
+    attemptCount: integer("attempt_count").notNull().default(1),
+    responseTimeMs: integer("response_time_ms"),
+    remoteStatus: text("remote_status"),
+    remoteIfCorrected: text("remote_if_corrected"),
+    requestPayloadJson: text("request_payload_json").notNull().default("{}"),
+    responsePayloadJson: text("response_payload_json").notNull().default("{}"),
+    syncedAt: text("synced_at").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    batchIdx: index("idx_report_rectification_sync_log_batch").on(table.syncBatchId, table.syncedAt),
+    orderIdx: index("idx_report_rectification_sync_log_order").on(table.orderId, table.syncedAt),
+    statusIdx: index("idx_report_rectification_sync_log_status").on(table.status, table.syncedAt)
   })
 );
 

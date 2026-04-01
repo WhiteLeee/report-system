@@ -10,6 +10,9 @@ export interface HuiYunYingApiSettings {
   rectificationDescriptionMaxLength: number;
   defaultShouldCorrectedDays: number;
   rectificationSyncIntervalMs: number;
+  rectificationSyncRetryCount: number;
+  rectificationSyncTimeoutMs: number;
+  rectificationSyncBatchSize: number;
 }
 
 export interface SystemSettingsRepository {

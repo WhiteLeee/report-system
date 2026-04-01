@@ -12,6 +12,10 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  ISSUE_SELECTION_MODAL_MESSAGE,
+  validateCompletedReviewSubmission
+} from "@/ui/result-review-workflow.validation";
 
 type ReviewIssueOption = {
   id: number;
@@ -42,8 +46,10 @@ export function ResultReviewWorkflow({
     Array.from(new Set(initialSelectedIssueIds.filter((issueId) => issues.some((issue) => issue.id === issueId))))
   );
   const [shouldCorrected, setShouldCorrected] = useState("");
+  const [shouldCorrectedError, setShouldCorrectedError] = useState("");
   const [note, setNote] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [issueSelectionModalOpen, setIssueSelectionModalOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [processingOpen, setProcessingOpen] = useState(false);
   const [previewOrders, setPreviewOrders] = useState<ReturnType<typeof buildRectificationPreviewOrders>>([]);
@@ -100,6 +106,18 @@ export function ResultReviewWorkflow({
 
   function handleSubmitCompletedPreview() {
     setErrorMessage("");
+    const validationResult = validateCompletedReviewSubmission({
+      selectedIssueCount: selectedIssues.length,
+      shouldCorrected
+    });
+    setShouldCorrectedError(validationResult.shouldCorrectedError);
+    if (validationResult.shouldCorrectedError) {
+      return;
+    }
+    if (validationResult.shouldShowIssueSelectionModal) {
+      setIssueSelectionModalOpen(true);
+      return;
+    }
     try {
       const nextPreviewOrders = buildRectificationPreviewOrders({
         selectedIssues,
@@ -129,6 +147,15 @@ export function ResultReviewWorkflow({
   function handleConfirmSubmit() {
     setIsSubmitting(true);
     setConfirmOpen(false);
+    setProcessingOpen(true);
+    void submitReview("completed").catch((error) => {
+      setErrorMessage(error instanceof Error ? error.message : "创建整改单失败。");
+    });
+  }
+
+  function handleIssueSelectionConfirm() {
+    setIsSubmitting(true);
+    setIssueSelectionModalOpen(false);
     setProcessingOpen(true);
     void submitReview("completed").catch((error) => {
       setErrorMessage(error instanceof Error ? error.message : "创建整改单失败。");
@@ -175,7 +202,7 @@ export function ResultReviewWorkflow({
             </ul>
           </>
         ) : (
-          <p className={styles.analysisCopy}>当前结果没有关联问题项，可以直接补充备注后完成复核。</p>
+          <p className={styles.analysisCopy}>当前结果没有关联问题项，提交复核时系统会提示先确认问题项。</p>
         )}
       </div>
 
@@ -186,12 +213,25 @@ export function ResultReviewWorkflow({
             <div className="field">
               <label htmlFor="shouldCorrected">整改截止日期</label>
               <Input
+                aria-describedby={shouldCorrectedError ? "shouldCorrected-error" : undefined}
+                aria-invalid={shouldCorrectedError ? true : undefined}
+                className={shouldCorrectedError ? styles.reviewInputError : undefined}
                 id="shouldCorrected"
                 name="should_corrected"
-                onChange={(event) => setShouldCorrected(event.target.value)}
+                onChange={(event) => {
+                  setShouldCorrected(event.target.value);
+                  if (shouldCorrectedError) {
+                    setShouldCorrectedError("");
+                  }
+                }}
                 type="date"
                 value={shouldCorrected}
               />
+              {shouldCorrectedError ? (
+                <div className={styles.reviewFieldError} id="shouldCorrected-error" role="alert">
+                  {shouldCorrectedError}
+                </div>
+              ) : null}
             </div>
             <div className="field">
               <label htmlFor="note">备注内容</label>
@@ -296,6 +336,48 @@ export function ResultReviewWorkflow({
         </div>,
           document.body
         )
+        : null}
+
+      {mounted && issueSelectionModalOpen
+        ? createPortal(
+            <div className={styles.reviewModalOverlay}>
+              <div
+                className={styles.reviewModalBackdrop}
+                onClick={() => {
+                  setIssueSelectionModalOpen(false);
+                }}
+              />
+              <div className={styles.reviewModalCard}>
+                <div className={styles.reviewModalHeader}>
+                  <div>
+                    <h3 className={styles.blockTitle}>请先勾选问题项</h3>
+                    <p className={styles.analysisCopy}>{ISSUE_SELECTION_MODAL_MESSAGE}</p>
+                  </div>
+                </div>
+                <div className={styles.reviewModalActions}>
+                  <Button
+                    onClick={() => {
+                      setIssueSelectionModalOpen(false);
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="secondary"
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    disabled={isSubmitting}
+                    onClick={handleIssueSelectionConfirm}
+                    size="sm"
+                    type="button"
+                  >
+                    确认
+                  </Button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
         : null}
 
       {mounted && processingOpen

@@ -18,6 +18,8 @@ export class RectificationPreviewError extends Error {
   }
 }
 
+const EMPTY_ISSUE_FALLBACK_DESCRIPTION = "当前结果未勾选具体问题项，请门店结合巡检图片完成整改。";
+
 function normalizeIssues(issues: RectificationIssueSelection[]): RectificationIssueSelection[] {
   return Array.from(
     new Map(
@@ -39,6 +41,12 @@ function buildIssueLine(issue: RectificationIssueSelection, allIssues: Rectifica
 function buildDescription(chunk: RectificationIssueSelection[], allIssues: RectificationIssueSelection[], note: string): string {
   const issueSection = chunk.map((issue) => buildIssueLine(issue, allIssues)).join("\n");
   const normalizedNote = note.trim();
+  if (!issueSection) {
+    if (!normalizedNote) {
+      return EMPTY_ISSUE_FALLBACK_DESCRIPTION;
+    }
+    return `复核备注：${normalizedNote}`;
+  }
   if (!normalizedNote) {
     return issueSection;
   }
@@ -53,15 +61,26 @@ export function buildRectificationPreviewOrders(input: {
   maxLength: number;
 }): RectificationPreviewOrder[] {
   const normalizedIssues = normalizeIssues(input.selectedIssues);
-  if (normalizedIssues.length === 0) {
-    throw new RectificationPreviewError("请至少勾选一个问题后再提交复核。");
-  }
-
   const normalizedNote = String(input.note || "").trim();
   const normalizedImageUrls = Array.from(
     new Set(input.imageUrls.map((url) => String(url || "").trim()).filter(Boolean))
   ).slice(0, 9);
   const maxLength = Math.max(1, Math.floor(Number(input.maxLength) || 0));
+  if (normalizedIssues.length === 0) {
+    const description = buildDescription([], [], normalizedNote);
+    if (description.length > maxLength) {
+      throw new RectificationPreviewError(`复核备注已超过 ${maxLength} 字，无法创建整改单。`);
+    }
+    return [
+      {
+        description,
+        issueCount: 0,
+        selectedIssues: [],
+        imageUrls: normalizedImageUrls,
+        shouldCorrected: input.shouldCorrected
+      }
+    ];
+  }
 
   const chunks: RectificationIssueSelection[][] = [];
   let currentChunk: RectificationIssueSelection[] = [];

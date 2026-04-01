@@ -10,6 +10,9 @@ export interface HuiYunYingResolvedSettings {
   rectificationDescriptionMaxLength: number;
   defaultShouldCorrectedDays: number;
   rectificationSyncIntervalMs: number;
+  rectificationSyncRetryCount: number;
+  rectificationSyncTimeoutMs: number;
+  rectificationSyncBatchSize: number;
 }
 
 export interface HuiYunYingSignResponse {
@@ -41,6 +44,11 @@ export interface HuiYunYingRectificationOrderItem {
   shouldCorrected?: string;
   realCorrected?: string;
   realCorrectedTime?: string;
+  inspectionPointsStr?: string;
+  contentTitle?: string;
+  markNames?: string;
+  examiner?: string;
+  examineTime?: string;
   modifiedTime?: string;
   [key: string]: unknown;
 }

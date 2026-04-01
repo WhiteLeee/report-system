@@ -40,6 +40,10 @@ function readBusinessMessage(payload: Record<string, unknown>): string {
   return String(payload.message || payload.error_msg || payload.error || "").trim();
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
 export class HuiYunYingClient {
   private readonly rateLimiter: HuiYunYingRateLimiter;
 
@@ -77,13 +81,36 @@ export class HuiYunYingClient {
       headers,
       body
     });
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      cache: "no-store"
-    });
-    return response;
+    const timeoutMs = Math.max(1, this.settings.rectificationSyncTimeoutMs);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        cache: "no-store",
+        signal: controller.signal
+      });
+    } catch (error) {
+      const message = isAbortError(error)
+        ? `慧运营请求超时: ${timeoutMs}ms`
+        : `慧运营请求失败: ${error instanceof Error ? error.message : "Unknown error"}`;
+      logHuiYunYingError({
+        label,
+        method: "POST",
+        url,
+        message,
+        detail: body
+      });
+      throw new HuiYunYingHttpError(
+        message,
+        isAbortError(error) ? 408 : 500,
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   private async executeWithTokenRetry<T>(

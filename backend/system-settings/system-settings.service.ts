@@ -19,7 +19,10 @@ export class SystemSettingsService {
       rectificationListRoute: settings.rectificationListRoute.trim(),
       rectificationDescriptionMaxLength: Math.max(1, Math.floor(settings.rectificationDescriptionMaxLength)),
       defaultShouldCorrectedDays: Math.max(0, Math.floor(settings.defaultShouldCorrectedDays)),
-      rectificationSyncIntervalMs: Math.max(0, Math.floor(settings.rectificationSyncIntervalMs))
+      rectificationSyncIntervalMs: Math.max(0, Math.floor(settings.rectificationSyncIntervalMs)),
+      rectificationSyncRetryCount: Math.max(0, Math.floor(settings.rectificationSyncRetryCount)),
+      rectificationSyncTimeoutMs: Math.max(1, Math.floor(settings.rectificationSyncTimeoutMs)),
+      rectificationSyncBatchSize: Math.max(1, Math.floor(settings.rectificationSyncBatchSize))
     });
   }
 }

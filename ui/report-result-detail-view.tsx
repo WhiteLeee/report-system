@@ -7,6 +7,7 @@ import styles from "./report-result-detail-view.module.css";
 
 import type { SessionUser } from "@/backend/auth/auth.types";
 import type { ReportDetail, ReportInspection, ReportIssue } from "@/backend/report/report.types";
+import { getRectificationStateLabel } from "@/backend/rectification/rectification-sync";
 import type { RectificationOrderRecord } from "@/backend/rectification/rectification.types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -237,19 +238,7 @@ function renderMarkdownBlocks(content: string): ReactNode[] {
 }
 
 function formatRectificationState(order: RectificationOrderRecord): string {
-  if (order.if_corrected === "1") {
-    return "已整改";
-  }
-  if (order.if_corrected === "2") {
-    return "待审核";
-  }
-  if (order.if_corrected === "0") {
-    return "未整改";
-  }
-  if (order.status === "sync_failed") {
-    return "同步失败";
-  }
-  return "已下发";
+  return getRectificationStateLabel(order);
 }
 
 function readSelectedIssueIds(reviewPayload: ReportDetail["results"][number]["review_payload"]): number[] {

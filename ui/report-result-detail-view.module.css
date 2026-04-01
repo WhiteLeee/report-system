@@ -392,6 +392,23 @@
   flex-wrap: wrap;
 }
 
+.reviewInputError {
+  border-color: rgba(239, 68, 68, 0.48);
+  background: rgba(254, 242, 242, 0.92);
+}
+
+.reviewInputError:focus {
+  border-color: rgba(239, 68, 68, 0.56);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+}
+
+.reviewFieldError {
+  margin-top: 8px;
+  color: #dc2626;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .reviewError {
   padding: 12px 14px;
   border-radius: 14px;

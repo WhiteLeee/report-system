@@ -92,9 +92,6 @@ export async function POST(
     if (!shouldCorrected) {
       return Response.json({ success: false, error: "整改截止日期不能为空。" }, { status: 400 });
     }
-    if (selectedIssues.length === 0) {
-      return Response.json({ success: false, error: "请至少勾选一个问题后再提交复核。" }, { status: 400 });
-    }
 
     const report = reportService.getReportDetail(reportId, requestContext);
     const resultDetail = report?.results.find((result) => result.id === imageId) ?? null;

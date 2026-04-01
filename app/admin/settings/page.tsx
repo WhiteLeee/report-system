@@ -129,8 +129,8 @@ export default async function AdminSettingsPage() {
 
               <div className={styles.settingSection}>
                 <div className={styles.settingSectionHeader}>
-                  <h3 className={styles.settingSectionTitle}>整改单约束</h3>
-                  <p className={styles.settingSectionCopy}>用于约束描述长度，并预留默认整改天数字段供后续策略使用。</p>
+                  <h3 className={styles.settingSectionTitle}>整改单同步设置</h3>
+                  <p className={styles.settingSectionCopy}>用于约束描述长度，并配置定时同步的间隔、超时、重试次数与批处理规模。</p>
                 </div>
                 <div className={styles.formGrid}>
                   <div className="field">
@@ -165,6 +165,42 @@ export default async function AdminSettingsPage() {
                       inputMode="numeric"
                       min={0}
                       name="rectificationSyncIntervalMs"
+                      required
+                      type="number"
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="rectificationSyncRetryCount">同步重试次数</label>
+                    <Input
+                      defaultValue={String(huiYunYingApiSettings.rectificationSyncRetryCount)}
+                      id="rectificationSyncRetryCount"
+                      inputMode="numeric"
+                      min={0}
+                      name="rectificationSyncRetryCount"
+                      required
+                      type="number"
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="rectificationSyncTimeoutMs">同步超时（ms）</label>
+                    <Input
+                      defaultValue={String(huiYunYingApiSettings.rectificationSyncTimeoutMs)}
+                      id="rectificationSyncTimeoutMs"
+                      inputMode="numeric"
+                      min={1}
+                      name="rectificationSyncTimeoutMs"
+                      required
+                      type="number"
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="rectificationSyncBatchSize">单次同步数量</label>
+                    <Input
+                      defaultValue={String(huiYunYingApiSettings.rectificationSyncBatchSize)}
+                      id="rectificationSyncBatchSize"
+                      inputMode="numeric"
+                      min={1}
+                      name="rectificationSyncBatchSize"
                       required
                       type="number"
                     />

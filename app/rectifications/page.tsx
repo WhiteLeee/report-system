@@ -4,6 +4,10 @@ import styles from "./rectifications-page.module.css";
 
 import { buildRequestContext, requirePermission } from "@/backend/auth/session";
 import { createRectificationService } from "@/backend/rectification/rectification.module";
+import {
+  getRectificationStateLabel,
+  normalizeRemoteIfCorrected
+} from "@/backend/rectification/rectification-sync";
 import type {
   RectificationOrderFilters,
   RectificationOrderRecord
@@ -32,29 +36,12 @@ function buildFilters(searchParams: Record<string, string | string[] | undefined
 }
 
 function formatRectificationState(order: RectificationOrderRecord): string {
-  if (order.if_corrected === "1") {
-    return "已整改";
-  }
-  if (order.if_corrected === "2") {
-    return "待审核";
-  }
-  if (order.if_corrected === "0") {
-    return "已下发";
-  }
-  if (order.status === "corrected") {
-    return "已整改";
-  }
-  if (order.status === "pending_review") {
-    return "待审核";
-  }
-  if (order.status === "sync_failed") {
-    return "同步失败";
-  }
-  return "已下发";
+  return getRectificationStateLabel(order);
 }
 
 function formatStateTone(order: RectificationOrderRecord): "default" | "secondary" | "outline" {
-  if (order.if_corrected === "1" || order.status === "corrected") {
+  const normalized = normalizeRemoteIfCorrected(order.if_corrected);
+  if (normalized === "1" || order.status === "corrected") {
     return "secondary";
   }
   if (order.status === "sync_failed") {
@@ -73,15 +60,19 @@ export default async function RectificationsPage({
   const filters = buildFilters(resolvedSearchParams);
   const requestContext = buildRequestContext(currentUser);
   const orders = rectificationService.listOrders(filters, requestContext);
+  const syncDashboard = rectificationService.getSyncDashboard();
 
   const totalOrders = orders.length;
-  const correctedOrders = orders.filter((order) => order.if_corrected === "1" || order.status === "corrected").length;
+  const correctedOrders = orders.filter(
+    (order) => normalizeRemoteIfCorrected(order.if_corrected) === "1" || order.status === "corrected"
+  ).length;
   const pendingReviewOrders = orders.filter(
-    (order) => order.if_corrected === "2" || order.status === "pending_review"
+    (order) => normalizeRemoteIfCorrected(order.if_corrected) === "2" || order.status === "pending_review"
   ).length;
   const issuedOrders = orders.filter(
-    (order) => !["1", "2"].includes(String(order.if_corrected || "")) && order.status !== "sync_failed"
+    (order) => !["1", "2"].includes(String(normalizeRemoteIfCorrected(order.if_corrected) || "")) && order.status !== "sync_failed"
   ).length;
+  const latestBatch = syncDashboard.recent_batches[0] || null;
 
   return (
     <main className="page-shell">
@@ -123,6 +114,7 @@ export default async function RectificationsPage({
           </Card>
         </div>
       </section>
+
 
       <section className={`section ${styles.workspaceSection}`}>
         <Card className={styles.workspacePanel}>
@@ -296,6 +288,99 @@ export default async function RectificationsPage({
             )}
           </CardContent>
         </Card>
+      </section>
+
+      <section className={`section ${styles.workspaceSection}`}>
+        <div className={styles.syncStatsGrid}>
+          <Card className={styles.syncPanel}>
+            <CardHeader className={styles.syncPanelHeader}>
+              <div>
+                <CardTitle className={styles.listTitle}>同步任务概览</CardTitle>
+                <CardDescription className={styles.listCopy}>
+                  展示最近一次定时同步的执行结果与耗时统计。
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className={styles.syncPanelBody}>
+              <div className={styles.syncMetricGrid}>
+                <div className={styles.syncMetricItem}>
+                  <span className={styles.statLabel}>最近批次</span>
+                  <strong className={styles.syncMetricValue}>{latestBatch?.sync_batch_id || "-"}</strong>
+                  <span className={styles.cellMeta}>
+                    {latestBatch?.started_at ? formatDisplayDate(latestBatch.started_at) : "暂无同步记录"}
+                  </span>
+                </div>
+                <div className={styles.syncMetricItem}>
+                  <span className={styles.statLabel}>成功 / 失败</span>
+                  <strong className={styles.syncMetricValue}>
+                    {latestBatch ? `${latestBatch.success_count} / ${latestBatch.failed_count}` : "-"}
+                  </strong>
+                  <span className={styles.cellMeta}>
+                    {latestBatch
+                      ? `未命中 ${latestBatch.not_found_count}，跳过 ${latestBatch.skipped_count}`
+                      : "等待定时任务执行"}
+                  </span>
+                </div>
+                <div className={styles.syncMetricItem}>
+                  <span className={styles.statLabel}>平均响应时间</span>
+                  <strong className={styles.syncMetricValue}>
+                    {latestBatch?.average_response_time_ms ? `${latestBatch.average_response_time_ms} ms` : "-"}
+                  </strong>
+                  <span className={styles.cellMeta}>
+                    {latestBatch?.max_response_time_ms ? `峰值 ${latestBatch.max_response_time_ms} ms` : "暂无接口耗时"}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={styles.syncPanel}>
+            <CardHeader className={styles.syncPanelHeader}>
+              <div>
+                <CardTitle className={styles.listTitle}>近 7 日同步统计</CardTitle>
+                <CardDescription className={styles.listCopy}>
+                  按天汇总同步成功、失败、未命中与接口响应时间。
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className={styles.syncPanelBody}>
+              {syncDashboard.daily_stats.length > 0 ? (
+                <div className={styles.syncSummaryTableWrap}>
+                  <table className={styles.syncSummaryTable}>
+                    <thead>
+                      <tr>
+                        <th>日期</th>
+                        <th>批次</th>
+                        <th>扫描</th>
+                        <th>成功</th>
+                        <th>失败</th>
+                        <th>未命中</th>
+                        <th>跳过</th>
+                        <th>平均耗时</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {syncDashboard.daily_stats.map((item) => (
+                        <tr key={item.sync_date}>
+                          <td>{item.sync_date}</td>
+                          <td>{item.batch_count}</td>
+                          <td>{item.scanned_count}</td>
+                          <td>{item.success_count}</td>
+                          <td>{item.failed_count}</td>
+                          <td>{item.not_found_count}</td>
+                          <td>{item.skipped_count}</td>
+                          <td>{item.average_response_time_ms ? `${item.average_response_time_ms} ms` : "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState className={styles.emptyState}>最近 7 天暂无同步统计。</EmptyState>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </section>
     </main>
   );

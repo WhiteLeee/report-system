@@ -71,6 +71,13 @@
       "when": 1774877056250,
       "tag": "0009_narrow_chronomancer",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1775005823274,
+      "tag": "0010_shallow_omega_red",
+      "breakpoints": true
     }
   ]
 }

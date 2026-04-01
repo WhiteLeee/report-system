@@ -51,6 +51,75 @@
   display: block;
 }
 
+.syncStatsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.syncPanel {
+  overflow: hidden;
+}
+
+.syncPanelHeader {
+  padding: 24px 24px 18px;
+  border-bottom: 1px solid rgba(56, 49, 37, 0.08);
+}
+
+.syncPanelBody {
+  padding: 18px 24px 24px;
+}
+
+.syncMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.syncMetricItem {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid rgba(56, 49, 37, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.syncMetricValue {
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.syncSummaryTableWrap {
+  overflow-x: auto;
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.syncSummaryTable {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.syncSummaryTable thead th {
+  padding: 14px 16px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  background: rgba(244, 237, 223, 0.78);
+}
+
+.syncSummaryTable tbody td {
+  padding: 14px 16px;
+  border-top: 1px solid rgba(56, 49, 37, 0.08);
+  font-size: 14px;
+}
+
 .workspacePanel {
   overflow: hidden;
 }
@@ -275,6 +344,10 @@
 @media (max-width: 1080px) {
   .statsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .syncMetricGrid {
+    grid-template-columns: 1fr;
   }
 
   .filterFormRow {

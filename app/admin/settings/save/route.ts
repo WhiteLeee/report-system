@@ -34,7 +34,10 @@ export async function POST(request: Request): Promise<Response> {
     rateLimitWindowMs: readPositiveNumber(formData.get("rateLimitWindowMs"), 60000),
     rectificationDescriptionMaxLength: readPositiveNumber(formData.get("rectificationDescriptionMaxLength"), 500),
     defaultShouldCorrectedDays: readNonNegativeNumber(formData.get("defaultShouldCorrectedDays"), 0),
-    rectificationSyncIntervalMs: readNonNegativeNumber(formData.get("rectificationSyncIntervalMs"), 600000)
+    rectificationSyncIntervalMs: readNonNegativeNumber(formData.get("rectificationSyncIntervalMs"), 1800000),
+    rectificationSyncRetryCount: readNonNegativeNumber(formData.get("rectificationSyncRetryCount"), 2),
+    rectificationSyncTimeoutMs: readPositiveNumber(formData.get("rectificationSyncTimeoutMs"), 10000),
+    rectificationSyncBatchSize: readPositiveNumber(formData.get("rectificationSyncBatchSize"), 50)
   });
   ensureRectificationSyncManagerStarted();
 

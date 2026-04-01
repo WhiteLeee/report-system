@@ -7,8 +7,36 @@ declare global {
     | {
         timer: NodeJS.Timeout | null;
         intervalMs: number;
+        runningPromise: Promise<unknown> | null;
       }
     | undefined;
+}
+
+async function triggerRectificationSync(): Promise<void> {
+  const state = globalThis.__reportSystemRectificationSyncManager;
+  if (!state) {
+    return;
+  }
+  if (state.runningPromise) {
+    await state.runningPromise;
+    return;
+  }
+
+  const promise = createRectificationService()
+    .syncPendingOrders(undefined, "scheduler")
+    .catch((error) => {
+      console.error(
+        `[rectification-sync][scheduler:error] ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    })
+    .finally(() => {
+      if (globalThis.__reportSystemRectificationSyncManager) {
+        globalThis.__reportSystemRectificationSyncManager.runningPromise = null;
+      }
+    });
+
+  state.runningPromise = promise;
+  await promise;
 }
 
 export function ensureRectificationSyncManagerStarted(): void {
@@ -16,7 +44,8 @@ export function ensureRectificationSyncManagerStarted(): void {
   const intervalMs = Math.max(0, settings.rectificationSyncIntervalMs);
   const state = globalThis.__reportSystemRectificationSyncManager || {
     timer: null,
-    intervalMs: -1
+    intervalMs: -1,
+    runningPromise: null
   };
 
   if (state.timer && state.intervalMs === intervalMs) {
@@ -32,8 +61,9 @@ export function ensureRectificationSyncManagerStarted(): void {
   state.intervalMs = intervalMs;
 
   if (intervalMs > 0) {
+    void triggerRectificationSync();
     state.timer = setInterval(() => {
-      void createRectificationService().syncPendingOrders().catch(() => undefined);
+      void triggerRectificationSync();
     }, intervalMs);
   }
 

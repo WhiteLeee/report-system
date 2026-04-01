@@ -17,7 +17,10 @@ const defaultHuiYunYingApiSettings: HuiYunYingApiSettings = {
   rectificationListRoute: "/route/ri/open/item/list",
   rectificationDescriptionMaxLength: 500,
   defaultShouldCorrectedDays: 0,
-  rectificationSyncIntervalMs: 600000
+  rectificationSyncIntervalMs: 1800000,
+  rectificationSyncRetryCount: 2,
+  rectificationSyncTimeoutMs: 10000,
+  rectificationSyncBatchSize: 50
 };
 
 function safeParseSettings(value: string): HuiYunYingApiSettings {
@@ -52,7 +55,19 @@ function safeParseSettings(value: string): HuiYunYingApiSettings {
       rectificationSyncIntervalMs:
         Number.isFinite(parsed.rectificationSyncIntervalMs) && Number(parsed.rectificationSyncIntervalMs) >= 0
           ? Number(parsed.rectificationSyncIntervalMs)
-          : defaultHuiYunYingApiSettings.rectificationSyncIntervalMs
+          : defaultHuiYunYingApiSettings.rectificationSyncIntervalMs,
+      rectificationSyncRetryCount:
+        Number.isFinite(parsed.rectificationSyncRetryCount) && Number(parsed.rectificationSyncRetryCount) >= 0
+          ? Number(parsed.rectificationSyncRetryCount)
+          : defaultHuiYunYingApiSettings.rectificationSyncRetryCount,
+      rectificationSyncTimeoutMs:
+        Number.isFinite(parsed.rectificationSyncTimeoutMs) && Number(parsed.rectificationSyncTimeoutMs) > 0
+          ? Number(parsed.rectificationSyncTimeoutMs)
+          : defaultHuiYunYingApiSettings.rectificationSyncTimeoutMs,
+      rectificationSyncBatchSize:
+        Number.isFinite(parsed.rectificationSyncBatchSize) && Number(parsed.rectificationSyncBatchSize) > 0
+          ? Number(parsed.rectificationSyncBatchSize)
+          : defaultHuiYunYingApiSettings.rectificationSyncBatchSize
     };
   } catch {
     return defaultHuiYunYingApiSettings;

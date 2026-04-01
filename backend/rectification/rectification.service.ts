@@ -1,10 +1,23 @@
+import { randomUUID } from "node:crypto";
+
 import type { RequestContext } from "@/backend/auth/request-context";
 import { createHuiYunYingRectificationService } from "@/backend/integrations/huiyunying/huiyunying.module";
-import type { HuiYunYingCreateRectificationInput } from "@/backend/integrations/huiyunying/huiyunying.types";
+import type {
+  HuiYunYingCreateRectificationInput,
+  HuiYunYingListRectificationInput,
+  HuiYunYingRectificationOrderItem
+} from "@/backend/integrations/huiyunying/huiyunying.types";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
 import type { ReviewSelectedIssue } from "@/backend/report/report.types";
+import {
+  buildRectificationSyncPatch,
+  isRemoteRectificationSnapshotUnchanged
+} from "@/backend/rectification/rectification-sync";
 import type {
   CreateRectificationOrderInput,
+  RectificationSyncBatchRecord,
+  RectificationSyncDashboard,
+  RectificationSyncLogStatus,
   RectificationOrderFilters,
   RectificationOrderRecord
 } from "@/backend/rectification/rectification.types";
@@ -33,6 +46,22 @@ type CreateOrdersInput = {
   context?: RequestContext;
 };
 
+type SyncTriggerSource = "scheduler" | "detail_view";
+
+type SyncExecutionResult = {
+  status: RectificationSyncLogStatus;
+  orderId: number;
+  huiYunYingOrderId: string | null;
+  remoteStatus: RectificationOrderRecord["status"] | null;
+  remoteIfCorrected: string | null;
+  requestPayload: JsonValue;
+  responsePayload: JsonValue;
+  responseTimeMs: number | null;
+  attemptCount: number;
+  errorType: string | null;
+  errorMessage: string;
+};
+
 function formatDateOnly(value: string | Date): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -43,6 +72,175 @@ function formatDateOnly(value: string | Date): string {
 
 export class RectificationService {
   constructor(private readonly repository: RectificationOrderRepository) {}
+
+  private buildSyncRequest(order: RectificationOrderRecord): HuiYunYingListRectificationInput {
+    const today = formatDateOnly(new Date());
+    const createdDate = formatDateOnly(order.created_at) || today;
+    return {
+      searchName: order.store_code || order.store_name || order.store_id || "",
+      pageNumber: 1,
+      pageSize: 50,
+      startDate: createdDate,
+      endDate: today,
+      modifyStartDate: createdDate,
+      modifyEndDate: today
+    };
+  }
+
+  private findMatchedRemoteOrder(
+    order: RectificationOrderRecord,
+    items: HuiYunYingRectificationOrderItem[]
+  ): HuiYunYingRectificationOrderItem | null {
+    return (
+      items.find((item) => String(item.disqualifiedId || "").trim() === String(order.huiyunying_order_id || "").trim()) ||
+      items.find(
+        (item) =>
+          String(item.storeCode || "").trim() === String(order.store_code || "").trim() &&
+          String(item.description || "").trim() === order.request_description
+      ) ||
+      null
+    );
+  }
+
+  private async executeSyncAttempt(order: RectificationOrderRecord): Promise<SyncExecutionResult> {
+    const startedAt = Date.now();
+    const requestPayload = this.buildSyncRequest(order);
+    const huiYunYingService = createHuiYunYingRectificationService();
+    const items = await huiYunYingService.listRectificationOrders(requestPayload);
+    const responseTimeMs = Math.max(0, Date.now() - startedAt);
+    const matched = this.findMatchedRemoteOrder(order, items);
+    const syncedAt = new Date().toISOString();
+
+    if (!matched) {
+      this.repository.updateSyncState(order.id, {
+        last_synced_at: syncedAt,
+        response_payload: {
+          status: "not_found",
+          items_count: items.length,
+          request: requestPayload as unknown as JsonValue
+        }
+      });
+      return {
+        status: "not_found",
+        orderId: order.id,
+        huiYunYingOrderId: order.huiyunying_order_id,
+        remoteStatus: order.status,
+        remoteIfCorrected: order.if_corrected,
+        requestPayload: requestPayload as unknown as JsonValue,
+        responsePayload: {
+          status: "not_found",
+          items_count: items.length
+        },
+        responseTimeMs,
+        attemptCount: 1,
+        errorType: null,
+        errorMessage: ""
+      };
+    }
+
+    const patch = buildRectificationSyncPatch(order, matched);
+    const nextSyncedAt = new Date().toISOString();
+    const unchanged = isRemoteRectificationSnapshotUnchanged(order, matched);
+
+    this.repository.updateSyncState(order.id, {
+      ...(unchanged ? {} : patch),
+      last_synced_at: nextSyncedAt
+    });
+
+    return {
+      status: unchanged ? "skipped" : "success",
+      orderId: order.id,
+      huiYunYingOrderId: patch.huiyunying_order_id,
+      remoteStatus: patch.status,
+      remoteIfCorrected: patch.if_corrected,
+      requestPayload: requestPayload as unknown as JsonValue,
+      responsePayload: patch.response_payload,
+      responseTimeMs,
+      attemptCount: 1,
+      errorType: null,
+      errorMessage: ""
+    };
+  }
+
+  private async syncOrderWithRetry(
+    order: RectificationOrderRecord,
+    retryCount: number
+  ): Promise<SyncExecutionResult> {
+    let lastError: unknown = null;
+    let lastResponseTimeMs: number | null = null;
+
+    for (let attemptIndex = 0; attemptIndex <= retryCount; attemptIndex += 1) {
+      try {
+        const result = await this.executeSyncAttempt(order);
+        return {
+          ...result,
+          attemptCount: attemptIndex + 1
+        };
+      } catch (error) {
+        lastError = error;
+        lastResponseTimeMs = lastResponseTimeMs ?? 0;
+        if (attemptIndex === retryCount) {
+          break;
+        }
+      }
+    }
+
+    const syncedAt = new Date().toISOString();
+    const errorMessage = lastError instanceof Error ? lastError.message : "未知同步异常";
+    const errorType =
+      lastError instanceof Error && lastError.name ? lastError.name : typeof lastError === "string" ? "Error" : "UnknownError";
+
+    this.repository.updateSyncState(order.id, {
+      status: "sync_failed",
+      last_synced_at: syncedAt
+    });
+
+    return {
+      status: "failed",
+      orderId: order.id,
+      huiYunYingOrderId: order.huiyunying_order_id,
+      remoteStatus: null,
+      remoteIfCorrected: null,
+      requestPayload: this.buildSyncRequest(order) as unknown as JsonValue,
+      responsePayload: {
+        error_type: errorType,
+        error_message: errorMessage
+      },
+      responseTimeMs: lastResponseTimeMs,
+      attemptCount: retryCount + 1,
+      errorType,
+      errorMessage
+    };
+  }
+
+  private logSyncBatchStart(batchId: string, triggerSource: SyncTriggerSource, scannedCount: number): void {
+    console.info(
+      `[rectification-sync][batch:start] ${JSON.stringify({
+        sync_batch_id: batchId,
+        trigger_source: triggerSource,
+        scanned_count: scannedCount,
+        started_at: new Date().toISOString()
+      })}`
+    );
+  }
+
+  private logSyncBatchResult(batch: RectificationSyncBatchRecord): void {
+    console.info(
+      `[rectification-sync][batch:finish] ${JSON.stringify({
+        sync_batch_id: batch.sync_batch_id,
+        status: batch.status,
+        scanned_count: batch.scanned_count,
+        success_count: batch.success_count,
+        failed_count: batch.failed_count,
+        not_found_count: batch.not_found_count,
+        skipped_count: batch.skipped_count,
+        average_response_time_ms: batch.average_response_time_ms,
+        max_response_time_ms: batch.max_response_time_ms,
+        started_at: batch.started_at,
+        finished_at: batch.finished_at
+      })}`
+    );
+  }
 
   async createOrdersForReview(input: CreateOrdersInput): Promise<RectificationOrderRecord[]> {
     const settings = createSystemSettingsService().getHuiYunYingApiSettings();
@@ -107,6 +305,7 @@ export class RectificationService {
           response_payload: remoteResponse as JsonValue,
           status: "created",
           should_corrected: input.shouldCorrected,
+          rectification_reply_content: null,
           last_synced_at: new Date().toISOString(),
           created_by: input.createdBy
         })
@@ -128,51 +327,16 @@ export class RectificationService {
     return this.repository.listByResultId(resultId);
   }
 
+  getSyncDashboard(days = 7, recentBatchLimit = 10): RectificationSyncDashboard {
+    return {
+      recent_batches: this.repository.listRecentSyncBatches(recentBatchLimit),
+      daily_stats: this.repository.listDailySyncStats(days)
+    };
+  }
+
   async syncOrderStatus(order: RectificationOrderRecord): Promise<RectificationOrderRecord> {
-    const huiYunYingService = createHuiYunYingRectificationService();
-    const today = formatDateOnly(new Date());
-    const createdDate = formatDateOnly(order.created_at) || today;
-    const items = await huiYunYingService.listRectificationOrders({
-      searchName: order.store_code || order.store_name || order.store_id || "",
-      pageNumber: 1,
-      pageSize: 50,
-      startDate: createdDate,
-      endDate: today,
-      modifyStartDate: createdDate,
-      modifyEndDate: today
-    });
-
-    const matched =
-      items.find((item) => String(item.disqualifiedId || "").trim() === String(order.huiyunying_order_id || "").trim()) ||
-      items.find(
-        (item) =>
-          String(item.storeCode || "").trim() === String(order.store_code || "").trim() &&
-          String(item.description || "").trim() === order.request_description
-      ) ||
-      null;
-
-    if (!matched) {
-      this.repository.updateSyncState(order.id, {
-        last_synced_at: new Date().toISOString(),
-        response_payload: { status: "not_found" }
-      });
-      return this.repository.listByResultId(order.result_id).find((item) => item.id === order.id) || order;
-    }
-
-    const ifCorrected = String(matched.ifCorrected || "").trim() || null;
-    const status =
-      ifCorrected === "1" ? "corrected" : ifCorrected === "2" ? "pending_review" : "created";
-
-    this.repository.updateSyncState(order.id, {
-      huiyunying_order_id:
-        String(matched.disqualifiedId || "").trim() || order.huiyunying_order_id,
-      status,
-      if_corrected: ifCorrected,
-      real_corrected_time: String(matched.realCorrectedTime || "").trim() || null,
-      last_synced_at: new Date().toISOString(),
-      response_payload: matched as unknown as JsonValue
-    });
-
+    const settings = createSystemSettingsService().getHuiYunYingApiSettings();
+    await this.syncOrderWithRetry(order, settings.rectificationSyncRetryCount);
     return this.repository.listByResultId(order.result_id).find((item) => item.id === order.id) || order;
   }
 
@@ -187,10 +351,92 @@ export class RectificationService {
     return this.repository.listByResultId(resultId);
   }
 
-  async syncPendingOrders(limit = 50): Promise<void> {
-    const orders = this.repository.listPendingSync(limit);
+  async syncPendingOrders(limit?: number, triggerSource: SyncTriggerSource = "scheduler"): Promise<RectificationSyncBatchRecord> {
+    const settings = createSystemSettingsService().getHuiYunYingApiSettings();
+    const batchLimit = limit ?? settings.rectificationSyncBatchSize;
+    const orders = this.repository.listPendingSync(batchLimit);
+    const syncBatchId = `rectification-sync-${Date.now()}-${randomUUID().slice(0, 8)}`;
+    const startedAt = new Date().toISOString();
+    this.logSyncBatchStart(syncBatchId, triggerSource, orders.length);
+    const batch = this.repository.createSyncBatch({
+      sync_batch_id: syncBatchId,
+      trigger_source: triggerSource,
+      status: "running",
+      scanned_count: orders.length,
+      config: {
+        batch_size: batchLimit,
+        retry_count: settings.rectificationSyncRetryCount,
+        timeout_ms: settings.rectificationSyncTimeoutMs,
+        interval_ms: settings.rectificationSyncIntervalMs
+      },
+      started_at: startedAt
+    });
+
+    let successCount = 0;
+    let failedCount = 0;
+    let notFoundCount = 0;
+    let skippedCount = 0;
+    let responseTimeTotal = 0;
+    let responseTimeCount = 0;
+    let responseTimeMax = 0;
+
     for (const order of orders) {
-      await this.syncOrderStatus(order);
+      const result = await this.syncOrderWithRetry(order, settings.rectificationSyncRetryCount);
+      this.repository.createSyncLog({
+        sync_batch_id: syncBatchId,
+        order_id: result.orderId,
+        huiyunying_order_id: result.huiYunYingOrderId,
+        status: result.status,
+        error_type: result.errorType,
+        error_message: result.errorMessage,
+        attempt_count: result.attemptCount,
+        response_time_ms: result.responseTimeMs,
+        remote_status: result.remoteStatus,
+        remote_if_corrected: result.remoteIfCorrected,
+        request_payload: result.requestPayload,
+        response_payload: result.responsePayload,
+        synced_at: new Date().toISOString()
+      });
+
+      if (result.status === "success") {
+        successCount += 1;
+      } else if (result.status === "failed") {
+        failedCount += 1;
+      } else if (result.status === "not_found") {
+        notFoundCount += 1;
+      } else if (result.status === "skipped") {
+        skippedCount += 1;
+      }
+
+      if (typeof result.responseTimeMs === "number" && Number.isFinite(result.responseTimeMs)) {
+        responseTimeTotal += result.responseTimeMs;
+        responseTimeCount += 1;
+        responseTimeMax = Math.max(responseTimeMax, result.responseTimeMs);
+      }
     }
+
+    const finishedAt = new Date().toISOString();
+    this.repository.finalizeSyncBatch(syncBatchId, {
+      status: failedCount > 0 ? "completed_with_errors" : "completed",
+      success_count: successCount,
+      failed_count: failedCount,
+      not_found_count: notFoundCount,
+      skipped_count: skippedCount,
+      average_response_time_ms: responseTimeCount > 0 ? Math.round(responseTimeTotal / responseTimeCount) : null,
+      max_response_time_ms: responseTimeCount > 0 ? responseTimeMax : null,
+      summary: {
+        scanned_count: orders.length,
+        success_count: successCount,
+        failed_count: failedCount,
+        not_found_count: notFoundCount,
+        skipped_count: skippedCount
+      },
+      finished_at: finishedAt
+    });
+
+    const completedBatch =
+      this.repository.listRecentSyncBatches(1).find((item) => item.sync_batch_id === syncBatchId) || batch;
+    this.logSyncBatchResult(completedBatch);
+    return completedBatch;
   }
 }

@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { buildRectificationPreviewOrders, RectificationPreviewError } from "../lib/rectification-preview";
+
+test("未勾选问题项时使用默认描述生成整改单预览", () => {
+  const orders = buildRectificationPreviewOrders({
+    selectedIssues: [],
+    note: "",
+    shouldCorrected: "2026-04-08",
+    imageUrls: ["https://example.com/a.jpg"],
+    maxLength: 500
+  });
+
+  assert.equal(orders.length, 1);
+  assert.equal(orders[0].issueCount, 0);
+  assert.equal(orders[0].selectedIssues.length, 0);
+  assert.equal(orders[0].description, "当前结果未勾选具体问题项，请门店结合巡检图片完成整改。");
+});
+
+test("未勾选问题项但填写备注时使用备注生成整改单预览", () => {
+  const orders = buildRectificationPreviewOrders({
+    selectedIssues: [],
+    note: "请门店重点核查陈列完整性。",
+    shouldCorrected: "2026-04-08",
+    imageUrls: [],
+    maxLength: 500
+  });
+
+  assert.equal(orders.length, 1);
+  assert.equal(orders[0].description, "复核备注：请门店重点核查陈列完整性。");
+});
+
+test("未勾选问题项且备注超长时返回长度错误", () => {
+  assert.throws(
+    () =>
+      buildRectificationPreviewOrders({
+        selectedIssues: [],
+        note: "这是一个很长的备注",
+        shouldCorrected: "2026-04-08",
+        imageUrls: [],
+        maxLength: 5
+      }),
+    (error) => error instanceof RectificationPreviewError && error.message === "复核备注已超过 5 字，无法创建整改单。"
+  );
+});

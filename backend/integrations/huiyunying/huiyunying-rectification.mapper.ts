@@ -42,6 +42,9 @@ export function resolveHuiYunYingSettings(settings: HuiYunYingApiSettings): HuiY
     rateLimitWindowMs: settings.rateLimitWindowMs,
     rectificationDescriptionMaxLength: settings.rectificationDescriptionMaxLength,
     defaultShouldCorrectedDays: settings.defaultShouldCorrectedDays,
-    rectificationSyncIntervalMs: settings.rectificationSyncIntervalMs
+    rectificationSyncIntervalMs: settings.rectificationSyncIntervalMs,
+    rectificationSyncRetryCount: settings.rectificationSyncRetryCount,
+    rectificationSyncTimeoutMs: settings.rectificationSyncTimeoutMs,
+    rectificationSyncBatchSize: settings.rectificationSyncBatchSize
   };
 }

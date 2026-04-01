@@ -183,7 +183,10 @@ before(async () => {
     rectificationListRoute: "/route/ri/open/item/list",
     rectificationDescriptionMaxLength: 500,
     defaultShouldCorrectedDays: 0,
-    rectificationSyncIntervalMs: 600000
+    rectificationSyncIntervalMs: 600000,
+    rectificationSyncRetryCount: 2,
+    rectificationSyncTimeoutMs: 10000,
+    rectificationSyncBatchSize: 50
   });
 });
 
