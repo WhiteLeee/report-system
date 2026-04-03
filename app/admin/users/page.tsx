@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 import { DashboardHeader } from "@/ui/dashboard-header";
+import { SystemManagementTabs } from "@/ui/system-management-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -136,9 +137,13 @@ export default async function AdminUsersPage({
     <main className="page-shell">
       <DashboardHeader
         currentUser={currentUser}
-        subtitle="集中管理本地用户、角色、状态和范围授权。"
-        title="用户管理"
+        subtitle="系统管理工作台"
+        title="系统管理 / 用户管理"
       />
+
+      <section className="section">
+        <SystemManagementTabs activeTab="users" />
+      </section>
 
       <section className="section">
         <Card className={styles.workspaceCard}>

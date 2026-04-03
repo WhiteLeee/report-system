@@ -13,6 +13,8 @@ export interface HuiYunYingApiSettings {
   rectificationSyncRetryCount: number;
   rectificationSyncTimeoutMs: number;
   rectificationSyncBatchSize: number;
+  analyticsFactRefreshIntervalMs: number;
+  analyticsSnapshotRefreshIntervalMs: number;
 }
 
 export interface SystemSettingsRepository {

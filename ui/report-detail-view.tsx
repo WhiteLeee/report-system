@@ -17,6 +17,7 @@ import {
   filterImages,
   filterIssues,
   filterStores,
+  matchesInspectionToImage,
   matchesIssueToImage,
   readMetadataString,
   type DetailFilters
@@ -25,9 +26,15 @@ import { ReviewStatusBadge } from "@/ui/review-status-badge";
 import {
   formatDateRange,
   formatDisplayDate,
+  formatReportType,
   formatResultReviewState,
   getCompletionRatio
 } from "@/ui/report-view";
+import {
+  classifyReportResultSemantics,
+  getReportResultSemanticLabel,
+  getReportResultSemanticTone
+} from "@/ui/report-result-semantics";
 
 function formatCompactDateTime(value: string | null | undefined): string {
   const normalized = String(value || "").trim();
@@ -55,9 +62,28 @@ export function ReportDetailView({
   const canReview = currentUser.permissions.includes("review:write");
   const organizationOptions = Array.from(new Set(report.stores.map((store) => store.organization_name || "").filter(Boolean))).sort();
   const scopedStoreIds = buildScopeStoreIds(report.stores, filters);
-  const images = filterImages(report.results, scopedStoreIds, filters);
+  const scopedImages = filterImages(report.results, scopedStoreIds, filters);
   const issues = filterIssues(report.issues, scopedStoreIds, filters);
   const storeById = new Map(report.stores.map((store) => [store.store_id, store]));
+  const imageSemanticMap = new Map(
+    scopedImages.map((image) => {
+      const imageIssues = issues.filter((issue) => matchesIssueToImage(issue, image));
+      const imageInspections = report.inspections.filter((inspection) => matchesInspectionToImage(inspection, image));
+      return [image.id, classifyReportResultSemantics(imageIssues, imageInspections)];
+    })
+  );
+  const semanticCounts = {
+    issue_found: 0,
+    pass: 0,
+    inconclusive: 0,
+    inspection_failed: 0
+  };
+  imageSemanticMap.forEach((state) => {
+    semanticCounts[state] += 1;
+  });
+  const images = filters.semanticState
+    ? scopedImages.filter((image) => imageSemanticMap.get(image.id) === filters.semanticState)
+    : scopedImages;
   const pendingImages = images.filter((image) => image.review_state === "pending").length;
   const reviewedImages = images.length - pendingImages;
   const stores = filterStores(report.stores, filters);
@@ -79,6 +105,9 @@ export function ReportDetailView({
     }
     if (filters.reviewStatus) {
       searchParams.set("reviewStatus", filters.reviewStatus);
+    }
+    if (filters.semanticState) {
+      searchParams.set("semanticState", filters.semanticState);
     }
     if (page > 1) {
       searchParams.set("page", String(page));
@@ -105,11 +134,19 @@ export function ReportDetailView({
         <div className={styles.heroGrid}>
           <div className={styles.heroContent}>
             <p className="eyebrow">report details</p>
-            <h2 className={styles.heroTitle}>{report.report_type}</h2>
+            <h2 className={styles.heroTitle}>{report.report_topic || "智能巡检"}</h2>
             <p className={styles.heroCopy}>
               {formatDateRange(report.period_start, report.period_end)}
             </p>
             <div className={styles.heroInlineMeta}>
+              <Badge className={styles.infoBadge} variant="outline">
+                {formatReportType(report.report_type)}
+              </Badge>
+              {report.plan_name ? (
+                <Badge className={styles.infoBadge} variant="outline">
+                  计划 {report.plan_name}
+                </Badge>
+              ) : null}
               <ReviewStatusBadge
                 className={styles.statusBadge}
                 completed={report.completed_result_count}
@@ -126,12 +163,12 @@ export function ReportDetailView({
             </div>
           </div>
           <div className={styles.heroStatGrid}>
-            <Card className={styles.heroStatCard}>
-              <CardContent className={styles.heroStatCardInner}>
-                <span className={styles.summaryLabel}>巡检结果</span>
-                <strong className={styles.summaryValue}>{images.length}</strong>
-              </CardContent>
-            </Card>
+              <Card className={styles.heroStatCard}>
+                <CardContent className={styles.heroStatCardInner}>
+                  <span className={styles.summaryLabel}>巡检结果</span>
+                  <strong className={styles.summaryValue}>{scopedImages.length}</strong>
+                </CardContent>
+              </Card>
             <Card className={styles.heroStatCard}>
               <CardContent className={styles.heroStatCardInner}>
                 <span className={styles.summaryLabel}>待复核结果</span>
@@ -173,11 +210,38 @@ export function ReportDetailView({
             <div className={styles.workbenchHeader}>
               <div>
                 <h2 className={styles.workbenchTitle}>{listTitle}</h2>
-                <p className={styles.workbenchCopy}>先按条件缩小当前批次范围，再逐条进入巡检结果详情页处理复核动作。</p>
+                <p className={styles.workbenchCopy}>先按组织、门店、复核状态和巡检结论缩小当前批次范围，再逐条进入结果详情处理复核动作。</p>
               </div>
               <Badge className={styles.workbenchMetaBadge} variant="outline">
                 {images.length} 条
               </Badge>
+            </div>
+
+            <div className={styles.semanticStatGrid}>
+              <Card className={styles.semanticStatCard}>
+                <CardContent className={styles.semanticStatBody}>
+                  <span className={styles.summaryLabel}>发现问题</span>
+                  <strong className={styles.summaryValue}>{semanticCounts.issue_found}</strong>
+                </CardContent>
+              </Card>
+              <Card className={styles.semanticStatCard}>
+                <CardContent className={styles.semanticStatBody}>
+                  <span className={styles.summaryLabel}>未发现问题</span>
+                  <strong className={styles.summaryValue}>{semanticCounts.pass}</strong>
+                </CardContent>
+              </Card>
+              <Card className={styles.semanticStatCard}>
+                <CardContent className={styles.semanticStatBody}>
+                  <span className={styles.summaryLabel}>无法判定</span>
+                  <strong className={styles.summaryValue}>{semanticCounts.inconclusive}</strong>
+                </CardContent>
+              </Card>
+              <Card className={styles.semanticStatCard}>
+                <CardContent className={styles.semanticStatBody}>
+                  <span className={styles.summaryLabel}>巡检失败</span>
+                  <strong className={styles.summaryValue}>{semanticCounts.inspection_failed}</strong>
+                </CardContent>
+              </Card>
             </div>
 
             <div className={styles.workbenchDivider} />
@@ -194,7 +258,7 @@ export function ReportDetailView({
                 </summary>
                 <div className={styles.filterDisclosureBody}>
                   <div className={styles.filterSection}>
-                    <p className="section-copy">按组织、门店和复核状态聚焦当前批次，点击巡检结果后进入单独页面处理。</p>
+                    <p className="section-copy">按组织、门店、复核状态和巡检结论聚焦当前批次，点击巡检结果后进入单独页面处理。</p>
                     <form className={styles.filterForm} method="get">
                       <input name="page" type="hidden" value="1" />
                       <input name="pageSize" type="hidden" value={String(filters.pageSize)} />
@@ -228,6 +292,16 @@ export function ReportDetailView({
                             <option value="pending">待复核</option>
                             <option value="in_progress">未完成</option>
                             <option value="completed">已完成</option>
+                          </NativeSelect>
+                        </div>
+                        <div className={`field ${styles.filterField}`}>
+                          <label htmlFor="semanticState">巡检结论</label>
+                          <NativeSelect defaultValue={filters.semanticState} id="semanticState" name="semanticState">
+                            <option value="">全部结论</option>
+                            <option value="issue_found">发现问题</option>
+                            <option value="pass">未发现问题</option>
+                            <option value="inconclusive">无法判定</option>
+                            <option value="inspection_failed">巡检失败</option>
                           </NativeSelect>
                         </div>
                       </div>
@@ -269,7 +343,7 @@ export function ReportDetailView({
                             <th>摄像头</th>
                             <th>组织</th>
                             <th>拍摄时间</th>
-                            <th>问题项</th>
+                            <th>巡检结论</th>
                             <th>复核状态</th>
                             <th>操作</th>
                           </tr>
@@ -277,6 +351,7 @@ export function ReportDetailView({
                         <tbody>
                           {pagedImages.map((image) => {
                             const imageIssues = issues.filter((issue) => matchesIssueToImage(issue, image));
+                            const imageSemanticState = imageSemanticMap.get(image.id) ?? "inconclusive";
                             const organizationName = image.store_id
                               ? storeById.get(image.store_id)?.organization_name || "未分组组织"
                               : "未绑定门店";
@@ -310,8 +385,11 @@ export function ReportDetailView({
                                 </td>
                                 <td>
                                   <div className={styles.resultIssueCell}>
-                                    <Badge className={styles.chipBadge} variant="outline">
-                                      {imageIssues.length}
+                                    <Badge
+                                      className={styles.chipBadge}
+                                      variant={getReportResultSemanticTone(imageSemanticState)}
+                                    >
+                                      {getReportResultSemanticLabel(imageSemanticState, imageIssues.length)}
                                     </Badge>
                                   </div>
                                 </td>

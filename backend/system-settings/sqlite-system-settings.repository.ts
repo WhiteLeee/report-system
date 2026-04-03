@@ -20,7 +20,9 @@ const defaultHuiYunYingApiSettings: HuiYunYingApiSettings = {
   rectificationSyncIntervalMs: 1800000,
   rectificationSyncRetryCount: 2,
   rectificationSyncTimeoutMs: 10000,
-  rectificationSyncBatchSize: 50
+  rectificationSyncBatchSize: 50,
+  analyticsFactRefreshIntervalMs: 0,
+  analyticsSnapshotRefreshIntervalMs: 0
 };
 
 function safeParseSettings(value: string): HuiYunYingApiSettings {
@@ -67,7 +69,15 @@ function safeParseSettings(value: string): HuiYunYingApiSettings {
       rectificationSyncBatchSize:
         Number.isFinite(parsed.rectificationSyncBatchSize) && Number(parsed.rectificationSyncBatchSize) > 0
           ? Number(parsed.rectificationSyncBatchSize)
-          : defaultHuiYunYingApiSettings.rectificationSyncBatchSize
+          : defaultHuiYunYingApiSettings.rectificationSyncBatchSize,
+      analyticsFactRefreshIntervalMs:
+        Number.isFinite(parsed.analyticsFactRefreshIntervalMs) && Number(parsed.analyticsFactRefreshIntervalMs) >= 0
+          ? Number(parsed.analyticsFactRefreshIntervalMs)
+          : defaultHuiYunYingApiSettings.analyticsFactRefreshIntervalMs,
+      analyticsSnapshotRefreshIntervalMs:
+        Number.isFinite(parsed.analyticsSnapshotRefreshIntervalMs) && Number(parsed.analyticsSnapshotRefreshIntervalMs) >= 0
+          ? Number(parsed.analyticsSnapshotRefreshIntervalMs)
+          : defaultHuiYunYingApiSettings.analyticsSnapshotRefreshIntervalMs
     };
   } catch {
     return defaultHuiYunYingApiSettings;

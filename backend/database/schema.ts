@@ -260,6 +260,283 @@ export const reportRectificationSyncLogTable = sqliteTable(
   })
 );
 
+export const analyticsResultFactTable = sqliteTable(
+  "analytics_result_fact",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    reportId: integer("report_id")
+      .notNull()
+      .references(() => reportTable.id, { onDelete: "cascade" }),
+    resultId: integer("result_id")
+      .notNull()
+      .references(() => reportImageTable.id, { onDelete: "cascade" }),
+    sourceEnterpriseId: text("source_enterprise_id").notNull(),
+    enterpriseName: text("enterprise_name").notNull().default(""),
+    reportType: text("report_type").notNull().default(""),
+    reportTopic: text("report_topic").notNull().default(""),
+    planId: text("plan_id").notNull().default(""),
+    planName: text("plan_name").notNull().default(""),
+    reportVersion: text("report_version").notNull().default(""),
+    storeId: text("store_id"),
+    storeName: text("store_name"),
+    organizationCode: text("organization_code"),
+    organizationName: text("organization_name"),
+    franchiseeName: text("franchisee_name"),
+    publishedDate: text("published_date").notNull(),
+    capturedDate: text("captured_date"),
+    resultSemanticState: text("result_semantic_state").notNull(),
+    issueCount: integer("issue_count").notNull().default(0),
+    reviewState: text("review_state").notNull().default("pending"),
+    autoCompleted: integer("auto_completed").notNull().default(0),
+    rectificationRequired: integer("rectification_required").notNull().default(0),
+    sourceSnapshotVersion: integer("source_snapshot_version").notNull().default(1),
+    analyticsSchemaVersion: integer("analytics_schema_version").notNull().default(1),
+    sourcePayloadJson: text("source_payload_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    resultUnique: uniqueIndex("analytics_result_fact_result_unique").on(table.resultId),
+    reportIdx: index("idx_analytics_result_fact_report").on(table.reportId, table.publishedDate),
+    enterpriseIdx: index("idx_analytics_result_fact_enterprise").on(table.sourceEnterpriseId, table.publishedDate),
+    semanticIdx: index("idx_analytics_result_fact_semantic").on(table.resultSemanticState, table.publishedDate),
+    storeIdx: index("idx_analytics_result_fact_store").on(table.storeId, table.publishedDate)
+  })
+);
+
+export const analyticsIssueFactTable = sqliteTable(
+  "analytics_issue_fact",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    reportId: integer("report_id")
+      .notNull()
+      .references(() => reportTable.id, { onDelete: "cascade" }),
+    resultId: integer("result_id")
+      .references(() => reportImageTable.id, { onDelete: "cascade" }),
+    issueId: integer("issue_id")
+      .notNull()
+      .references(() => reportIssueTable.id, { onDelete: "cascade" }),
+    sourceEnterpriseId: text("source_enterprise_id").notNull(),
+    enterpriseName: text("enterprise_name").notNull().default(""),
+    reportType: text("report_type").notNull().default(""),
+    reportTopic: text("report_topic").notNull().default(""),
+    planId: text("plan_id").notNull().default(""),
+    planName: text("plan_name").notNull().default(""),
+    reportVersion: text("report_version").notNull().default(""),
+    storeId: text("store_id"),
+    storeName: text("store_name"),
+    organizationCode: text("organization_code"),
+    organizationName: text("organization_name"),
+    franchiseeName: text("franchisee_name"),
+    publishedDate: text("published_date").notNull(),
+    skillId: text("skill_id").notNull().default(""),
+    skillName: text("skill_name").notNull().default(""),
+    issueType: text("issue_type").notNull().default(""),
+    severity: text("severity"),
+    title: text("title").notNull().default(""),
+    analyticsSchemaVersion: integer("analytics_schema_version").notNull().default(1),
+    sourcePayloadJson: text("source_payload_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    issueUnique: uniqueIndex("analytics_issue_fact_issue_unique").on(table.issueId),
+    reportIdx: index("idx_analytics_issue_fact_report").on(table.reportId, table.publishedDate),
+    enterpriseIdx: index("idx_analytics_issue_fact_enterprise").on(table.sourceEnterpriseId, table.publishedDate),
+    storeIdx: index("idx_analytics_issue_fact_store").on(table.storeId, table.publishedDate),
+    issueTypeIdx: index("idx_analytics_issue_fact_issue_type").on(table.issueType, table.publishedDate),
+    skillIdx: index("idx_analytics_issue_fact_skill").on(table.skillId, table.publishedDate),
+    severityIdx: index("idx_analytics_issue_fact_severity").on(table.severity, table.publishedDate)
+  })
+);
+
+export const analyticsReviewFactTable = sqliteTable(
+  "analytics_review_fact",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    reportId: integer("report_id")
+      .notNull()
+      .references(() => reportTable.id, { onDelete: "cascade" }),
+    resultId: integer("result_id")
+      .notNull()
+      .references(() => reportImageTable.id, { onDelete: "cascade" }),
+    reviewLogId: integer("review_log_id")
+      .notNull()
+      .references(() => reportReviewLogTable.id, { onDelete: "cascade" }),
+    sourceEnterpriseId: text("source_enterprise_id").notNull(),
+    enterpriseName: text("enterprise_name").notNull().default(""),
+    reportType: text("report_type").notNull().default(""),
+    reportTopic: text("report_topic").notNull().default(""),
+    planId: text("plan_id").notNull().default(""),
+    planName: text("plan_name").notNull().default(""),
+    reportVersion: text("report_version").notNull().default(""),
+    storeId: text("store_id"),
+    storeName: text("store_name"),
+    organizationCode: text("organization_code"),
+    organizationName: text("organization_name"),
+    franchiseeName: text("franchisee_name"),
+    publishedDate: text("published_date").notNull(),
+    reviewDate: text("review_date").notNull(),
+    fromStatus: text("from_status").notNull().default(""),
+    toStatus: text("to_status").notNull().default(""),
+    operatorName: text("operator_name").notNull().default(""),
+    reviewAction: text("review_action").notNull().default("transition"),
+    reviewLatencyMinutes: integer("review_latency_minutes").notNull().default(0),
+    noteLength: integer("note_length").notNull().default(0),
+    analyticsSchemaVersion: integer("analytics_schema_version").notNull().default(1),
+    sourcePayloadJson: text("source_payload_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    reviewLogUnique: uniqueIndex("analytics_review_fact_review_log_unique").on(table.reviewLogId),
+    reportIdx: index("idx_analytics_review_fact_report").on(table.reportId, table.reviewDate),
+    enterpriseIdx: index("idx_analytics_review_fact_enterprise").on(table.sourceEnterpriseId, table.reviewDate),
+    storeIdx: index("idx_analytics_review_fact_store").on(table.storeId, table.reviewDate),
+    actionIdx: index("idx_analytics_review_fact_action").on(table.reviewAction, table.reviewDate)
+  })
+);
+
+export const analyticsRectificationFactTable = sqliteTable(
+  "analytics_rectification_fact",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => reportRectificationOrderTable.id, { onDelete: "cascade" }),
+    reportId: integer("report_id")
+      .notNull()
+      .references(() => reportTable.id, { onDelete: "cascade" }),
+    resultId: integer("result_id")
+      .notNull()
+      .references(() => reportImageTable.id, { onDelete: "cascade" }),
+    sourceEnterpriseId: text("source_enterprise_id").notNull(),
+    enterpriseName: text("enterprise_name").notNull().default(""),
+    reportType: text("report_type").notNull().default(""),
+    reportTopic: text("report_topic").notNull().default(""),
+    planId: text("plan_id").notNull().default(""),
+    planName: text("plan_name").notNull().default(""),
+    reportVersion: text("report_version").notNull().default(""),
+    storeId: text("store_id"),
+    storeCode: text("store_code"),
+    storeName: text("store_name"),
+    organizationCode: text("organization_code"),
+    organizationName: text("organization_name"),
+    franchiseeName: text("franchisee_name"),
+    publishedDate: text("published_date").notNull(),
+    createdDate: text("created_date").notNull(),
+    shouldCorrectedDate: text("should_corrected_date"),
+    completedDate: text("completed_date"),
+    localStatus: text("local_status").notNull().default(""),
+    remoteIfCorrected: text("remote_if_corrected"),
+    syncFailed: integer("sync_failed").notNull().default(0),
+    overdue: integer("overdue").notNull().default(0),
+    analyticsSchemaVersion: integer("analytics_schema_version").notNull().default(1),
+    sourcePayloadJson: text("source_payload_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    orderUnique: uniqueIndex("analytics_rectification_fact_order_unique").on(table.orderId),
+    reportIdx: index("idx_analytics_rectification_fact_report").on(table.reportId, table.createdDate),
+    enterpriseIdx: index("idx_analytics_rectification_fact_enterprise").on(table.sourceEnterpriseId, table.createdDate),
+    storeIdx: index("idx_analytics_rectification_fact_store").on(table.storeId, table.createdDate),
+    overdueIdx: index("idx_analytics_rectification_fact_overdue").on(table.overdue, table.shouldCorrectedDate)
+  })
+);
+
+export const analyticsDailyOverviewSnapshotTable = sqliteTable(
+  "analytics_daily_overview_snapshot",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    snapshotDate: text("snapshot_date").notNull(),
+    sourceEnterpriseId: text("source_enterprise_id").notNull(),
+    enterpriseName: text("enterprise_name").notNull().default(""),
+    reportCount: integer("report_count").notNull().default(0),
+    storeCount: integer("store_count").notNull().default(0),
+    resultCount: integer("result_count").notNull().default(0),
+    issueCount: integer("issue_count").notNull().default(0),
+    pendingReviewCount: integer("pending_review_count").notNull().default(0),
+    completedReviewCount: integer("completed_review_count").notNull().default(0),
+    autoCompletedReviewCount: integer("auto_completed_review_count").notNull().default(0),
+    manualCompletedReviewCount: integer("manual_completed_review_count").notNull().default(0),
+    rectificationOrderCount: integer("rectification_order_count").notNull().default(0),
+    rectificationCompletedCount: integer("rectification_completed_count").notNull().default(0),
+    rectificationPendingCount: integer("rectification_pending_count").notNull().default(0),
+    rectificationOverdueCount: integer("rectification_overdue_count").notNull().default(0),
+    rectificationCloseRate: integer("rectification_close_rate").notNull().default(0),
+    analyticsSchemaVersion: integer("analytics_schema_version").notNull().default(1),
+    builtAt: text("built_at").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    snapshotUnique: uniqueIndex("analytics_daily_overview_snapshot_unique").on(table.snapshotDate, table.sourceEnterpriseId),
+    enterpriseIdx: index("idx_analytics_daily_overview_enterprise").on(table.sourceEnterpriseId, table.snapshotDate)
+  })
+);
+
+export const analyticsDailySemanticSnapshotTable = sqliteTable(
+  "analytics_daily_semantic_snapshot",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    snapshotDate: text("snapshot_date").notNull(),
+    sourceEnterpriseId: text("source_enterprise_id").notNull(),
+    enterpriseName: text("enterprise_name").notNull().default(""),
+    resultSemanticState: text("result_semantic_state").notNull(),
+    resultCount: integer("result_count").notNull().default(0),
+    issueCount: integer("issue_count").notNull().default(0),
+    analyticsSchemaVersion: integer("analytics_schema_version").notNull().default(1),
+    builtAt: text("built_at").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    snapshotUnique: uniqueIndex("analytics_daily_semantic_snapshot_unique").on(
+      table.snapshotDate,
+      table.sourceEnterpriseId,
+      table.resultSemanticState
+    ),
+    enterpriseIdx: index("idx_analytics_daily_semantic_enterprise").on(table.sourceEnterpriseId, table.snapshotDate)
+  })
+);
+
+export const analyticsJobRunTable = sqliteTable(
+  "analytics_job_run",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    jobKey: text("job_key").notNull(),
+    jobType: text("job_type").notNull(),
+    status: text("status").notNull().default("running"),
+    scopeJson: text("scope_json").notNull().default("{}"),
+    metricsJson: text("metrics_json").notNull().default("{}"),
+    errorMessage: text("error_message").notNull().default(""),
+    startedAt: text("started_at").notNull(),
+    finishedAt: text("finished_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    jobKeyUnique: uniqueIndex("analytics_job_run_key_unique").on(table.jobKey),
+    typeIdx: index("idx_analytics_job_run_type").on(table.jobType, table.startedAt),
+    statusIdx: index("idx_analytics_job_run_status").on(table.status, table.startedAt)
+  })
+);
+
+export const analyticsJobCheckpointTable = sqliteTable(
+  "analytics_job_checkpoint",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    jobType: text("job_type").notNull(),
+    scopeKey: text("scope_key").notNull().default("global"),
+    checkpointJson: text("checkpoint_json").notNull().default("{}"),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    jobScopeUnique: uniqueIndex("analytics_job_checkpoint_unique").on(table.jobType, table.scopeKey)
+  })
+);
+
 export const reportSourceSnapshotTable = sqliteTable(
   "report_source_snapshot",
   {

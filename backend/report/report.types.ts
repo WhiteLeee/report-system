@@ -14,7 +14,10 @@ export interface ReviewProgressSummary {
 }
 
 export interface ReportMetaPayload {
+  report_type?: string;
   topic: string;
+  plan_id?: string;
+  plan_name?: string;
   report_versions: string[];
   enterprise_id: string;
   enterprise_name: string;
@@ -34,6 +37,7 @@ export interface ReportStoreFact {
   store_id: string;
   store_code?: string;
   store_name: string;
+  organize_code?: string;
   organize_name?: string;
   store_type?: string;
   franchisee_name?: string;
@@ -180,6 +184,9 @@ export interface ReportSummary extends ReviewProgressSummary {
   source_enterprise_id: string;
   enterprise_name: string;
   report_type: string;
+  report_topic: string;
+  plan_id: string;
+  plan_name: string;
   report_version: string;
   period_start: string;
   period_end: string;

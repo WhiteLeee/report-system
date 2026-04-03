@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 
 import styles from "./report-result-detail-view.module.css";
 
+import { Button } from "@/components/ui/button";
+
 type ReviewIssueOption = {
   id: number;
   title: string;
@@ -61,12 +63,12 @@ export function ReviewIssueSelector({
       {issues.length > 0 ? (
         <>
           <div className={styles.selectionToolbar}>
-            <button className={styles.selectionAction} disabled={disabled} onClick={selectAll} type="button">
+            <Button className={styles.selectionAction} disabled={disabled} onClick={selectAll} size="sm" type="button" variant="ghost">
               全选
-            </button>
-            <button className={styles.selectionAction} disabled={disabled} onClick={clearAll} type="button">
+            </Button>
+            <Button className={styles.selectionAction} disabled={disabled} onClick={clearAll} size="sm" type="button" variant="ghost">
               清空
-            </button>
+            </Button>
           </div>
           <ul className={styles.issueChecklist}>
             {issues.map((issue) => {

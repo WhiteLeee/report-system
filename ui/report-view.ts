@@ -2,6 +2,9 @@ import type { JsonValue } from "@/backend/shared/json";
 import type { ProgressState, ResultReviewState } from "@/backend/report/report.types";
 
 const reportTypeLabels: Record<string, string> = {
+  daily: "日常报告",
+  special: "专项报告",
+  stage: "阶段报告",
   monthly_operation: "月度运营巡检",
   weekly_operation: "周度运营巡检",
   daily_operation: "日常巡检",

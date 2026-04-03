@@ -2,9 +2,7 @@
   padding: 24px 28px;
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
-  background:
-    linear-gradient(135deg, rgba(255, 250, 242, 0.96), rgba(240, 231, 216, 0.94)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -63,7 +61,7 @@
 
 .syncPanelHeader {
   padding: 24px 24px 18px;
-  border-bottom: 1px solid rgba(56, 49, 37, 0.08);
+  border-bottom: 1px solid var(--line);
 }
 
 .syncPanelBody {
@@ -80,23 +78,23 @@
   display: grid;
   gap: 8px;
   padding: 18px;
-  border: 1px solid rgba(56, 49, 37, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
 }
 
 .syncMetricValue {
   font-size: 18px;
   line-height: 1.4;
-  font-weight: 700;
+  font-weight: 600;
   word-break: break-word;
 }
 
 .syncSummaryTableWrap {
   overflow-x: auto;
-  border: 1px solid rgba(56, 49, 37, 0.1);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
 }
 
 .syncSummaryTable {
@@ -109,14 +107,14 @@
   padding: 14px 16px;
   text-align: left;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--muted);
-  background: rgba(244, 237, 223, 0.78);
+  background: #fafafa;
 }
 
 .syncSummaryTable tbody td {
   padding: 14px 16px;
-  border-top: 1px solid rgba(56, 49, 37, 0.08);
+  border-top: 1px solid var(--line);
   font-size: 14px;
 }
 
@@ -130,7 +128,7 @@
   align-items: flex-start;
   gap: 16px;
   padding: 24px 24px 18px;
-  border-bottom: 1px solid rgba(56, 49, 37, 0.08);
+  border-bottom: 1px solid var(--line);
 }
 
 .workspacePanelBody {
@@ -149,9 +147,9 @@
   display: grid;
   gap: 0;
   margin-bottom: 18px;
-  border: 1px solid rgba(56, 49, 37, 0.1);
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(248, 244, 236, 0.88));
+  border: 1px solid var(--line);
+  border-radius: 0.875rem;
+  background: var(--surface);
 }
 
 .filterDisclosureSummary {
@@ -172,7 +170,7 @@
   display: block;
   font-size: 16px;
   line-height: 1.2;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .filterDisclosureMeta {
@@ -187,11 +185,11 @@
   min-height: 32px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(56, 49, 37, 0.12);
-  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--line);
+  background: var(--surface);
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .filterDisclosure[open] .filterToggleLabel::before {
@@ -204,7 +202,7 @@
 
 .filterDisclosureBody {
   padding: 0 20px 20px;
-  border-top: 1px solid rgba(56, 49, 37, 0.08);
+  border-top: 1px solid var(--line);
 }
 
 .sidebarForm {
@@ -235,8 +233,8 @@
 }
 
 .control {
-  height: 44px;
-  min-height: 44px;
+  height: 40px;
+  min-height: 40px;
   font-size: 14px;
 }
 
@@ -248,16 +246,36 @@
 }
 
 .filterButton {
-  min-height: 40px;
-  height: 40px;
+  min-height: 36px;
+  height: 36px;
   padding: 0 16px;
 }
 
 .tableShell {
   overflow: hidden;
-  border: 1px solid rgba(56, 49, 37, 0.1);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 0.875rem;
+  background: var(--surface);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 4px 0;
+}
+
+.pagerLeft,
+.pagerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pageSizeSelect {
+  width: 88px;
 }
 
 .tableWrap {
@@ -274,14 +292,14 @@
   padding: 14px 16px;
   text-align: left;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--muted);
-  background: rgba(244, 237, 223, 0.78);
+  background: #fafafa;
 }
 
 .table tbody td {
   padding: 16px;
-  border-top: 1px solid rgba(56, 49, 37, 0.08);
+  border-top: 1px solid var(--line);
   vertical-align: middle;
 }
 

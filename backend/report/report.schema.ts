@@ -11,7 +11,10 @@ const jsonSchema: z.ZodType<Json> = z.lazy(() =>
 );
 
 const reportMetaSchema = z.object({
+  report_type: z.string().trim().optional().default("daily"),
   topic: z.string().trim().min(1),
+  plan_id: z.string().trim().optional().default(""),
+  plan_name: z.string().trim().optional().default(""),
   report_versions: z.array(z.string().trim().min(1)).default([]),
   enterprise_id: z.string().trim().min(1),
   enterprise_name: z.string().trim().min(1),
@@ -31,6 +34,7 @@ const storeFactSchema = z.object({
   store_id: z.string().trim().min(1),
   store_code: z.string().trim().optional(),
   store_name: z.string().trim().min(1),
+  organize_code: z.string().trim().optional(),
   organize_name: z.string().trim().optional(),
   store_type: z.string().trim().optional(),
   franchisee_name: z.string().trim().optional(),

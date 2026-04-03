@@ -3,15 +3,13 @@ import { and, desc, eq, gte, inArray, like, lte, or } from "drizzle-orm";
 import type { RequestContext } from "@/backend/auth/request-context";
 import { db } from "@/backend/database/client";
 import {
-  organizationMasterTable,
   reportImageTable,
   reportInspectionTable,
   reportIssueTable,
   reportReviewLogTable,
   reportSourceSnapshotTable,
   reportStoreTable,
-  reportTable,
-  storeMasterProfileTable
+  reportTable
 } from "@/backend/database/schema";
 import { normalizePublishedReport } from "@/backend/report/report-publish-normalizer";
 import type { ReportRepository } from "@/backend/report/report.repository";
@@ -35,6 +33,7 @@ import type {
   ReviewResultUpdateResult
 } from "@/backend/report/report.types";
 import type { JsonValue } from "@/backend/shared/json";
+import { canAccessEnterprise, normalizeScopeIds, resolveScopedStoreIds } from "@/backend/shared/request-scope";
 
 function safeStringify(value: unknown, fallback: unknown = {}): string {
   return JSON.stringify(value ?? fallback);
@@ -82,6 +81,7 @@ function normalizeResultReviewState(value: unknown): ResultReviewState {
 }
 
 function toReportSummary(row: typeof reportTable.$inferSelect): ReportSummary {
+  const extensions = safeParse(row.extensionsJson, {}) as Record<string, JsonValue>;
   return {
     id: row.id,
     publish_id: row.publishId,
@@ -89,6 +89,9 @@ function toReportSummary(row: typeof reportTable.$inferSelect): ReportSummary {
     source_enterprise_id: row.sourceEnterpriseId,
     enterprise_name: row.enterpriseName,
     report_type: row.reportType,
+    report_topic: typeof extensions.report_topic === "string" ? extensions.report_topic : "",
+    plan_id: typeof extensions.plan_id === "string" ? extensions.plan_id : "",
+    plan_name: typeof extensions.plan_name === "string" ? extensions.plan_name : "",
     report_version: row.reportVersion,
     progress_state: row.progressState as ProgressState,
     period_start: row.periodStart,
@@ -211,10 +214,6 @@ function toReportReviewLog(row: typeof reportReviewLogTable.$inferSelect): Repor
   };
 }
 
-function normalizeScopeIds(values: string[] | undefined): string[] {
-  return Array.from(new Set((values || []).map((item) => item.trim()).filter(Boolean)));
-}
-
 function normalizeSelectedIssues(values: ReviewSelectedIssue[] | undefined): ReviewSelectedIssue[] {
   return Array.from(
     new Map(
@@ -226,90 +225,6 @@ function normalizeSelectedIssues(values: ReviewSelectedIssue[] | undefined): Rev
         .filter((item) => Number.isInteger(item.id) && item.id > 0 && item.title)
         .map((item) => [item.id, item] as const)
     ).values()
-  );
-}
-
-function canAccessEnterprise(context: RequestContext, enterpriseId: string): boolean {
-  const enterpriseScopeIds = normalizeScopeIds(context.enterpriseScopeIds);
-  if (enterpriseScopeIds.length === 0) {
-    return true;
-  }
-  return enterpriseScopeIds.includes(enterpriseId);
-}
-
-function resolveScopedStoreIds(context: RequestContext, enterpriseId?: string): string[] | null {
-  const storeScopeIds = normalizeScopeIds(context.storeScopeIds);
-  if (storeScopeIds.length > 0) {
-    return storeScopeIds;
-  }
-
-  const organizationScopeIds = normalizeScopeIds(context.organizationScopeIds);
-  if (organizationScopeIds.length === 0) {
-    return null;
-  }
-
-  const organizationWhere = [eq(organizationMasterTable.isActive, 1)];
-  if (enterpriseId) {
-    organizationWhere.push(eq(organizationMasterTable.enterpriseId, enterpriseId));
-  }
-  const organizationRows = db
-    .select({
-      enterpriseId: organizationMasterTable.enterpriseId,
-      organizeCode: organizationMasterTable.organizeCode,
-      parentCode: organizationMasterTable.parentCode
-    })
-    .from(organizationMasterTable)
-    .where(and(...organizationWhere))
-    .all()
-    .filter((row) => canAccessEnterprise(context, row.enterpriseId));
-
-  const childrenMap = new Map<string, string[]>();
-  organizationRows.forEach((row) => {
-    const parentCode = String(row.parentCode || "").trim();
-    if (!childrenMap.has(parentCode)) {
-      childrenMap.set(parentCode, []);
-    }
-    childrenMap.get(parentCode)?.push(row.organizeCode);
-  });
-
-  const allowedOrganizationCodes = new Set<string>();
-  const queue = [...organizationScopeIds];
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current || allowedOrganizationCodes.has(current)) {
-      continue;
-    }
-    allowedOrganizationCodes.add(current);
-    (childrenMap.get(current) || []).forEach((childCode) => queue.push(childCode));
-  }
-
-  if (allowedOrganizationCodes.size === 0) {
-    return [];
-  }
-
-  const storeWhere = [eq(storeMasterProfileTable.isActive, 1)];
-  if (enterpriseId) {
-    storeWhere.push(eq(storeMasterProfileTable.enterpriseId, enterpriseId));
-  }
-
-  return Array.from(
-    new Set(
-      db
-        .select({
-          enterpriseId: storeMasterProfileTable.enterpriseId,
-          storeId: storeMasterProfileTable.storeId,
-          organizeCode: storeMasterProfileTable.organizeCode
-        })
-        .from(storeMasterProfileTable)
-        .where(and(...storeWhere))
-        .all()
-        .filter(
-          (row) =>
-            canAccessEnterprise(context, row.enterpriseId) &&
-            allowedOrganizationCodes.has(String(row.organizeCode || "").trim())
-        )
-        .map((row) => row.storeId)
-    )
   );
 }
 

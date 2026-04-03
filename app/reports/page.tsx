@@ -2,17 +2,17 @@ import Link from "next/link";
 
 import styles from "./reports-page.module.css";
 
-import { getReportSystemConfig } from "@/backend/config/report-system-config";
 import { buildRequestContext, requirePermission } from "@/backend/auth/session";
 import { createReportService } from "@/backend/report/report.module";
 import type { ReportFilters } from "@/backend/report/report.types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DatePickerField } from "@/components/ui/date-picker-field";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { DashboardHeader } from "@/ui/dashboard-header";
+import { QueryPagination } from "@/ui/query-pagination";
 import { ReviewStatusBadge } from "@/ui/review-status-badge";
 import {
   formatDateRange,
@@ -23,7 +23,16 @@ import {
 export const dynamic = "force-dynamic";
 
 const reportService = createReportService();
-const siteConfig = getReportSystemConfig();
+const PAGE_SIZE_OPTIONS = [20, 50, 100, 200];
+
+function parsePositiveInt(value: string | string[] | undefined, fallback: number) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 function buildFilters(searchParams: Record<string, string | string[] | undefined>): ReportFilters {
   return {
@@ -48,9 +57,15 @@ export default async function ReportsPage({
   const filters = buildFilters(resolvedSearchParams);
   const requestContext = buildRequestContext(currentUser);
   const allReports = reportService.listReports({}, requestContext);
-  const reports = reportService.listReports(filters, requestContext);
+  const filteredReports = reportService.listReports(filters, requestContext);
+  const pageSize = parsePositiveInt(resolvedSearchParams.pageSize, PAGE_SIZE_OPTIONS[0]);
+  const totalReports = filteredReports.length;
+  const totalPages = Math.max(1, Math.ceil(totalReports / pageSize));
+  const page = Math.min(parsePositiveInt(resolvedSearchParams.page, 1), totalPages);
+  const startIndex = (page - 1) * pageSize;
+  const reports = filteredReports.slice(startIndex, startIndex + pageSize);
   const reportTypeOptions = Array.from(new Set(allReports.map((report) => report.report_type).filter(Boolean))).sort();
-  const pendingReports = allReports.filter((report) => report.progress_state === "pending").length;
+  const pendingReports = allReports.filter((report) => report.pending_result_count > 0).length;
   const totalIssues = allReports.reduce((sum, report) => sum + report.issue_count, 0);
   const totalImages = allReports.reduce((sum, report) => sum + report.total_result_count, 0);
 
@@ -75,7 +90,7 @@ export default async function ReportsPage({
             <CardContent className={styles.statCardInner}>
               <span className={styles.statLabel}>待复核批次</span>
               <strong className={styles.statValue}>{pendingReports}</strong>
-              <span className={styles.statNote}>适合多人并行处理</span>
+              <span className={styles.statNote}>仍有待处理结果的批次</span>
             </CardContent>
           </Card>
           <Card className={styles.statCard}>
@@ -141,11 +156,11 @@ export default async function ReportsPage({
                         </div>
                         <div className={`field ${styles.compactField}`}>
                           <label htmlFor="startDate">开始日期</label>
-                          <Input className={styles.control} id="startDate" name="startDate" type="date" defaultValue={filters.startDate} />
+                          <DatePickerField className={styles.control} defaultValue={filters.startDate} id="startDate" name="startDate" />
                         </div>
                         <div className={`field ${styles.compactField}`}>
                           <label htmlFor="endDate">结束日期</label>
-                          <Input className={styles.control} id="endDate" name="endDate" type="date" defaultValue={filters.endDate} />
+                          <DatePickerField className={styles.control} defaultValue={filters.endDate} id="endDate" name="endDate" />
                         </div>
                       </div>
                       <div className={styles.filterActions}>
@@ -196,9 +211,14 @@ export default async function ReportsPage({
                         {reports.map((report) => (
                           <tr className={styles.reportTableRow} key={report.id}>
                             <td>
-                              <Badge className={styles.reportTypeBadge} variant="outline">
-                                {formatReportType(report.report_type)}
-                              </Badge>
+                              <div className={styles.progressCell}>
+                                <Badge className={styles.reportTypeBadge} variant="outline">
+                                  {formatReportType(report.report_type)}
+                                </Badge>
+                                <span className={styles.cellMeta}>
+                                  {report.report_topic || report.plan_name || "未命名主题"}
+                                </span>
+                              </div>
                             </td>
                             <td>
                               <span className={styles.cellValue}>
@@ -248,6 +268,19 @@ export default async function ReportsPage({
                 </EmptyState>
               )}
             </div>
+            {totalReports > 0 ? (
+              <QueryPagination
+                className={styles.pager}
+                leftClassName={styles.pagerLeft}
+                page={page}
+                pageSize={pageSize}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                rightClassName={styles.pagerRight}
+                selectClassName={styles.pageSizeSelect}
+                total={totalReports}
+                totalPages={totalPages}
+              />
+            ) : null}
           </CardContent>
         </Card>
       </section>

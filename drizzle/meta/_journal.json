@@ -78,6 +78,41 @@
       "when": 1775005823274,
       "tag": "0010_shallow_omega_red",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1775088000000,
+      "tag": "0011_solid_analytics_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1775174400000,
+      "tag": "0012_bold_issue_fact",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1775251200000,
+      "tag": "0013_structured_review_rectification_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1775342400000,
+      "tag": "0014_multirole_governance_dimensions",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1775433600000,
+      "tag": "0015_precise_skill_severity_metrics",
+      "breakpoints": true
     }
   ]
 }

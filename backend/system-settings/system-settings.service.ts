@@ -22,7 +22,9 @@ export class SystemSettingsService {
       rectificationSyncIntervalMs: Math.max(0, Math.floor(settings.rectificationSyncIntervalMs)),
       rectificationSyncRetryCount: Math.max(0, Math.floor(settings.rectificationSyncRetryCount)),
       rectificationSyncTimeoutMs: Math.max(1, Math.floor(settings.rectificationSyncTimeoutMs)),
-      rectificationSyncBatchSize: Math.max(1, Math.floor(settings.rectificationSyncBatchSize))
+      rectificationSyncBatchSize: Math.max(1, Math.floor(settings.rectificationSyncBatchSize)),
+      analyticsFactRefreshIntervalMs: Math.max(0, Math.floor(settings.analyticsFactRefreshIntervalMs)),
+      analyticsSnapshotRefreshIntervalMs: Math.max(0, Math.floor(settings.analyticsSnapshotRefreshIntervalMs))
     });
   }
 }

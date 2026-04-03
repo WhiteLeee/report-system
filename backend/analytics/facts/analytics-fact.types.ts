@@ -1,0 +1,121 @@
+export interface AnalyticsResultFactRecord {
+  id: number;
+  report_id: number;
+  result_id: number;
+  source_enterprise_id: string;
+  enterprise_name: string;
+  report_type: string;
+  report_topic: string;
+  plan_id: string;
+  plan_name: string;
+  report_version: string;
+  store_id: string | null;
+  store_name: string | null;
+  organization_code: string | null;
+  organization_name: string | null;
+  franchisee_name: string | null;
+  published_date: string;
+  captured_date: string | null;
+  result_semantic_state: string;
+  issue_count: number;
+  review_state: string;
+  auto_completed: boolean;
+  rectification_required: boolean;
+  source_snapshot_version: number;
+  analytics_schema_version: number;
+  source_payload: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnalyticsIssueFactRecord {
+  id: number;
+  report_id: number;
+  result_id: number | null;
+  issue_id: number;
+  source_enterprise_id: string;
+  enterprise_name: string;
+  report_type: string;
+  report_topic: string;
+  plan_id: string;
+  plan_name: string;
+  report_version: string;
+  store_id: string | null;
+  store_name: string | null;
+  organization_code: string | null;
+  organization_name: string | null;
+  franchisee_name: string | null;
+  published_date: string;
+  skill_id: string;
+  skill_name: string;
+  issue_type: string;
+  severity: string | null;
+  title: string;
+  analytics_schema_version: number;
+  source_payload: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnalyticsReviewFactRecord {
+  id: number;
+  report_id: number;
+  result_id: number;
+  review_log_id: number;
+  source_enterprise_id: string;
+  enterprise_name: string;
+  report_type: string;
+  report_topic: string;
+  plan_id: string;
+  plan_name: string;
+  report_version: string;
+  store_id: string | null;
+  store_name: string | null;
+  organization_code: string | null;
+  organization_name: string | null;
+  franchisee_name: string | null;
+  published_date: string;
+  review_date: string;
+  from_status: string;
+  to_status: string;
+  operator_name: string;
+  review_action: string;
+  review_latency_minutes: number;
+  note_length: number;
+  analytics_schema_version: number;
+  source_payload: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnalyticsRectificationFactRecord {
+  id: number;
+  order_id: number;
+  report_id: number;
+  result_id: number;
+  source_enterprise_id: string;
+  enterprise_name: string;
+  report_type: string;
+  report_topic: string;
+  plan_id: string;
+  plan_name: string;
+  report_version: string;
+  store_id: string | null;
+  store_code: string | null;
+  store_name: string | null;
+  organization_code: string | null;
+  organization_name: string | null;
+  franchisee_name: string | null;
+  published_date: string;
+  created_date: string;
+  should_corrected_date: string | null;
+  completed_date: string | null;
+  local_status: string;
+  remote_if_corrected: string | null;
+  sync_failed: boolean;
+  overdue: boolean;
+  analytics_schema_version: number;
+  source_payload: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}

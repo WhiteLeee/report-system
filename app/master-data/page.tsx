@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import styles from "./master-data-page.module.css";
+import { MasterDataPagination } from "./master-data-pagination";
 
 import { requirePermission } from "@/backend/auth/session";
 import { createMasterDataService } from "@/backend/master-data/master-data.module";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { DashboardHeader } from "@/ui/dashboard-header";
+import { SystemManagementTabs } from "@/ui/system-management-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -262,235 +264,182 @@ export default async function MasterDataPage({
 
   return (
     <main className="page-shell">
-      <DashboardHeader currentUser={currentUser} subtitle="按 vision-agent 的主数据结构保存并展示当前企业的组织树与门店台账。" title="门店主数据" />
+      <DashboardHeader
+        currentUser={currentUser}
+        subtitle="系统管理工作台"
+        title="系统管理 / 门店主数据"
+      />
 
-      <section className={styles.panel}>
-        <form className={styles.searchBar} method="get">
-          <div className={styles.searchField}>
-            <label htmlFor="enterprise">企业</label>
-            <NativeSelect defaultValue={activeEnterprise} id="enterprise" name="enterprise">
-              {enterprises.map((item) => (
-                <option key={item.enterprise_id} value={item.enterprise_id}>
-                  {item.enterprise_name}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div className={styles.searchField}>
-            <label htmlFor="organizeCode">运营组织</label>
-            <NativeSelect defaultValue={organizeCode} id="organizeCode" name="organizeCode">
-              <option value="">全部组织</option>
-              {organizationOptions.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div className={styles.searchField}>
-            <label htmlFor="keyword">名称/编码</label>
-            <Input defaultValue={keyword} id="keyword" name="keyword" placeholder="输入门店名称或门店编码" />
-          </div>
-          <div className={styles.searchField}>
-            <label htmlFor="status">门店状态</label>
-            <NativeSelect defaultValue={status} id="status" name="status">
-              <option value="">全部状态</option>
-              {statusOptions.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div className={styles.searchActions}>
-            <Button size="sm" type="submit">
-              查询
-            </Button>
-            <Button asChild size="sm" variant="secondary">
-              <Link href="/master-data">重置</Link>
-            </Button>
-          </div>
-        </form>
+      <section className="section">
+        <SystemManagementTabs activeTab="master-data" />
+      </section>
 
-        <div className={styles.summaryStrip}>
-          <div className={styles.summaryCard}>
-            <div className={styles.summaryTitle}>最近接收快照</div>
-            <div className={styles.summaryValue}>
-              {currentEnterprise?.latest_snapshot_version ? `快照 ${currentEnterprise.latest_snapshot_version}` : "暂无接收记录"}
+      <section className="section">
+        <div className={styles.panel}>
+          <form className={styles.searchBar} method="get">
+            <input name="enterprise" type="hidden" value={activeEnterprise} />
+            <input name="organizeCode" type="hidden" value={organizeCode} />
+            <div className={styles.searchField}>
+              <label htmlFor="keyword">名称/编码</label>
+              <Input defaultValue={keyword} id="keyword" name="keyword" placeholder="输入门店名称或门店编码" />
             </div>
-            <div className={styles.summaryMeta}>
-              {currentEnterprise
-                ? `组织数：${currentEnterprise.organize_count} · 门店数：${currentEnterprise.store_count} · 更新时间：${formatDateLabel(currentEnterprise.latest_published_at)}`
-                : "请选择企业查看主数据快照。"}
+            <div className={styles.searchField}>
+              <label htmlFor="status">门店状态</label>
+              <NativeSelect defaultValue={status} id="status" name="status">
+                <option value="">全部状态</option>
+                {statusOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </NativeSelect>
             </div>
-          </div>
-          <div className={styles.summaryCard}>
-            <div className={styles.summaryTitle}>最近接收结果</div>
-            <div className={styles.summaryValue}>{latestLog ? `已接收 / ${latestLog.snapshot_version}` : "暂无批次"}</div>
-            <div className={styles.summaryMeta}>
-              {latestLog
-                ? `发布时间：${formatDateLabel(latestLog.published_at)} · 组织数：${latestLog.organize_count} · 门店数：${latestLog.store_count}`
-                : "等待 vision-agent 发布主数据快照。"}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.bodyWrap}>
-          <aside className={styles.orgPane}>
-            <form className={styles.orgSearchBar} method="get">
-              <input name="enterprise" type="hidden" value={activeEnterprise} />
-              <input name="organizeCode" type="hidden" value={organizeCode} />
-              <input name="keyword" type="hidden" value={keyword} />
-              <input name="status" type="hidden" value={status} />
-              <input name="pageSize" type="hidden" value={String(pageSize)} />
-              <Input defaultValue={orgKeyword} name="orgKeyword" placeholder="搜索组织名称" />
-              <Button size="sm" type="submit" variant="secondary">
-                筛选
+            <div className={styles.searchActions}>
+              <Button size="sm" type="submit">
+                查询
               </Button>
-            </form>
-            <div className={styles.orgTreeWrap}>
-              <Link
-                className={!organizeCode ? `${styles.orgRow} ${styles.orgRowActive}` : styles.orgRow}
-                href={buildQueryString({
-                  ...commonParams,
-                  organizeCode: "",
-                  page: "1"
-                })}
-              >
-                <span className={styles.orgName}>全部组织</span>
-                <span className={styles.orgCount}>{storeUniverse.length}</span>
-              </Link>
-              {filteredTree.length > 0 ? (
-                renderOrganizationTree(
-                  filteredTree,
-                  {
-                    buildHref: (nextOrganizeCode) =>
-                      buildQueryString({
-                        ...commonParams,
-                        organizeCode: nextOrganizeCode,
-                        page: "1"
-                      }),
-                    buildToggleHref: (nextOrganizeCode, shouldExpand) => {
-                      const nextExpanded = new Set(expandedCodes);
-                      if (shouldExpand) {
-                        nextExpanded.add(nextOrganizeCode);
-                      } else {
-                        nextExpanded.delete(nextOrganizeCode);
-                      }
-                      return buildQueryString({
-                        ...commonParams,
-                        expanded: Array.from(nextExpanded).join(","),
-                        page: String(page)
-                      });
-                    },
-                    selectedCode: organizeCode,
-                    expandedCodes,
-                    forcedOpenCodes
-                  }
-                )
-              ) : (
-                <div className={styles.empty}>暂无组织数据</div>
-              )}
+              <Button asChild size="sm" variant="secondary">
+                <Link href="/master-data">重置</Link>
+              </Button>
             </div>
-          </aside>
+          </form>
 
-          <div className={styles.contentPane}>
-            <div className={styles.contentHead}>
-              <div>
-                <strong>门店信息</strong>
-                <div className={styles.muted}>
-                  当前范围：{selectedOrganizationName} · 共 {total} 家门店
-                </div>
+          <div className={styles.summaryStrip}>
+            <div className={styles.summaryCard}>
+              <div className={styles.summaryTitle}>最近接收快照</div>
+              <div className={styles.summaryValue}>
+                {currentEnterprise?.latest_snapshot_version ? `快照 ${currentEnterprise.latest_snapshot_version}` : "暂无接收记录"}
+              </div>
+              <div className={styles.summaryMeta}>
+                {currentEnterprise
+                  ? `组织数：${currentEnterprise.organize_count} · 门店数：${currentEnterprise.store_count} · 更新时间：${formatDateLabel(currentEnterprise.latest_published_at)}`
+                  : "请选择企业查看主数据快照。"}
               </div>
             </div>
-
-            <div className={styles.tableWrap}>
-              {pagedStores.length > 0 ? (
-                <table className={styles.storeTable}>
-                  <thead>
-                    <tr>
-                      <th>门店名称</th>
-                      <th>门店编号</th>
-                      <th>门店类型</th>
-                      <th>运营组织</th>
-                      <th>加盟商名称</th>
-                      <th>员工数量</th>
-                      <th>负责督导</th>
-                      <th>门店状态</th>
-                      <th>营业执照</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedStores.map((item) => (
-                      <tr key={item.store_id}>
-                        <td title={item.store_name}>{item.store_name}</td>
-                        <td>{item.store_code || item.store_id}</td>
-                        <td>{item.store_type || "-"}</td>
-                        <td title={item.organize_name}>{item.organize_name || item.organize_code || "-"}</td>
-                        <td title={item.franchisee_name}>{item.franchisee_name || "-"}</td>
-                        <td>{item.emp_count || 0}</td>
-                        <td title={item.employee_name || item.supervisor}>{item.employee_name || item.supervisor || "-"}</td>
-                        <td>{renderStoreStatus(item.status)}</td>
-                        <td>{renderDocStatus(item.business_status)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className={styles.empty}>当前筛选条件下没有可展示的门店主数据。</div>
-              )}
+            <div className={styles.summaryCard}>
+              <div className={styles.summaryTitle}>最近接收结果</div>
+              <div className={styles.summaryValue}>{latestLog ? `已接收 / ${latestLog.snapshot_version}` : "暂无批次"}</div>
+              <div className={styles.summaryMeta}>
+                {latestLog
+                  ? `发布时间：${formatDateLabel(latestLog.published_at)} · 组织数：${latestLog.organize_count} · 门店数：${latestLog.store_count}`
+                  : "等待 vision-agent 发布主数据快照。"}
+              </div>
             </div>
+          </div>
 
-            <div className={styles.pager}>
-              <form className={styles.pagerLeft} method="get">
+          <div className={styles.bodyWrap}>
+            <aside className={styles.orgPane}>
+              <form className={styles.orgSearchBar} method="get">
                 <input name="enterprise" type="hidden" value={activeEnterprise} />
                 <input name="organizeCode" type="hidden" value={organizeCode} />
                 <input name="keyword" type="hidden" value={keyword} />
                 <input name="status" type="hidden" value={status} />
-                <input name="orgKeyword" type="hidden" value={orgKeyword} />
-                <span className={styles.muted}>共 {total} 条</span>
-                <label className={styles.muted} htmlFor="pageSize">
-                  每页
-                </label>
-                <NativeSelect defaultValue={String(pageSize)} id="pageSize" name="pageSize">
-                  {PAGE_SIZE_OPTIONS.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </NativeSelect>
+                <input name="pageSize" type="hidden" value={String(pageSize)} />
+                <Input defaultValue={orgKeyword} name="orgKeyword" placeholder="搜索组织名称" />
                 <Button size="sm" type="submit" variant="secondary">
-                  应用
+                  筛选
                 </Button>
               </form>
-
-              <div className={styles.pagerRight}>
-                <span className={styles.muted}>
-                  第 {page} / {totalPages} 页
-                </span>
-                <Button asChild disabled={page <= 1} size="sm" variant="secondary">
-                  <Link
-                    aria-disabled={page <= 1}
-                    href={buildQueryString({
-                      ...commonParams,
-                      page: String(Math.max(1, page - 1))
-                    })}
-                  >
-                    上一页
-                  </Link>
-                </Button>
-                <Button asChild disabled={page >= totalPages} size="sm" variant="secondary">
-                  <Link
-                    aria-disabled={page >= totalPages}
-                    href={buildQueryString({
-                      ...commonParams,
-                      page: String(Math.min(totalPages, page + 1))
-                    })}
-                  >
-                    下一页
-                  </Link>
-                </Button>
+              <div className={styles.orgTreeWrap}>
+                <Link
+                  className={!organizeCode ? `${styles.orgRow} ${styles.orgRowActive}` : styles.orgRow}
+                  href={buildQueryString({
+                    ...commonParams,
+                    organizeCode: "",
+                    page: "1"
+                  })}
+                >
+                  <span className={styles.orgName}>全部组织</span>
+                  <span className={styles.orgCount}>{storeUniverse.length}</span>
+                </Link>
+                {filteredTree.length > 0 ? (
+                  renderOrganizationTree(
+                    filteredTree,
+                    {
+                      buildHref: (nextOrganizeCode) =>
+                        buildQueryString({
+                          ...commonParams,
+                          organizeCode: nextOrganizeCode,
+                          page: "1"
+                        }),
+                      buildToggleHref: (nextOrganizeCode, shouldExpand) => {
+                        const nextExpanded = new Set(expandedCodes);
+                        if (shouldExpand) {
+                          nextExpanded.add(nextOrganizeCode);
+                        } else {
+                          nextExpanded.delete(nextOrganizeCode);
+                        }
+                        return buildQueryString({
+                          ...commonParams,
+                          expanded: Array.from(nextExpanded).join(","),
+                          page: String(page)
+                        });
+                      },
+                      selectedCode: organizeCode,
+                      expandedCodes,
+                      forcedOpenCodes
+                    }
+                  )
+                ) : (
+                  <div className={styles.empty}>暂无组织数据</div>
+                )}
               </div>
+            </aside>
+
+            <div className={styles.contentPane}>
+              <div className={styles.contentHead}>
+                <div>
+                  <strong>门店信息</strong>
+                  <div className={styles.muted}>
+                    当前范围：{selectedOrganizationName} · 共 {total} 家门店
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.tableWrap}>
+                {pagedStores.length > 0 ? (
+                  <table className={styles.storeTable}>
+                    <thead>
+                      <tr>
+                        <th>门店名称</th>
+                        <th>门店编号</th>
+                        <th>门店类型</th>
+                        <th>运营组织</th>
+                        <th>加盟商名称</th>
+                        <th>员工数量</th>
+                        <th>负责督导</th>
+                        <th>门店状态</th>
+                        <th>营业执照</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedStores.map((item) => (
+                        <tr key={item.store_id}>
+                          <td title={item.store_name}>{item.store_name}</td>
+                          <td>{item.store_code || item.store_id}</td>
+                          <td>{item.store_type || "-"}</td>
+                          <td title={item.organize_name}>{item.organize_name || item.organize_code || "-"}</td>
+                          <td title={item.franchisee_name}>{item.franchisee_name || "-"}</td>
+                          <td>{item.emp_count || 0}</td>
+                          <td title={item.employee_name || item.supervisor}>{item.employee_name || item.supervisor || "-"}</td>
+                          <td>{renderStoreStatus(item.status)}</td>
+                          <td>{renderDocStatus(item.business_status)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className={styles.empty}>当前筛选条件下没有可展示的门店主数据。</div>
+                )}
+              </div>
+
+              <MasterDataPagination
+                page={page}
+                pageSize={pageSize}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                total={total}
+                totalPages={totalPages}
+              />
             </div>
           </div>
         </div>

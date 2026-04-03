@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { buildRequestContext, getSessionUserFromRequest, hasPermission } from "@/backend/auth/session";
 import { createReportService, createReportReviewService } from "@/backend/report/report.module";
+import { classifyReportResultSemantics, type ReportResultSemanticState } from "@/backend/report/result-semantics";
 import { RectificationSplitError } from "@/backend/rectification/rectification.service";
 import { createRectificationService } from "@/backend/rectification/rectification.module";
 import type { ResultReviewState, ReviewSelectedIssue } from "@/backend/report/report.types";
@@ -84,19 +85,43 @@ export async function POST(
   const note = String(payload.note || "").trim();
   const selectedIssues = parseSelectedIssues(String(payload.selected_issues_json || ""));
   const shouldCorrected = String(payload.should_corrected || "").trim();
+  const requestedSemanticState = String(payload.result_semantic_state || "").trim();
   const requestContext = buildRequestContext(currentUser);
+  let resolvedSemanticState: ReportResultSemanticState | null = null;
 
   let createdRectificationOrders: Array<{ id: number; huiyunying_order_id: string | null; status: string }> = [];
 
   if (normalizedReviewStatus === "completed") {
-    if (!shouldCorrected) {
-      return Response.json({ success: false, error: "整改截止日期不能为空。" }, { status: 400 });
-    }
-
     const report = reportService.getReportDetail(reportId, requestContext);
     const resultDetail = report?.results.find((result) => result.id === imageId) ?? null;
     if (!report || !resultDetail) {
       return Response.json({ success: false, error: "Review target not found." }, { status: 404 });
+    }
+
+    const resultIssues = report.issues.filter((issue) => {
+      if (issue.result_id && issue.result_id === imageId) {
+        return true;
+      }
+      return readMetadataString(issue.metadata, "capture_id") === readMetadataString(resultDetail.metadata, "capture_id");
+    });
+    const resultInspections = report.inspections.filter((inspection) => {
+      if (inspection.result_id && inspection.result_id === imageId) {
+        return true;
+      }
+      return readMetadataString(inspection.metadata, "capture_id") === readMetadataString(resultDetail.metadata, "capture_id");
+    });
+    const semanticState: ReportResultSemanticState = classifyReportResultSemantics(resultIssues, resultInspections);
+    resolvedSemanticState = semanticState;
+    const shouldCreateRectification = semanticState === "issue_found" || resultIssues.length > 0;
+    const semanticMismatch = requestedSemanticState && requestedSemanticState !== semanticState;
+    if (semanticMismatch) {
+      return Response.json(
+        { success: false, error: "当前巡检结果状态已变化，请刷新页面后重试。" },
+        { status: 409 }
+      );
+    }
+    if (shouldCreateRectification && !shouldCorrected) {
+      return Response.json({ success: false, error: "整改截止日期不能为空。" }, { status: 400 });
     }
 
     const store = report.stores.find((item) => item.store_id === resultDetail.store_id) ?? null;
@@ -106,38 +131,40 @@ export async function POST(
       "";
     const imageUrl = readMetadataString(resultDetail.metadata, "display_url") || resultDetail.url;
 
-    try {
-      createdRectificationOrders = (
-        await rectificationService.createOrdersForReview({
-          reportId,
-          resultId: imageId,
-          storeId: resultDetail.store_id,
-          storeCode,
-          storeName: resultDetail.store_name,
-          imageUrls: imageUrl ? [imageUrl] : [],
-          selectedIssues,
-          shouldCorrected,
-          note,
-          createdBy: operatorName,
-          context: requestContext
-        })
-      ).map((order) => ({
-        id: order.id,
-        huiyunying_order_id: order.huiyunying_order_id,
-        status: order.status
-      }));
-    } catch (error) {
-      if (error instanceof RectificationSplitError) {
-        return Response.json({ success: false, error: error.message }, { status: 400 });
+    if (shouldCreateRectification) {
+      try {
+        createdRectificationOrders = (
+          await rectificationService.createOrdersForReview({
+            reportId,
+            resultId: imageId,
+            storeId: resultDetail.store_id,
+            storeCode,
+            storeName: resultDetail.store_name,
+            imageUrls: imageUrl ? [imageUrl] : [],
+            selectedIssues,
+            shouldCorrected,
+            note,
+            createdBy: operatorName,
+            context: requestContext
+          })
+        ).map((order) => ({
+          id: order.id,
+          huiyunying_order_id: order.huiyunying_order_id,
+          status: order.status
+        }));
+      } catch (error) {
+        if (error instanceof RectificationSplitError) {
+          return Response.json({ success: false, error: error.message }, { status: 400 });
+        }
+        return Response.json(
+          {
+            success: false,
+            error: "创建慧运营整改单失败。",
+            detail: error instanceof Error ? error.message : "Unknown error"
+          },
+          { status: 502 }
+        );
       }
-      return Response.json(
-        {
-          success: false,
-          error: "创建慧运营整改单失败。",
-          detail: error instanceof Error ? error.message : "Unknown error"
-        },
-        { status: 502 }
-      );
     }
   }
 
@@ -183,6 +210,7 @@ export async function POST(
     completed_result_count: result.completed_result_count,
     total_result_count: result.total_result_count,
     should_corrected: shouldCorrected || null,
+    result_semantic_state: resolvedSemanticState,
     selected_issues: selectedIssues,
     rectification_orders: createdRectificationOrders,
     recent_log: result.recent_log,

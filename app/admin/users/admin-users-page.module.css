@@ -21,7 +21,7 @@
   margin: 0;
   font-size: 22px;
   line-height: 1.1;
-  font-family: var(--font-display);
+  font-weight: 600;
 }
 
 .workspaceCopy,
@@ -33,10 +33,10 @@
 }
 
 .tableShell {
-  border: 1px solid rgba(56, 49, 37, 0.1);
-  border-radius: 20px;
+  border: 1px solid var(--line);
+  border-radius: 0.875rem;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--surface);
 }
 
 .tableWrap {
@@ -58,28 +58,26 @@
 }
 
 .userTable thead {
-  background: rgba(244, 239, 230, 0.92);
+  background: #fafafa;
 }
 
 .userTable thead th {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 500;
 }
 
 .userRow {
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--surface);
   transition: background-color 150ms ease;
 }
 
 .userRow:hover {
-  background: rgba(255, 252, 246, 0.96);
+  background: #fafafa;
 }
 
 .userTable tbody tr:nth-child(even) {
-  background: rgba(250, 247, 241, 0.76);
+  background: #fcfcfc;
 }
 
 .userTable tbody tr:last-child td {
@@ -120,7 +118,7 @@
 
 .roleBadge {
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .activeBadge {
@@ -159,8 +157,8 @@
 }
 
 .modalBackdrop {
-  background: rgba(22, 18, 14, 0.52);
-  backdrop-filter: blur(8px);
+  background: rgba(9, 9, 11, 0.48);
+  backdrop-filter: blur(4px);
 }
 
 .modalCloseArea {
@@ -173,7 +171,7 @@
   width: min(1080px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   overflow: auto;
-  box-shadow: 0 28px 72px rgba(22, 18, 14, 0.24);
+  box-shadow: 0 20px 50px rgba(9, 9, 11, 0.18);
 }
 
 .modalBody,
@@ -197,15 +195,15 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
-  border: 1px solid rgba(56, 49, 37, 0.08);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 244, 236, 0.92) 100%);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
 }
 
 .userIdentityTitle {
-  color: #1f1912;
+  color: var(--text);
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .userIdentityMeta {
@@ -242,10 +240,9 @@
   display: grid;
   gap: 16px;
   padding: 18px;
-  border: 1px solid rgba(56, 49, 37, 0.08);
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(249, 246, 240, 0.92) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--line);
+  border-radius: 0.875rem;
+  background: var(--surface);
 }
 
 .scopeCard {
@@ -272,8 +269,8 @@
   margin: 0;
   font-size: 13px;
   line-height: 1.2;
-  font-weight: 700;
-  color: var(--foreground);
+  font-weight: 600;
+  color: var(--text);
 }
 
 .scopeFieldCopy {
@@ -290,9 +287,9 @@
   max-height: 420px;
   padding: 12px;
   overflow: auto;
-  border: 1px solid rgba(56, 49, 37, 0.1);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
 }
 
 .scopeOption {
@@ -301,15 +298,15 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid rgba(56, 49, 37, 0.08);
-  border-radius: 14px;
-  background: rgba(250, 247, 241, 0.78);
+  border: 1px solid var(--line);
+  border-radius: 0.625rem;
+  background: #fafafa;
   cursor: pointer;
 }
 
 .scopeCheckbox {
   margin-top: 2px;
-  accent-color: #8b5a2b;
+  accent-color: #18181b;
 }
 
 .scopeOptionBody {

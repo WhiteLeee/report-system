@@ -10,6 +10,7 @@ import type {
   ResultReviewState,
   ReviewProgressSummary
 } from "@/backend/report/report.types";
+import { classifyReportResultSemantics } from "@/backend/report/result-semantics";
 
 interface NormalizedStoreRecord extends ReviewProgressSummary {
   store_id: string;
@@ -69,6 +70,11 @@ interface NormalizedInspectionRecord {
   display_order: number;
 }
 
+interface CaptureSemanticSnapshot {
+  semanticState: "issue_found" | "pass" | "inconclusive" | "inspection_failed";
+  reviewState: ResultReviewState;
+}
+
 export interface NormalizedPublishedReport extends ReviewProgressSummary {
   publishId: string;
   sourceSystem: string;
@@ -110,10 +116,18 @@ function normalizeIncomingReviewState(value: unknown): ResultReviewState {
   return value === "completed" || value === "reviewed" ? "completed" : "pending";
 }
 
+function readReportType(payload: ReportPublishPayload): string {
+  const meta = payload.report.report_meta;
+  return safeString(meta.report_type) || "daily";
+}
+
 function buildReportVersion(payload: ReportPublishPayload): string {
   const meta = payload.report.report_meta;
+  const reportType = readReportType(payload);
+  const planId = safeString(meta.plan_id) || "all-plans";
+  const topic = safeString(meta.topic) || "untitled";
   const versionText = meta.report_versions.join("+") || "default";
-  return `${meta.start_date}~${meta.end_date}|${versionText}`;
+  return `${meta.start_date}~${meta.end_date}|${reportType}|${planId}|${topic}|${versionText}`;
 }
 
 function resolveDisplayUrl(capture: ReportCaptureFact | undefined): string {
@@ -154,9 +168,39 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
   const summaryMetrics = (payload.report.summary.metrics ?? {}) as Record<string, JsonValue>;
   const facts = payload.report.facts;
   const capturesById = new Map<string, ReportCaptureFact>();
+  const inspectionsByCaptureId = new Map<string, ReportInspectionFact[]>();
+  const issuesByCaptureId = new Map<string, ReportIssueFact[]>();
 
   facts.captures.forEach((capture) => {
     capturesById.set(capture.capture_id, capture);
+  });
+
+  facts.inspections.forEach((inspection) => {
+    const list = inspectionsByCaptureId.get(inspection.capture_id) ?? [];
+    list.push(inspection);
+    inspectionsByCaptureId.set(inspection.capture_id, list);
+  });
+
+  facts.issues.forEach((issue) => {
+    const list = issuesByCaptureId.get(issue.capture_id) ?? [];
+    list.push(issue);
+    issuesByCaptureId.set(issue.capture_id, list);
+  });
+
+  const captureSemanticMap = new Map<string, CaptureSemanticSnapshot>();
+  facts.captures.forEach((capture) => {
+    const semanticState = classifyReportResultSemantics(
+      (issuesByCaptureId.get(capture.capture_id) ?? []).map((issue) => ({ id: issue.issue_id })),
+      (inspectionsByCaptureId.get(capture.capture_id) ?? []).map((inspection) => ({
+        status: inspection.status ?? null,
+        raw_result: inspection.raw_result ?? null,
+        error_message: inspection.error_message ?? null
+      }))
+    );
+    captureSemanticMap.set(capture.capture_id, {
+      semanticState,
+      reviewState: semanticState === "pass" ? "completed" : "pending"
+    });
   });
 
   const storeMap = new Map<string, Omit<NormalizedStoreRecord, keyof ReviewProgressSummary | "state_snapshot">>();
@@ -170,6 +214,7 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
       image_count: 0,
       metadata: {
         store_code: safeString(store.store_code),
+        organize_code: safeString(store.organize_code),
         store_type: safeString(store.store_type),
         franchisee_name: safeString(store.franchisee_name),
         supervisor: safeString(store.supervisor),
@@ -190,6 +235,7 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
         image_count: 0,
         metadata: {
           store_code: safeString(capture.store_code),
+          organize_code: "",
           enterprise_id: meta.enterprise_id,
           enterprise_name: meta.enterprise_name
         },
@@ -212,6 +258,7 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
         image_count: 0,
         metadata: {
           store_code: safeString(issue.store_code),
+          organize_code: "",
           enterprise_id: meta.enterprise_id,
           enterprise_name: meta.enterprise_name
         },
@@ -224,10 +271,21 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
     }
   });
 
+  const completedCaptureCountByStoreId = new Map<string, number>();
+  facts.captures.forEach((capture) => {
+    if ((captureSemanticMap.get(capture.capture_id)?.reviewState ?? "pending") !== "completed") {
+      return;
+    }
+    completedCaptureCountByStoreId.set(
+      capture.store_id,
+      (completedCaptureCountByStoreId.get(capture.store_id) ?? 0) + 1
+    );
+  });
+
   const stores = Array.from(storeMap.values())
     .sort((left, right) => left.display_order - right.display_order)
     .map((store) => {
-      const progress = buildProgressSummary(store.image_count, 0);
+      const progress = buildProgressSummary(store.image_count, completedCaptureCountByStoreId.get(store.store_id) ?? 0);
       return {
         ...store,
         ...progress,
@@ -239,39 +297,53 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
       };
     });
 
-  const images: NormalizedImageRecord[] = facts.captures.map((capture, index) => ({
-    store_id: capture.store_id || null,
-    store_name: capture.store_name || null,
-    object_key: safeString(capture.oss_key) || safeString(capture.capture_url) || null,
-    bucket: null,
-    region: null,
-    url: resolveDisplayUrl(capture),
-    width: null,
-    height: null,
-    captured_at: safeString(capture.captured_at) || null,
-    review_state: "pending",
-    reviewed_by: null,
-    reviewed_at: null,
-    review_note: null,
-    review_payload: {},
-    metadata: {
-      capture_id: capture.capture_id,
-      image_id: capture.image_id,
-      camera_id: safeString(capture.camera_id),
-      camera_index: capture.camera_index ?? null,
-      camera_alias: safeString(capture.camera_alias),
-      camera_device_code: safeString(capture.camera_device_code),
-      capture_provider: safeString(capture.capture_provider),
-      channel_code: safeString(capture.channel_code),
-      capture_url: safeString(capture.capture_url),
-      preview_url: safeString(capture.preview_url),
-      display_url: resolveDisplayUrl(capture),
-      oss_key: safeString(capture.oss_key),
-      local_path: safeString(capture.local_path),
-      issue_count: capture.issue_count ?? 0
-    },
-    display_order: index
-  }));
+  const images: NormalizedImageRecord[] = facts.captures.map((capture, index) => {
+    const semanticSnapshot = captureSemanticMap.get(capture.capture_id) ?? {
+      semanticState: "inconclusive" as const,
+      reviewState: "pending" as const
+    };
+    const reviewPayload: JsonValue =
+      semanticSnapshot.reviewState === "completed"
+        ? {
+            auto_completed: true,
+            auto_completed_reason: "pass_no_issues"
+          }
+        : {};
+    return {
+      store_id: capture.store_id || null,
+      store_name: capture.store_name || null,
+      object_key: safeString(capture.oss_key) || safeString(capture.capture_url) || null,
+      bucket: null,
+      region: null,
+      url: resolveDisplayUrl(capture),
+      width: null,
+      height: null,
+      captured_at: safeString(capture.captured_at) || null,
+      review_state: semanticSnapshot.reviewState,
+      reviewed_by: null,
+      reviewed_at: semanticSnapshot.reviewState === "completed" ? payload.published_at : null,
+      review_note: null,
+      review_payload: reviewPayload,
+      metadata: {
+        capture_id: capture.capture_id,
+        image_id: capture.image_id,
+        camera_id: safeString(capture.camera_id),
+        camera_index: capture.camera_index ?? null,
+        camera_alias: safeString(capture.camera_alias),
+        camera_device_code: safeString(capture.camera_device_code),
+        capture_provider: safeString(capture.capture_provider),
+        channel_code: safeString(capture.channel_code),
+        capture_url: safeString(capture.capture_url),
+        preview_url: safeString(capture.preview_url),
+        display_url: resolveDisplayUrl(capture),
+        oss_key: safeString(capture.oss_key),
+        local_path: safeString(capture.local_path),
+        issue_count: capture.issue_count ?? 0,
+        result_semantic_state: semanticSnapshot.semanticState
+      },
+      display_order: index
+    };
+  });
 
   const inspections: NormalizedInspectionRecord[] = facts.inspections.map((inspection: ReportInspectionFact, index) => {
     const capture = capturesById.get(inspection.capture_id);
@@ -334,7 +406,10 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
     };
   });
 
-  const reportProgress = buildProgressSummary(images.length, 0);
+  const reportProgress = buildProgressSummary(
+    images.length,
+    images.filter((image) => image.review_state === "completed").length
+  );
   const completedStoreCount = stores.filter((store) => store.progress_state === "completed").length;
   const inProgressStoreCount = stores.filter((store) => store.progress_state === "in_progress").length;
   const pendingStoreCount = stores.length - completedStoreCount - inProgressStoreCount;
@@ -347,7 +422,7 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
     payloadHash,
     sourceEnterpriseId: meta.enterprise_id,
     enterpriseName: meta.enterprise_name,
-    reportType: meta.topic,
+    reportType: readReportType(payload),
     reportVersion: buildReportVersion(payload),
     periodStart: meta.start_date,
     periodEnd: meta.end_date,
@@ -370,7 +445,11 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
         pending_store_count: pendingStoreCount
       }
     } as unknown as JsonValue,
-    extensions: {},
+    extensions: {
+      report_topic: safeString(meta.topic),
+      plan_id: safeString(meta.plan_id),
+      plan_name: safeString(meta.plan_name)
+    },
     rawPayload: payload,
     publishedAt: payload.published_at,
     stores,

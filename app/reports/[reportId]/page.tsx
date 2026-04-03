@@ -4,6 +4,7 @@ import { buildRequestContext, requirePermission } from "@/backend/auth/session";
 import { createReportService } from "@/backend/report/report.module";
 import type { ReviewFilterState } from "@/backend/report/report.types";
 import { DETAIL_PAGE_SIZE_OPTIONS, type DetailFilters } from "@/ui/report-detail-helpers";
+import type { ReportResultSemanticState } from "@/ui/report-result-semantics";
 import { ReportDetailView } from "@/ui/report-detail-view";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,12 @@ function normalizeReviewStatus(value: string): ReviewFilterState {
 function normalizePage(value: string | string[] | undefined): number {
   const page = typeof value === "string" ? Number(value) : NaN;
   return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function normalizeSemanticState(value: string): ReportResultSemanticState | "" {
+  return value === "issue_found" || value === "pass" || value === "inconclusive" || value === "inspection_failed"
+    ? value
+    : "";
 }
 
 function normalizePageSize(value: string | string[] | undefined): DetailFilters["pageSize"] {
@@ -51,6 +58,9 @@ export default async function ReportDetailPage({
     storeId: typeof resolvedSearchParams.storeId === "string" ? resolvedSearchParams.storeId : "",
     reviewStatus: normalizeReviewStatus(
       typeof resolvedSearchParams.reviewStatus === "string" ? resolvedSearchParams.reviewStatus : ""
+    ),
+    semanticState: normalizeSemanticState(
+      typeof resolvedSearchParams.semanticState === "string" ? resolvedSearchParams.semanticState : ""
     ),
     page: normalizePage(resolvedSearchParams.page),
     pageSize: normalizePageSize(resolvedSearchParams.pageSize)

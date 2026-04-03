@@ -2,9 +2,7 @@
   padding: 24px 28px;
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
-  background:
-    linear-gradient(135deg, rgba(255, 250, 242, 0.96), rgba(240, 231, 216, 0.94)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -74,7 +72,7 @@
   align-items: flex-start;
   gap: 16px;
   padding: 24px 24px 18px;
-  border-bottom: 1px solid rgba(56, 49, 37, 0.08);
+  border-bottom: 1px solid var(--line);
 }
 
 .workspacePanelBody {
@@ -85,9 +83,9 @@
   display: grid;
   gap: 0;
   margin-bottom: 18px;
-  border: 1px solid rgba(56, 49, 37, 0.1);
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(248, 244, 236, 0.88));
+  border: 1px solid var(--line);
+  border-radius: 0.875rem;
+  background: var(--surface);
 }
 
 .filterDisclosure[open] .filterToggleLabel {
@@ -110,9 +108,9 @@
 
 .filterDisclosureTitle {
   display: block;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.2;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .filterDisclosureCopy {
@@ -136,15 +134,15 @@
   min-height: 32px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(56, 49, 37, 0.12);
-  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--line);
+  background: var(--surface);
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .filterDisclosure[open] .filterToggleLabel {
-  color: var(--brand);
+  color: var(--text);
 }
 
 .filterDisclosure[open] .filterToggleLabel::before {
@@ -157,7 +155,7 @@
 
 .filterDisclosureBody {
   padding: 0 20px 20px;
-  border-top: 1px solid rgba(56, 49, 37, 0.08);
+  border-top: 1px solid var(--line);
 }
 
 .filterFormPanel {
@@ -185,8 +183,8 @@
 }
 
 .control {
-  height: 44px;
-  min-height: 44px;
+  height: 40px;
+  min-height: 40px;
   font-size: 14px;
 }
 
@@ -200,9 +198,9 @@
 }
 
 .filterButton {
-  min-height: 40px;
-  height: 40px;
-  padding: 0 16px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 14px;
   flex: 0 1 auto;
 }
 
@@ -221,7 +219,7 @@
   white-space: nowrap;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .filterFooter {
@@ -254,10 +252,30 @@
 }
 
 .reportTableShell {
-  border: 1px solid rgba(56, 49, 37, 0.1);
-  border-radius: 20px;
+  border: 1px solid var(--line);
+  border-radius: 0.875rem;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--surface);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 4px 0;
+}
+
+.pagerLeft,
+.pagerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pageSizeSelect {
+  width: 88px;
 }
 
 .reportTable {
@@ -275,24 +293,22 @@
 }
 
 .reportTable thead {
-  background: rgba(244, 239, 230, 0.92);
+  background: #fafafa;
 }
 
 .reportTable thead th {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 500;
 }
 
 .reportTableRow {
-  background: rgba(255, 255, 255, 0.62);
-  transition: background-color 150ms ease, box-shadow 150ms ease;
+  background: var(--surface);
+  transition: background-color 150ms ease;
 }
 
 .reportTableRow:hover {
-  background: rgba(255, 252, 246, 0.96);
+  background: #fafafa;
 }
 
 .reportTable tbody tr:last-child td {
@@ -300,14 +316,14 @@
 }
 
 .reportTable tbody tr:nth-child(even) {
-  background: rgba(250, 247, 241, 0.76);
+  background: #fcfcfc;
 }
 
 .reportTypeBadge {
   width: fit-content;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .cellValue,
@@ -338,12 +354,12 @@
 }
 
 .inlineActionButton {
-  min-height: 28px;
-  height: 28px;
+  min-height: 32px;
+  height: 32px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: 0.5rem;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .typeCol {

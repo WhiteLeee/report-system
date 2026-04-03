@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { ensureAnalyticsJobManagerStarted } from "@/backend/analytics/jobs/analytics-job.manager";
 import { getSessionUserFromRequest, hasPermission } from "@/backend/auth/session";
 import { ensureRectificationSyncManagerStarted } from "@/backend/rectification/rectification-sync.manager";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
@@ -16,6 +17,14 @@ function readNonNegativeNumber(value: FormDataEntryValue | null, fallback: numbe
   return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
 }
 
+function resolveSettingsTab(raw: FormDataEntryValue | null): "api" | "rectification" | "analytics" {
+  const value = String(raw || "").trim();
+  if (value === "rectification" || value === "analytics") {
+    return value;
+  }
+  return "api";
+}
+
 export async function POST(request: Request): Promise<Response> {
   const currentUser = getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "user:manage") || !currentUser?.roles.includes("admin")) {
@@ -23,23 +32,64 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const formData = await request.formData().catch(() => new FormData());
-  systemSettingsService.saveHuiYunYingApiSettings({
-    uri: String(formData.get("uri") || "").trim(),
-    route: String(formData.get("route") || "").trim(),
-    rectificationCreateRoute: String(formData.get("rectificationCreateRoute") || "").trim(),
-    rectificationListRoute: String(formData.get("rectificationListRoute") || "").trim(),
-    appid: String(formData.get("appid") || "").trim(),
-    secret: String(formData.get("secret") || "").trim(),
-    rateLimitCount: readPositiveNumber(formData.get("rateLimitCount"), 30),
-    rateLimitWindowMs: readPositiveNumber(formData.get("rateLimitWindowMs"), 60000),
-    rectificationDescriptionMaxLength: readPositiveNumber(formData.get("rectificationDescriptionMaxLength"), 500),
-    defaultShouldCorrectedDays: readNonNegativeNumber(formData.get("defaultShouldCorrectedDays"), 0),
-    rectificationSyncIntervalMs: readNonNegativeNumber(formData.get("rectificationSyncIntervalMs"), 1800000),
-    rectificationSyncRetryCount: readNonNegativeNumber(formData.get("rectificationSyncRetryCount"), 2),
-    rectificationSyncTimeoutMs: readPositiveNumber(formData.get("rectificationSyncTimeoutMs"), 10000),
-    rectificationSyncBatchSize: readPositiveNumber(formData.get("rectificationSyncBatchSize"), 50)
-  });
-  ensureRectificationSyncManagerStarted();
+  const tab = resolveSettingsTab(formData.get("tab"));
+  const currentSettings = systemSettingsService.getHuiYunYingApiSettings();
 
-  return NextResponse.redirect(new URL("/admin/settings", request.url), 303);
+  if (tab === "api") {
+    systemSettingsService.saveHuiYunYingApiSettings({
+      ...currentSettings,
+      uri: String(formData.get("uri") || "").trim(),
+      route: String(formData.get("route") || "").trim(),
+      appid: String(formData.get("appid") || "").trim(),
+      secret: String(formData.get("secret") || "").trim(),
+      rateLimitCount: readPositiveNumber(formData.get("rateLimitCount"), currentSettings.rateLimitCount),
+      rateLimitWindowMs: readPositiveNumber(formData.get("rateLimitWindowMs"), currentSettings.rateLimitWindowMs)
+    });
+  } else if (tab === "rectification") {
+    systemSettingsService.saveHuiYunYingApiSettings({
+      ...currentSettings,
+      rectificationCreateRoute: String(formData.get("rectificationCreateRoute") || "").trim(),
+      rectificationListRoute: String(formData.get("rectificationListRoute") || "").trim(),
+      rectificationDescriptionMaxLength: readPositiveNumber(
+        formData.get("rectificationDescriptionMaxLength"),
+        currentSettings.rectificationDescriptionMaxLength
+      ),
+      defaultShouldCorrectedDays: readNonNegativeNumber(
+        formData.get("defaultShouldCorrectedDays"),
+        currentSettings.defaultShouldCorrectedDays
+      ),
+      rectificationSyncIntervalMs: readNonNegativeNumber(
+        formData.get("rectificationSyncIntervalMs"),
+        currentSettings.rectificationSyncIntervalMs
+      ),
+      rectificationSyncRetryCount: readNonNegativeNumber(
+        formData.get("rectificationSyncRetryCount"),
+        currentSettings.rectificationSyncRetryCount
+      ),
+      rectificationSyncTimeoutMs: readPositiveNumber(
+        formData.get("rectificationSyncTimeoutMs"),
+        currentSettings.rectificationSyncTimeoutMs
+      ),
+      rectificationSyncBatchSize: readPositiveNumber(
+        formData.get("rectificationSyncBatchSize"),
+        currentSettings.rectificationSyncBatchSize
+      )
+    });
+  } else {
+    systemSettingsService.saveHuiYunYingApiSettings({
+      ...currentSettings,
+      analyticsFactRefreshIntervalMs: readNonNegativeNumber(
+        formData.get("analyticsFactRefreshIntervalMs"),
+        currentSettings.analyticsFactRefreshIntervalMs
+      ),
+      analyticsSnapshotRefreshIntervalMs: readNonNegativeNumber(
+        formData.get("analyticsSnapshotRefreshIntervalMs"),
+        currentSettings.analyticsSnapshotRefreshIntervalMs
+      )
+    });
+  }
+  ensureRectificationSyncManagerStarted();
+  ensureAnalyticsJobManagerStarted();
+
+  return NextResponse.redirect(new URL(`/admin/settings?tab=${tab}`, request.url), 303);
 }

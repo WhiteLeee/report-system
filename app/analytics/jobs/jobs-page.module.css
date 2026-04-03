@@ -1,0 +1,136 @@
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 18px;
+}
+
+.actionGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.actionCardBody {
+  display: grid;
+  gap: 14px;
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.actionMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.actionTitle {
+  font-weight: 600;
+}
+
+.actionCopy {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.settingList {
+  display: grid;
+  gap: 12px;
+}
+
+.settingItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.settingLabel {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.settingValue {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.tableWrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.875rem;
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.primaryCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cellMeta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sectionGrid {
+  display: grid;
+  gap: 18px;
+}
+
+.checkpointGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.checkpointCard {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.checkpointHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+}

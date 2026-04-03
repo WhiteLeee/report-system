@@ -25,6 +25,12 @@ import {
 import { DashboardHeader } from "@/ui/dashboard-header";
 import { ReviewStatusBadge } from "@/ui/review-status-badge";
 import { formatDisplayDate, formatResultReviewState } from "@/ui/report-view";
+import {
+  classifyReportResultSemantics,
+  getReportResultSemanticLabel,
+  getReportResultSemanticSummaryLabel,
+  getReportResultSemanticTone
+} from "@/ui/report-result-semantics";
 import { ResultReviewWorkflow } from "@/ui/result-review-workflow";
 
 function formatCompactDate(value: string | null | undefined): string {
@@ -263,6 +269,7 @@ export function ReportResultDetailView({
   activeInspectionId,
   activePanel,
   currentUser,
+  defaultShouldCorrectedDays,
   filters,
   maxRectificationDescriptionLength,
   previewImage,
@@ -273,6 +280,7 @@ export function ReportResultDetailView({
   activeInspectionId: string;
   activePanel: string;
   currentUser: SessionUser;
+  defaultShouldCorrectedDays: number;
   filters: DetailFilters;
   maxRectificationDescriptionLength: number;
   previewImage: boolean;
@@ -302,6 +310,7 @@ export function ReportResultDetailView({
   const selectedInspections = report.inspections
     .filter((inspection) => matchesInspectionToImage(inspection, selectedResult))
     .sort((left, right) => left.display_order - right.display_order);
+  const selectedResultSemanticState = classifyReportResultSemantics(selectedIssues, selectedInspections);
   const selectedLogs = report.review_logs.filter((log) => log.result_id === selectedResult.id);
   const backPath = `/reports/${report.id}${buildSearch(filters)}`;
   const currentPath = buildResultPath(report.id, selectedResult.id, filters, {
@@ -373,8 +382,11 @@ export function ReportResultDetailView({
                 <Badge className={styles.metaPill} variant="outline">
                   1 张图片
                 </Badge>
-                <Badge className={styles.alertBadge} variant="outline">
-                  发现 {selectedIssues.length} 个问题
+                <Badge
+                  className={styles.alertBadge}
+                  variant={getReportResultSemanticTone(selectedResultSemanticState)}
+                >
+                  {getReportResultSemanticSummaryLabel(selectedResultSemanticState, selectedIssues.length)}
                 </Badge>
               </div>
             </div>
@@ -427,10 +439,12 @@ export function ReportResultDetailView({
                   canReview={canReview}
                   currentImageUrl={currentImageUrl}
                   currentPath={currentPath}
+                  defaultShouldCorrectedDays={defaultShouldCorrectedDays}
                   initialReviewState={selectedResult.review_state}
                   initialSelectedIssueIds={initialSelectedIssueIds}
                   issues={selectedIssues.map((issue) => ({ id: issue.id, title: issue.title }))}
                   maxDescriptionLength={maxRectificationDescriptionLength}
+                  semanticState={selectedResultSemanticState}
                 />
 
                 <div className={styles.reviewGrid}>
@@ -493,7 +507,7 @@ export function ReportResultDetailView({
               <div className={styles.analysisWorkspace}>
                 <div className={styles.alertPanel}>
                   <div className={styles.alertHead}>
-                    <strong>发现 {activeInspection.issues.length} 处问题</strong>
+                    <strong>{getReportResultSemanticSummaryLabel(selectedResultSemanticState, activeInspection.issues.length)}</strong>
                   </div>
                   {activeInspection.issues.length > 0 ? (
                     <ul className={styles.issueSummaryList}>
@@ -501,8 +515,12 @@ export function ReportResultDetailView({
                         <li key={issue.id}>{issue.title}</li>
                       ))}
                     </ul>
+                  ) : selectedResultSemanticState === "pass" ? (
+                    <p className={styles.analysisCopy}>当前图片已完成巡检，未发现需要复核的问题项。</p>
+                  ) : selectedResultSemanticState === "inspection_failed" ? (
+                    <p className={styles.analysisCopy}>当前图片存在巡检失败记录，本次仅支持本地复核记录异常情况，不下发整改单。</p>
                   ) : (
-                    <p className={styles.analysisCopy}>当前 inspection 没有关联问题项，可继续查看详细分析结果。</p>
+                    <p className={styles.analysisCopy}>当前图片没有形成明确问题项，可结合算法返回内容判断是否属于目标缺失、画面异常或其他无法判定场景。</p>
                   )}
                 </div>
 

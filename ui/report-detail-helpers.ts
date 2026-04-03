@@ -1,10 +1,12 @@
 import type { JsonValue } from "@/backend/shared/json";
 import type { ReportInspection, ReportIssue, ReportResult, ReportStore, ReviewFilterState } from "@/backend/report/report.types";
+import type { ReportResultSemanticState } from "@/ui/report-result-semantics";
 
 export type DetailFilters = {
   organization: string;
   storeId: string;
   reviewStatus: ReviewFilterState;
+  semanticState: ReportResultSemanticState | "";
   page: number;
   pageSize: 30 | 50 | 100 | 200;
 };
@@ -103,6 +105,9 @@ export function buildSearch(filters: DetailFilters): string {
   }
   if (filters.reviewStatus) {
     searchParams.set("reviewStatus", filters.reviewStatus);
+  }
+  if (filters.semanticState) {
+    searchParams.set("semanticState", filters.semanticState);
   }
   if (filters.page > 1) {
     searchParams.set("page", String(filters.page));

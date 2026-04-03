@@ -2,15 +2,15 @@
   display: grid;
   gap: 18px;
   padding: 24px;
-  border: 1px solid color-mix(in srgb, var(--border-color, #d6d0c2) 88%, white);
-  border-radius: 28px;
-  background: color-mix(in srgb, white 94%, #f6efe2 6%);
-  box-shadow: 0 24px 54px rgba(98, 70, 33, 0.12);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 .searchBar {
   display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(180px, 220px) minmax(220px, 1fr) minmax(160px, 180px) auto;
+  grid-template-columns: minmax(320px, 1fr) minmax(180px, 220px) auto;
   gap: 12px;
   align-items: end;
 }
@@ -21,9 +21,9 @@
 }
 
 .searchField label {
-  color: #685b47;
+  color: var(--text);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .searchActions {
@@ -40,29 +40,27 @@
 
 .summaryCard {
   padding: 18px 20px;
-  border: 1px solid color-mix(in srgb, var(--border-color, #d6d0c2) 82%, white);
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 246, 238, 0.92) 100%);
+  border: 1px solid var(--line);
+  border-radius: 0.875rem;
+  background: var(--surface);
 }
 
 .summaryTitle {
-  color: #6f634f;
+  color: var(--muted);
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 500;
 }
 
 .summaryValue {
   margin-top: 8px;
-  color: #1d1914;
+  color: var(--text);
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .summaryMeta {
   margin-top: 8px;
-  color: #706552;
+  color: var(--muted);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -76,9 +74,9 @@
 
 .orgPane,
 .contentPane {
-  border: 1px solid color-mix(in srgb, var(--border-color, #d6d0c2) 82%, white);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
 }
 
 .orgPane {
@@ -91,7 +89,7 @@
   display: flex;
   gap: 8px;
   padding: 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color, #d6d0c2) 82%, white);
+  border-bottom: 1px solid var(--line);
 }
 
 .orgTreeWrap {
@@ -119,21 +117,21 @@
   margin-bottom: 6px;
   padding: 10px 12px;
   border: 1px solid transparent;
-  border-radius: 14px;
-  color: #2d261c;
+  border-radius: 0.625rem;
+  color: var(--text);
   text-decoration: none;
   transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
 
 .orgRow:hover {
-  border-color: rgba(155, 120, 67, 0.22);
-  background: rgba(248, 241, 229, 0.82);
+  border-color: var(--line-strong);
+  background: #fafafa;
   transform: translateX(1px);
 }
 
 .orgRowActive {
-  border-color: rgba(155, 120, 67, 0.28);
-  background: rgba(248, 241, 229, 0.94);
+  border-color: var(--line-strong);
+  background: #fafafa;
 }
 
 .orgToggle,
@@ -144,14 +142,14 @@
 }
 
 .orgToggle {
-  color: #7f6137;
+  color: var(--muted);
   font-size: 14px;
   font-weight: 700;
   text-decoration: none;
 }
 
 .orgToggle:hover {
-  color: #9a6f28;
+  color: var(--text);
 }
 
 .orgTogglePlaceholder {
@@ -175,7 +173,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .orgCount {
@@ -183,10 +181,10 @@
   min-width: 28px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(146, 113, 63, 0.08);
-  color: #7a5d33;
+  background: #f4f4f5;
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -202,17 +200,17 @@
   justify-content: space-between;
   gap: 12px;
   padding: 18px 20px 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color, #d6d0c2) 82%, white);
+  border-bottom: 1px solid var(--line);
 }
 
 .contentHead strong {
-  color: #1e1914;
+  color: var(--text);
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .muted {
-  color: #756955;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -231,7 +229,7 @@
 .logTable th,
 .logTable td {
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(214, 208, 194, 0.7);
+  border-bottom: 1px solid var(--line);
   text-align: left;
   font-size: 14px;
   vertical-align: middle;
@@ -242,19 +240,19 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #f6f0e5;
-  color: #6f624d;
+  background: #fafafa;
+  color: var(--muted);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
 }
 
 .storeTable td {
-  color: #231d15;
+  color: var(--text);
 }
 
 .storeTable tbody tr:hover {
-  background: rgba(248, 243, 234, 0.72);
+  background: #fafafa;
 }
 
 .storeTable td:first-child,
@@ -278,28 +276,28 @@
   padding: 0 12px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
 }
 
 .statusSuccess {
-  background: rgba(37, 99, 66, 0.12);
-  color: #22613f;
+  background: #ecfdf5;
+  color: #166534;
 }
 
 .statusWarning {
-  background: rgba(176, 125, 31, 0.14);
-  color: #8a6110;
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .statusDanger {
-  background: rgba(185, 70, 64, 0.12);
-  color: #b23f34;
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .statusNeutral {
-  background: rgba(120, 113, 108, 0.12);
-  color: #61584d;
+  background: #f4f4f5;
+  color: #52525b;
 }
 
 .pager {
@@ -308,7 +306,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 20px 20px;
-  border-top: 1px solid color-mix(in srgb, var(--border-color, #d6d0c2) 82%, white);
+  border-top: 1px solid var(--line);
 }
 
 .pagerLeft,
@@ -319,23 +317,29 @@
   flex-wrap: wrap;
 }
 
-.pagerLeft :global(select) {
-  width: 96px;
+.pageSizeSelect {
+  width: 88px;
 }
 
 .empty {
   padding: 28px;
-  color: #726756;
+  color: var(--muted);
   font-size: 14px;
 }
 
 @media (max-width: 1380px) {
   .searchBar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 220px) auto;
   }
 
   .searchActions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 1040px) {
+  .searchBar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

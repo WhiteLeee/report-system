@@ -15,15 +15,27 @@ import type {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DatePickerField } from "@/components/ui/date-picker-field";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { DashboardHeader } from "@/ui/dashboard-header";
+import { QueryPagination } from "@/ui/query-pagination";
 import { formatDisplayDate } from "@/ui/report-view";
 
 export const dynamic = "force-dynamic";
 
 const rectificationService = createRectificationService();
+const PAGE_SIZE_OPTIONS = [20, 50, 100, 200];
+
+function parsePositiveInt(value: string | string[] | undefined, fallback: number) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 function buildFilters(searchParams: Record<string, string | string[] | undefined>): RectificationOrderFilters {
   return {
@@ -59,21 +71,23 @@ export default async function RectificationsPage({
   const resolvedSearchParams = await searchParams;
   const filters = buildFilters(resolvedSearchParams);
   const requestContext = buildRequestContext(currentUser);
-  const orders = rectificationService.listOrders(filters, requestContext);
-  const syncDashboard = rectificationService.getSyncDashboard();
+  const filteredOrders = rectificationService.listOrders(filters, requestContext);
+  const pageSize = parsePositiveInt(resolvedSearchParams.pageSize, PAGE_SIZE_OPTIONS[0]);
+  const totalOrders = filteredOrders.length;
+  const totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));
+  const page = Math.min(parsePositiveInt(resolvedSearchParams.page, 1), totalPages);
+  const startIndex = (page - 1) * pageSize;
+  const orders = filteredOrders.slice(startIndex, startIndex + pageSize);
 
-  const totalOrders = orders.length;
-  const correctedOrders = orders.filter(
+  const correctedOrders = filteredOrders.filter(
     (order) => normalizeRemoteIfCorrected(order.if_corrected) === "1" || order.status === "corrected"
   ).length;
-  const pendingReviewOrders = orders.filter(
+  const pendingReviewOrders = filteredOrders.filter(
     (order) => normalizeRemoteIfCorrected(order.if_corrected) === "2" || order.status === "pending_review"
   ).length;
-  const issuedOrders = orders.filter(
+  const issuedOrders = filteredOrders.filter(
     (order) => !["1", "2"].includes(String(normalizeRemoteIfCorrected(order.if_corrected) || "")) && order.status !== "sync_failed"
   ).length;
-  const latestBatch = syncDashboard.recent_batches[0] || null;
-
   return (
     <main className="page-shell">
       <DashboardHeader
@@ -177,11 +191,11 @@ export default async function RectificationsPage({
                         </div>
                         <div className={`field ${styles.compactField}`}>
                           <label htmlFor="startDate">开始日期</label>
-                          <Input className={styles.control} defaultValue={filters.startDate} id="startDate" name="startDate" type="date" />
+                          <DatePickerField className={styles.control} defaultValue={filters.startDate} id="startDate" name="startDate" />
                         </div>
                         <div className={`field ${styles.compactField}`}>
                           <label htmlFor="endDate">结束日期</label>
-                          <Input className={styles.control} defaultValue={filters.endDate} id="endDate" name="endDate" type="date" />
+                          <DatePickerField className={styles.control} defaultValue={filters.endDate} id="endDate" name="endDate" />
                         </div>
                       </div>
                       <div className={styles.filterActions}>
@@ -286,101 +300,21 @@ export default async function RectificationsPage({
             ) : (
               <EmptyState className={styles.emptyState}>当前没有匹配的整改单记录。</EmptyState>
             )}
+            {totalOrders > 0 ? (
+              <QueryPagination
+                className={styles.pager}
+                leftClassName={styles.pagerLeft}
+                page={page}
+                pageSize={pageSize}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                rightClassName={styles.pagerRight}
+                selectClassName={styles.pageSizeSelect}
+                total={totalOrders}
+                totalPages={totalPages}
+              />
+            ) : null}
           </CardContent>
         </Card>
-      </section>
-
-      <section className={`section ${styles.workspaceSection}`}>
-        <div className={styles.syncStatsGrid}>
-          <Card className={styles.syncPanel}>
-            <CardHeader className={styles.syncPanelHeader}>
-              <div>
-                <CardTitle className={styles.listTitle}>同步任务概览</CardTitle>
-                <CardDescription className={styles.listCopy}>
-                  展示最近一次定时同步的执行结果与耗时统计。
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className={styles.syncPanelBody}>
-              <div className={styles.syncMetricGrid}>
-                <div className={styles.syncMetricItem}>
-                  <span className={styles.statLabel}>最近批次</span>
-                  <strong className={styles.syncMetricValue}>{latestBatch?.sync_batch_id || "-"}</strong>
-                  <span className={styles.cellMeta}>
-                    {latestBatch?.started_at ? formatDisplayDate(latestBatch.started_at) : "暂无同步记录"}
-                  </span>
-                </div>
-                <div className={styles.syncMetricItem}>
-                  <span className={styles.statLabel}>成功 / 失败</span>
-                  <strong className={styles.syncMetricValue}>
-                    {latestBatch ? `${latestBatch.success_count} / ${latestBatch.failed_count}` : "-"}
-                  </strong>
-                  <span className={styles.cellMeta}>
-                    {latestBatch
-                      ? `未命中 ${latestBatch.not_found_count}，跳过 ${latestBatch.skipped_count}`
-                      : "等待定时任务执行"}
-                  </span>
-                </div>
-                <div className={styles.syncMetricItem}>
-                  <span className={styles.statLabel}>平均响应时间</span>
-                  <strong className={styles.syncMetricValue}>
-                    {latestBatch?.average_response_time_ms ? `${latestBatch.average_response_time_ms} ms` : "-"}
-                  </strong>
-                  <span className={styles.cellMeta}>
-                    {latestBatch?.max_response_time_ms ? `峰值 ${latestBatch.max_response_time_ms} ms` : "暂无接口耗时"}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={styles.syncPanel}>
-            <CardHeader className={styles.syncPanelHeader}>
-              <div>
-                <CardTitle className={styles.listTitle}>近 7 日同步统计</CardTitle>
-                <CardDescription className={styles.listCopy}>
-                  按天汇总同步成功、失败、未命中与接口响应时间。
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className={styles.syncPanelBody}>
-              {syncDashboard.daily_stats.length > 0 ? (
-                <div className={styles.syncSummaryTableWrap}>
-                  <table className={styles.syncSummaryTable}>
-                    <thead>
-                      <tr>
-                        <th>日期</th>
-                        <th>批次</th>
-                        <th>扫描</th>
-                        <th>成功</th>
-                        <th>失败</th>
-                        <th>未命中</th>
-                        <th>跳过</th>
-                        <th>平均耗时</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {syncDashboard.daily_stats.map((item) => (
-                        <tr key={item.sync_date}>
-                          <td>{item.sync_date}</td>
-                          <td>{item.batch_count}</td>
-                          <td>{item.scanned_count}</td>
-                          <td>{item.success_count}</td>
-                          <td>{item.failed_count}</td>
-                          <td>{item.not_found_count}</td>
-                          <td>{item.skipped_count}</td>
-                          <td>{item.average_response_time_ms ? `${item.average_response_time_ms} ms` : "-"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <EmptyState className={styles.emptyState}>最近 7 天暂无同步统计。</EmptyState>
-              )}
-            </CardContent>
-          </Card>
-        </div>
       </section>
     </main>
   );

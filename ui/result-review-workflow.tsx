@@ -7,10 +7,11 @@ import { createPortal } from "react-dom";
 import styles from "./report-result-detail-view.module.css";
 
 import type { ReviewSelectedIssue, ResultReviewState } from "@/backend/report/report.types";
+import type { ReportResultSemanticState } from "@/ui/report-result-semantics";
 import { buildRectificationPreviewOrders, RectificationPreviewError } from "@/lib/rectification-preview";
 import { Button } from "@/components/ui/button";
+import { DatePickerField } from "@/components/ui/date-picker-field";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ISSUE_SELECTION_MODAL_MESSAGE,
@@ -22,6 +23,20 @@ type ReviewIssueOption = {
   title: string;
 };
 
+function formatDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildDefaultShouldCorrectedDate(defaultDays: number): string {
+  const nextDate = new Date();
+  nextDate.setHours(0, 0, 0, 0);
+  nextDate.setDate(nextDate.getDate() + Math.max(0, Math.floor(defaultDays)));
+  return formatDateInputValue(nextDate);
+}
+
 export function ResultReviewWorkflow({
   actionUrl,
   canReview,
@@ -30,7 +45,9 @@ export function ResultReviewWorkflow({
   initialSelectedIssueIds,
   initialReviewState,
   issues,
-  maxDescriptionLength
+  maxDescriptionLength,
+  semanticState,
+  defaultShouldCorrectedDays
 }: {
   actionUrl: string;
   canReview: boolean;
@@ -40,12 +57,14 @@ export function ResultReviewWorkflow({
   initialReviewState: ResultReviewState;
   issues: ReviewIssueOption[];
   maxDescriptionLength: number;
+  semanticState: ReportResultSemanticState;
+  defaultShouldCorrectedDays: number;
 }) {
   const router = useRouter();
   const [selectedIssueIds, setSelectedIssueIds] = useState<number[]>(() =>
     Array.from(new Set(initialSelectedIssueIds.filter((issueId) => issues.some((issue) => issue.id === issueId))))
   );
-  const [shouldCorrected, setShouldCorrected] = useState("");
+  const [shouldCorrected, setShouldCorrected] = useState(() => buildDefaultShouldCorrectedDate(defaultShouldCorrectedDays));
   const [shouldCorrectedError, setShouldCorrectedError] = useState("");
   const [note, setNote] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -56,6 +75,7 @@ export function ResultReviewWorkflow({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
   const selectedIssues: ReviewSelectedIssue[] = issues.filter((issue) => selectedIssueIds.includes(issue.id));
+  const requiresRectification = semanticState === "issue_found" || issues.length > 0;
 
   useEffect(() => {
     setMounted(true);
@@ -88,7 +108,8 @@ export function ResultReviewWorkflow({
           should_corrected: shouldCorrected,
           note,
           return_to: currentPath,
-          selected_issues_json: JSON.stringify(selectedIssues)
+          selected_issues_json: JSON.stringify(selectedIssues),
+          result_semantic_state: semanticState
         })
       });
 
@@ -107,6 +128,7 @@ export function ResultReviewWorkflow({
   function handleSubmitCompletedPreview() {
     setErrorMessage("");
     const validationResult = validateCompletedReviewSubmission({
+      requiresRectification,
       selectedIssueCount: selectedIssues.length,
       shouldCorrected
     });
@@ -116,6 +138,14 @@ export function ResultReviewWorkflow({
     }
     if (validationResult.shouldShowIssueSelectionModal) {
       setIssueSelectionModalOpen(true);
+      return;
+    }
+    if (!requiresRectification) {
+      setIsSubmitting(true);
+      setProcessingOpen(true);
+      void submitReview("completed").catch((error) => {
+        setErrorMessage(error instanceof Error ? error.message : "提交复核失败。");
+      });
       return;
     }
     try {
@@ -174,12 +204,12 @@ export function ResultReviewWorkflow({
         {issues.length > 0 ? (
           <>
             <div className={styles.selectionToolbar}>
-              <button className={styles.selectionAction} disabled={!canReview || isSubmitting} onClick={selectAll} type="button">
+              <Button className={styles.selectionAction} disabled={!canReview || isSubmitting} onClick={selectAll} size="sm" type="button" variant="ghost">
                 全选
-              </button>
-              <button className={styles.selectionAction} disabled={!canReview || isSubmitting} onClick={clearAll} type="button">
+              </Button>
+              <Button className={styles.selectionAction} disabled={!canReview || isSubmitting} onClick={clearAll} size="sm" type="button" variant="ghost">
                 清空
-              </button>
+              </Button>
             </div>
             <ul className={styles.issueChecklist}>
               {issues.map((issue) => {
@@ -202,7 +232,11 @@ export function ResultReviewWorkflow({
             </ul>
           </>
         ) : (
-          <p className={styles.analysisCopy}>当前结果没有关联问题项，提交复核时系统会提示先确认问题项。</p>
+          <p className={styles.analysisCopy}>
+            {requiresRectification
+              ? "当前结果没有关联问题项，提交整改单前需要先确认至少一个问题项。"
+              : "当前结果无需下发整改单，本次提交仅在本地完成复核。"}
+          </p>
         )}
       </div>
 
@@ -212,21 +246,22 @@ export function ResultReviewWorkflow({
           <div className={styles.reviewForm}>
             <div className="field">
               <label htmlFor="shouldCorrected">整改截止日期</label>
-              <Input
-                aria-describedby={shouldCorrectedError ? "shouldCorrected-error" : undefined}
-                aria-invalid={shouldCorrectedError ? true : undefined}
+              <DatePickerField
                 className={shouldCorrectedError ? styles.reviewInputError : undefined}
+                disabled={!requiresRectification}
                 id="shouldCorrected"
                 name="should_corrected"
-                onChange={(event) => {
-                  setShouldCorrected(event.target.value);
+                onValueChange={(nextValue) => {
+                  setShouldCorrected(nextValue);
                   if (shouldCorrectedError) {
                     setShouldCorrectedError("");
                   }
                 }}
-                type="date"
                 value={shouldCorrected}
               />
+              {!requiresRectification ? (
+                <div className={styles.analysisCopy}>当前结果状态不需要下发整改单，整改截止日期不会参与本次提交。</div>
+              ) : null}
               {shouldCorrectedError ? (
                 <div className={styles.reviewFieldError} id="shouldCorrected-error" role="alert">
                   {shouldCorrectedError}
@@ -252,7 +287,7 @@ export function ResultReviewWorkflow({
                 type="button"
                 variant="secondary"
               >
-                退回待复核
+                退回
               </Button>
               <Button
                 disabled={initialReviewState === "completed" || isSubmitting}
@@ -260,7 +295,7 @@ export function ResultReviewWorkflow({
                 size="sm"
                 type="button"
               >
-                提交复核
+                {requiresRectification ? "提交" : "提交"}
               </Button>
             </div>
           </div>
@@ -326,10 +361,10 @@ export function ResultReviewWorkflow({
                 type="button"
                 variant="secondary"
               >
-                返回修改
+                返回
               </Button>
               <Button disabled={isSubmitting} onClick={handleConfirmSubmit} size="sm" type="button">
-                提交整改单
+                确认创建整改单
               </Button>
             </div>
           </div>
@@ -388,7 +423,9 @@ export function ResultReviewWorkflow({
                 <div className={styles.processingSpinner} />
                 <div className={styles.processingContent}>
                   <h3 className={styles.blockTitle}>处理中</h3>
-                  <p className={styles.analysisCopy}>正在创建整改单，请稍候。</p>
+                  <p className={styles.analysisCopy}>
+                    {requiresRectification ? "正在创建整改单，请稍候。" : "正在提交本地复核，请稍候。"}
+                  </p>
                 </div>
               </div>
             </div>,

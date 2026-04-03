@@ -19,7 +19,7 @@ function createOrder(overrides: Partial<RectificationOrderRecord> = {}): Rectifi
     result_id: 201,
     source_enterprise_id: "ent-1",
     enterprise_name: "测试企业",
-    report_type: "standard",
+    report_type: "daily",
     report_version: "v1",
     published_at: "2026-04-01T08:00:00.000Z",
     source_review_log_id: 1,

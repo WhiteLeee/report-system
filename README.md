@@ -116,7 +116,10 @@ report-system/
 ### 5.1 `report_meta`
 
 表示报告基本信息：
+- `report_type`
 - `topic`
+- `plan_id`
+- `plan_name`
 - `report_versions`
 - `enterprise_id`
 - `enterprise_name`
@@ -140,6 +143,19 @@ report-system/
 - `captures`
 - `inspections`
 - `issues`
+
+### 5.4 当前结果语义约定
+
+`vision-agent` 当前会同时发送 `captures.issue_count` 和 `inspections.status/raw_result/error_message/total_issues`。
+
+`report-system` 的展示与复核默认按下面规则解释单张图片结果：
+
+- 存在 `issues`：视为 `发现问题`
+- 无 `issues`，但 inspection 明确失败或有错误信息：视为 `巡检失败`
+- 无 `issues`，但 inspection 命中“目标缺失 / 无法判断 / 低置信度”等语义：视为 `无法判定`
+- 其余无 `issues` 且 inspection 正常完成：视为 `未发现问题`
+
+因此，`0 问题` 不再等价于“业务正常”，必须结合 inspection 结果一起判断。
 
 ## 6. 启动
 

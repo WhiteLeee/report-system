@@ -21,12 +21,12 @@ export function ReviewStatusBadge({
   return (
     <Badge
       className={cn(
-        "w-fit font-semibold",
+        "w-fit font-medium",
         isCompleted
-          ? "border-[rgba(48,88,65,0.18)] bg-[var(--reviewed-bg)] text-[var(--reviewed-text)]"
+          ? "border-transparent bg-zinc-100 text-zinc-900"
           : isInProgress
-            ? "border-[rgba(140,106,44,0.22)] bg-[rgba(242,223,180,0.48)] text-[#76531f]"
-          : "border-[rgba(194,154,78,0.24)] bg-[var(--pending-bg)] text-[var(--pending-text)]",
+            ? "border-transparent bg-amber-100 text-amber-900"
+            : "border-transparent bg-zinc-100 text-zinc-700",
         className
       )}
       variant="secondary"

@@ -35,6 +35,30 @@ function normalizeScopeIds(values: string[] | undefined): string[] {
   return Array.from(new Set((values || []).map((item) => item.trim()).filter(Boolean)));
 }
 
+function resolveStoreOrganizeCode(
+  explicitCode: string | undefined,
+  rawJson: Record<string, unknown>
+): string {
+  return String(
+    explicitCode ||
+      rawJson.parentOrgCode ||
+      rawJson.organizeCode ||
+      ""
+  ).trim();
+}
+
+function resolveStoreOrganizeName(
+  explicitName: string | undefined,
+  rawJson: Record<string, unknown>
+): string {
+  return String(
+    explicitName ||
+      rawJson.parentOrgName ||
+      rawJson.organizeName ||
+      ""
+  ).trim();
+}
+
 function canAccessEnterprise(context: RequestContext, enterpriseId: string): boolean {
   const enterpriseScopeIds = normalizeScopeIds(context.enterpriseScopeIds);
   if (enterpriseScopeIds.length === 0) {
@@ -239,6 +263,9 @@ export class SqliteMasterDataRepository implements MasterDataRepository {
       }
 
       payload.stores.forEach((item) => {
+        const rawJson = item.raw_json ?? {};
+        const organizeCode = resolveStoreOrganizeCode(item.organize_code, rawJson);
+        const organizeName = resolveStoreOrganizeName(item.organize_name, rawJson);
         tx
           .insert(storeMasterProfileTable)
           .values({
@@ -247,13 +274,13 @@ export class SqliteMasterDataRepository implements MasterDataRepository {
             storeId: item.store_id.trim(),
             storeCode: item.store_code?.trim() || "",
             storeName: item.store_name.trim(),
-            organizeCode: item.organize_code?.trim() || "",
-            organizeName: item.organize_name?.trim() || "",
+            organizeCode,
+            organizeName,
             storeType: item.store_type?.trim() || "",
             franchiseeName: item.franchisee_name?.trim() || "",
             supervisor: item.supervisor?.trim() || "",
             status: item.status?.trim() || "",
-            rawJson: JSON.stringify(item.raw_json ?? {}),
+            rawJson: JSON.stringify(rawJson),
             isActive: 1,
             snapshotVersion,
             updatedAt
@@ -264,13 +291,13 @@ export class SqliteMasterDataRepository implements MasterDataRepository {
               enterpriseName,
               storeCode: item.store_code?.trim() || "",
               storeName: item.store_name.trim(),
-              organizeCode: item.organize_code?.trim() || "",
-              organizeName: item.organize_name?.trim() || "",
+              organizeCode,
+              organizeName,
               storeType: item.store_type?.trim() || "",
               franchiseeName: item.franchisee_name?.trim() || "",
               supervisor: item.supervisor?.trim() || "",
               status: item.status?.trim() || "",
-              rawJson: JSON.stringify(item.raw_json ?? {}),
+              rawJson: JSON.stringify(rawJson),
               isActive: 1,
               snapshotVersion,
               updatedAt
@@ -387,9 +414,6 @@ export class SqliteMasterDataRepository implements MasterDataRepository {
       return [];
     }
     const where = [eq(storeMasterProfileTable.enterpriseId, filters.enterpriseId), eq(storeMasterProfileTable.isActive, 1)];
-    if (filters.organizeCode) {
-      where.push(eq(storeMasterProfileTable.organizeCode, filters.organizeCode));
-    }
     if (filters.status) {
       where.push(eq(storeMasterProfileTable.status, filters.status));
     }
@@ -402,12 +426,14 @@ export class SqliteMasterDataRepository implements MasterDataRepository {
       .map(
         (row): MasterDataStore => {
           const rawJson = safeParseJson(row.rawJson);
+          const organizeCode = resolveStoreOrganizeCode(row.organizeCode, rawJson);
+          const organizeName = resolveStoreOrganizeName(row.organizeName, rawJson);
           return {
             store_id: row.storeId,
             store_code: row.storeCode,
             store_name: row.storeName,
-            organize_code: row.organizeCode,
-            organize_name: row.organizeName,
+            organize_code: organizeCode,
+            organize_name: organizeName,
             store_type: row.storeType,
             franchisee_name: row.franchiseeName,
             supervisor: row.supervisor,
@@ -430,6 +456,9 @@ export class SqliteMasterDataRepository implements MasterDataRepository {
       rows = rows.filter((row) => allowedOrganizationCodes.has(row.organize_code));
     }
     rows = applyStoreScope(rows, context);
+    if (filters.organizeCode) {
+      rows = rows.filter((row) => row.organize_code === filters.organizeCode);
+    }
     if (filters.keyword) {
       const keyword = filters.keyword.toLowerCase();
       rows = rows.filter((row) => row.store_name.toLowerCase().includes(keyword) || row.store_code.toLowerCase().includes(keyword));

@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 import "./globals.css";
 
+import { ensureAnalyticsJobManagerStarted } from "@/backend/analytics/jobs/analytics-job.manager";
 import { getReportSystemConfig } from "@/backend/config/report-system-config";
 import { ensureRectificationSyncManagerStarted } from "@/backend/rectification/rectification-sync.manager";
 
@@ -14,6 +15,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   ensureRectificationSyncManagerStarted();
+  ensureAnalyticsJobManagerStarted();
 
   return (
     <html lang="zh-CN">
