@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { BarChart3, FileText, LogOut, Settings2, User, Wrench } from "lucide-react";
 
 import type { SessionUser } from "@/backend/auth/auth.types";
@@ -26,6 +27,8 @@ export function DashboardHeader({
   subtitle: string;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isAdmin = currentUser.roles.includes("admin");
   const navigationItems = [
     { href: "/reports", label: "报告列表", icon: FileText, active: pathname.startsWith("/reports") },
@@ -45,6 +48,23 @@ export function DashboardHeader({
         ]
       : [])
   ] as const;
+
+  async function handleLogout() {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include"
+      });
+    } finally {
+      window.location.assign("/login");
+      router.refresh();
+    }
+  }
 
   return (
     <header className="mb-8 flex flex-col gap-6 border-b border-zinc-200 pb-6 lg:flex-row lg:items-start lg:justify-between">
@@ -67,40 +87,38 @@ export function DashboardHeader({
                 </TabsTrigger>
               );
             })}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={cn(
-                  tabsTriggerVariants({
-                    state: "inactive",
-                    orientation: "horizontal"
-                  }),
-                  "rounded-full"
-                )}
-                type="button"
-              >
-                <User className="h-4 w-4" />
-                {currentUser.username}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="space-y-0.5">
-                  <div className="text-sm font-medium text-zinc-950">{currentUser.username}</div>
-                  <div className="text-xs text-zinc-500">当前登录账号</div>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <form action="/api/auth/logout" method="post">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    tabsTriggerVariants({
+                      state: "inactive",
+                      orientation: "horizontal"
+                    }),
+                    "rounded-full"
+                  )}
+                  type="button"
+                >
+                  <User className="h-4 w-4" />
+                  {currentUser.username}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-medium text-zinc-950">{currentUser.username}</div>
+                    <div className="text-xs text-zinc-500">当前登录账号</div>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <button type="submit">
+                  <button disabled={isLoggingOut} onClick={handleLogout} type="button">
                     <LogOut className="h-4 w-4" />
-                    退出登录
+                    {isLoggingOut ? "退出中..." : "退出登录"}
                   </button>
                 </DropdownMenuItem>
-              </form>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </TabsList>
         </div>
       </div>

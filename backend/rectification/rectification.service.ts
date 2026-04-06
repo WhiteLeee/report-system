@@ -65,6 +65,27 @@ type SyncExecutionResult = {
 const RECTIFICATION_LIST_PAGE_SIZE = 50;
 const RECTIFICATION_LIST_MAX_PAGES = 10;
 
+const OSS_SIGNATURE_QUERY_KEYS = ["OSSAccessKeyId", "Signature", "Expires"] as const;
+
+export function normalizeRectificationImageUrl(rawUrl: string): string {
+  const value = String(rawUrl || "").trim();
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(value);
+    const hasSignedQuery = OSS_SIGNATURE_QUERY_KEYS.some((key) => parsed.searchParams.has(key));
+    if (!hasSignedQuery) {
+      return value;
+    }
+    parsed.search = "";
+    return parsed.toString();
+  } catch {
+    return value;
+  }
+}
+
 function formatDateOnly(value: string | Date): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -267,7 +288,7 @@ export class RectificationService {
     const settings = createSystemSettingsService().getHuiYunYingApiSettings();
     const huiYunYingService = createHuiYunYingRectificationService();
     const normalizedImageUrls = Array.from(
-      new Set(input.imageUrls.map((url) => String(url || "").trim()).filter(Boolean))
+      new Set(input.imageUrls.map((url) => normalizeRectificationImageUrl(String(url || ""))).filter(Boolean))
     ).slice(0, 9);
     let previewOrders;
     try {

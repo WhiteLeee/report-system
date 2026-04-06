@@ -62,6 +62,8 @@ report-system/
 ## 3.1 领域设计文档
 
 - [docs/report-review-state-refactor.md](/Users/wick/Desktop/ZhiQing Selection/SourceCode/report-system/docs/report-review-state-refactor.md)
+- [docs/慧运营整改单自动下发需求文档.md](/Users/wick/Desktop/ZhiQing Selection/SourceCode/report-system/docs/慧运营整改单自动下发需求文档.md)
+- [docs/慧运营整改单自动下发技术方案.md](/Users/wick/Desktop/ZhiQing Selection/SourceCode/report-system/docs/慧运营整改单自动下发技术方案.md)
   说明：批次、门店、巡检结果三级复核状态重构方案，以及快照和扩展字段的建模原则。
 
 ## 4. 数据模型说明
