@@ -90,9 +90,12 @@ export function getReportResultSemanticLabel(state: ReportResultSemanticState, i
   return "无法判定";
 }
 
-export function getReportResultSemanticSummaryLabel(state: ReportResultSemanticState, issueCount = 0): string {
+export function getReportResultSemanticSummaryLabel(state: ReportResultSemanticState, issueCount?: number): string {
   if (state === "issue_found") {
-    return `发现 ${issueCount} 个问题`;
+    if (typeof issueCount === "number" && issueCount > 0) {
+      return `发现 ${issueCount} 个问题`;
+    }
+    return "发现问题";
   }
   if (state === "pass") {
     return "未发现问题";

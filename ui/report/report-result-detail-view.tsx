@@ -21,17 +21,17 @@ import {
   matchesIssueToImage,
   readMetadataString,
   type DetailFilters
-} from "@/ui/report-detail-helpers";
-import { DashboardHeader } from "@/ui/dashboard-header";
-import { ReviewStatusBadge } from "@/ui/review-status-badge";
-import { formatDisplayDate, formatResultReviewState } from "@/ui/report-view";
+} from "@/ui/report/report-detail-helpers";
+import { DashboardHeader } from "@/ui/shared/dashboard-header";
+import { ReviewStatusBadge } from "@/ui/report/review-status-badge";
+import { formatDisplayDate, formatResultReviewState } from "@/ui/report/report-view";
 import {
   classifyReportResultSemantics,
   getReportResultSemanticLabel,
   getReportResultSemanticSummaryLabel,
   getReportResultSemanticTone
-} from "@/ui/report-result-semantics";
-import { ResultReviewWorkflow } from "@/ui/result-review-workflow";
+} from "@/ui/report/report-result-semantics";
+import { ResultReviewWorkflow } from "@/ui/report/result-review-workflow";
 
 function formatCompactDate(value: string | null | undefined): string {
   const normalized = String(value || "").trim();

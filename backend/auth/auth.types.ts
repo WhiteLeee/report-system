@@ -4,6 +4,25 @@ export type RoleCode = (typeof roleCodes)[number];
 export const permissionCodes = ["report:read", "review:write", "user:manage"] as const;
 export type PermissionCode = (typeof permissionCodes)[number];
 
+export interface RoleDefinition {
+  code: RoleCode;
+  name: string;
+  description: string;
+}
+
+export interface PermissionDefinition {
+  code: PermissionCode;
+  name: string;
+  description: string;
+}
+
+export interface RolePermissionMatrixItem {
+  roleCode: RoleCode;
+  roleName: string;
+  roleDescription: string;
+  permissionCodes: PermissionCode[];
+}
+
 export interface SessionUser {
   id: number;
   username: string;

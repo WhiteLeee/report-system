@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import styles from "./report-result-detail-view.module.css";
 
 import type { ReviewSelectedIssue, ResultReviewState } from "@/backend/report/report.types";
-import type { ReportResultSemanticState } from "@/ui/report-result-semantics";
+import type { ReportResultSemanticState } from "@/ui/report/report-result-semantics";
 import { buildRectificationPreviewOrders, RectificationPreviewError } from "@/lib/rectification-preview";
 import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ISSUE_SELECTION_MODAL_MESSAGE,
   validateCompletedReviewSubmission
-} from "@/ui/result-review-workflow.validation";
+} from "@/ui/report/result-review-workflow.validation";
 
 type ReviewIssueOption = {
   id: number;

@@ -4,14 +4,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const tabs = [
   { key: "master-data", label: "门店主数据", href: "/master-data" },
-  { key: "users", label: "用户管理", href: "/admin/users" },
   { key: "settings", label: "系统设置", href: "/admin/settings" }
 ] as const;
 
 export function SystemManagementTabs({
   activeTab
 }: {
-  activeTab: "master-data" | "users" | "settings";
+  activeTab: "master-data" | "settings";
 }) {
   return (
     <Tabs>

@@ -12,7 +12,12 @@ import {
   reportTable
 } from "@/backend/database/schema";
 import type { AnalyticsFilters } from "@/backend/analytics/contracts/analytics.filters";
-import type { AnalyticsDashboard } from "@/backend/analytics/contracts/analytics.types";
+import type {
+  AnalyticsDashboard,
+  AnalyticsFilterOption,
+  AnalyticsFilterOptions,
+  AnalyticsStoreFilterOption
+} from "@/backend/analytics/contracts/analytics.types";
 import type {
   AnalyticsDailyTrendItem,
   AnalyticsFranchiseeCloseRateItem,
@@ -109,6 +114,80 @@ function computeDurationDays(start: string | null | undefined, end: string | nul
 
 function canUseDailySnapshots(filters: AnalyticsFilters): boolean {
   return !filters.organizationId && !filters.franchiseeName && !filters.storeId && !filters.reportType && !filters.topic && !filters.planId;
+}
+
+function sortOptions<T extends AnalyticsFilterOption>(items: T[]): T[] {
+  return items.sort(
+    (left, right) =>
+      left.label.localeCompare(right.label, "zh-Hans-CN") ||
+      left.value.localeCompare(right.value, "en")
+  );
+}
+
+function buildFilterOptions(
+  reportRows: AnalyticsReportRow[],
+  resultRows: AnalyticsResultFactRow[]
+): AnalyticsFilterOptions {
+  const reportTypeMap = new Map<string, AnalyticsFilterOption>();
+  const topicMap = new Map<string, AnalyticsFilterOption>();
+  const planMap = new Map<string, AnalyticsFilterOption>();
+  const organizationMap = new Map<string, AnalyticsFilterOption>();
+  const storeMap = new Map<string, AnalyticsStoreFilterOption>();
+
+  reportRows.forEach((row) => {
+    const reportType = String(row.reportType || "").trim();
+    if (reportType && !reportTypeMap.has(reportType)) {
+      reportTypeMap.set(reportType, { value: reportType, label: reportType });
+    }
+
+    const extensions = safeParseRecord(row.extensionsJson);
+    const topic = readString(extensions, "report_topic");
+    if (topic && !topicMap.has(topic)) {
+      topicMap.set(topic, { value: topic, label: topic });
+    }
+
+    const planId = readString(extensions, "plan_id");
+    const planName = readString(extensions, "plan_name");
+    if (planId && !planMap.has(planId)) {
+      planMap.set(planId, {
+        value: planId,
+        label: planName && planName !== planId ? `${planName} (${planId})` : planId
+      });
+    }
+  });
+
+  resultRows.forEach((row) => {
+    const organizationId = String(row.organizationCode || "").trim();
+    const organizationName = String(row.organizationName || "").trim();
+    if (organizationId && !organizationMap.has(organizationId)) {
+      organizationMap.set(organizationId, {
+        value: organizationId,
+        label: organizationName || organizationId
+      });
+    }
+
+    const storeId = String(row.storeId || "").trim();
+    if (!storeId) {
+      return;
+    }
+    if (storeMap.has(storeId)) {
+      return;
+    }
+    storeMap.set(storeId, {
+      value: storeId,
+      label: String(row.storeName || "").trim() || storeId,
+      organization_id: organizationId,
+      organization_name: organizationName || organizationId
+    });
+  });
+
+  return {
+    report_types: sortOptions(Array.from(reportTypeMap.values())),
+    organizations: sortOptions(Array.from(organizationMap.values())),
+    stores: sortOptions(Array.from(storeMap.values())),
+    topics: sortOptions(Array.from(topicMap.values())),
+    plans: sortOptions(Array.from(planMap.values()))
+  };
 }
 
 function buildSemanticDistribution(
@@ -1579,6 +1658,11 @@ export class SqliteAnalyticsRepository implements AnalyticsRepository {
   getRectificationOverview(filters: AnalyticsFilters, context: RequestContext): AnalyticsRectificationOverviewMetrics {
     const dataset = this.loadDataset(filters, context);
     return buildRectificationOverview(dataset.rectificationFactRows);
+  }
+
+  getFilterOptions(filters: AnalyticsFilters, context: RequestContext): AnalyticsFilterOptions {
+    const dataset = this.loadDataset(filters, context);
+    return buildFilterOptions(dataset.reportRows, dataset.resultFactRows);
   }
 
   getDashboard(filters: AnalyticsFilters, context: RequestContext, issueTypeLimit = 10): AnalyticsDashboard {

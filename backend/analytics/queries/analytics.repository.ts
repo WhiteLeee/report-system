@@ -1,6 +1,6 @@
 import type { RequestContext } from "@/backend/auth/request-context";
 import type { AnalyticsFilters } from "@/backend/analytics/contracts/analytics.filters";
-import type { AnalyticsDashboard } from "@/backend/analytics/contracts/analytics.types";
+import type { AnalyticsDashboard, AnalyticsFilterOptions } from "@/backend/analytics/contracts/analytics.types";
 import type {
   AnalyticsDailyTrendItem,
   AnalyticsFranchiseeCloseRateItem,
@@ -56,4 +56,5 @@ export interface AnalyticsRepository {
   getOverdueFranchisees(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsOverdueFranchiseeItem[];
   getRectificationOverview(filters: AnalyticsFilters, context: RequestContext): AnalyticsRectificationOverviewMetrics;
   getDashboard(filters: AnalyticsFilters, context: RequestContext, issueTypeLimit?: number): AnalyticsDashboard;
+  getFilterOptions(filters: AnalyticsFilters, context: RequestContext): AnalyticsFilterOptions;
 }

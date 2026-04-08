@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { BarChart3, FileText, LogOut, Settings2, User, Wrench } from "lucide-react";
+import { BarChart3, FileText, LogOut, Settings2, ShieldUser, User, Wrench } from "lucide-react";
 
 import type { SessionUser } from "@/backend/auth/auth.types";
 import {
@@ -37,13 +37,20 @@ export function DashboardHeader({
     ...(isAdmin
       ? [
           {
+            href: "/admin/users",
+            label: "用户管理",
+            icon: ShieldUser,
+            active: pathname.startsWith("/admin/users")
+          }
+        ]
+      : []),
+    ...(isAdmin
+      ? [
+          {
             href: "/master-data",
             label: "系统管理",
             icon: Settings2,
-            active:
-              pathname.startsWith("/master-data") ||
-              pathname.startsWith("/admin/users") ||
-              pathname.startsWith("/admin/settings")
+            active: pathname.startsWith("/master-data") || pathname.startsWith("/admin/settings")
           }
         ]
       : [])

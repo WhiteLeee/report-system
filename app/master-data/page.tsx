@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import styles from "./master-data-page.module.css";
 import { MasterDataPagination } from "./master-data-pagination";
@@ -10,8 +11,8 @@ import type { MasterDataOrganization, MasterDataStore } from "@/backend/master-d
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { DashboardHeader } from "@/ui/dashboard-header";
-import { SystemManagementTabs } from "@/ui/system-management-tabs";
+import { DashboardHeader } from "@/ui/shared/dashboard-header";
+import { SystemManagementTabs } from "@/ui/shared/system-management-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -198,6 +199,9 @@ export default async function MasterDataPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const currentUser = await requirePermission("report:read", "/master-data");
+  if (!currentUser.roles.includes("admin")) {
+    redirect("/reports");
+  }
   const resolvedSearchParams = await searchParams;
 
   const enterprise = normalizeQueryValue(resolvedSearchParams.enterprise);

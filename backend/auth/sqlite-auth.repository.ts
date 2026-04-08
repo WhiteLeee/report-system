@@ -3,7 +3,14 @@ import { and, eq, gt, inArray } from "drizzle-orm";
 
 import { hashPassword, verifyPassword } from "@/backend/auth/password";
 import type { AuthRepository } from "@/backend/auth/auth.repository";
-import type { CreateUserInput, PermissionCode, RoleCode, SessionUser, UserAccount } from "@/backend/auth/auth.types";
+import type {
+  CreateUserInput,
+  PermissionCode,
+  RoleCode,
+  RolePermissionMatrixItem,
+  SessionUser,
+  UserAccount
+} from "@/backend/auth/auth.types";
 import { db } from "@/backend/database/client";
 import {
   reportPermissionTable,
@@ -58,6 +65,11 @@ function normalizeRoleCode(value: string): RoleCode {
 
 function normalizeScopeValues(values: string[]): string[] {
   return Array.from(new Set(values.map((item) => item.trim()).filter(Boolean)));
+}
+
+function normalizePermissionCodes(values: PermissionCode[]): PermissionCode[] {
+  const allowed = new Set(permissionDefinitions.map((item) => item.code));
+  return Array.from(new Set(values)).filter((item): item is PermissionCode => allowed.has(item));
 }
 
 function loadScopeMap(
@@ -471,6 +483,97 @@ export class SqliteAuthRepository implements AuthRepository {
       .set({ status, updatedAt: nowIso() })
       .where(eq(reportUserTable.id, userId))
       .run();
+  }
+
+  listRolePermissionMatrix(): RolePermissionMatrixItem[] {
+    const roleRows = db.select().from(reportRoleTable).all();
+    const rolePermissionRows = db
+      .select({
+        roleCode: reportRoleTable.code,
+        permissionCode: reportPermissionTable.code
+      })
+      .from(reportRolePermissionTable)
+      .innerJoin(reportRoleTable, eq(reportRoleTable.id, reportRolePermissionTable.roleId))
+      .innerJoin(reportPermissionTable, eq(reportPermissionTable.id, reportRolePermissionTable.permissionId))
+      .all();
+
+    const permissionMap = new Map(
+      rolePermissionRows.map((row) => [String(row.roleCode), [] as PermissionCode[]])
+    );
+    roleRows.forEach((role) => {
+      if (!permissionMap.has(role.code)) {
+        permissionMap.set(role.code, []);
+      }
+    });
+    rolePermissionRows.forEach((row) => {
+      const roleCode = String(row.roleCode);
+      const permissionCode = String(row.permissionCode) as PermissionCode;
+      const bucket = permissionMap.get(roleCode) || [];
+      if (!bucket.includes(permissionCode)) {
+        bucket.push(permissionCode);
+      }
+      permissionMap.set(roleCode, bucket);
+    });
+
+    const roleOrder = new Map(roleDefinitions.map((item, index) => [item.code, index]));
+    const permissionOrder = new Map(permissionDefinitions.map((item, index) => [item.code, index]));
+
+    return roleRows
+      .map((role) => ({
+        roleCode: normalizeRoleCode(role.code),
+        roleName: role.name,
+        roleDescription: role.description || "",
+        permissionCodes: (permissionMap.get(role.code) || [])
+          .slice()
+          .sort((left, right) => (permissionOrder.get(left) ?? 99) - (permissionOrder.get(right) ?? 99))
+      }))
+      .sort((left, right) => (roleOrder.get(left.roleCode) ?? 99) - (roleOrder.get(right.roleCode) ?? 99));
+  }
+
+  replaceRolePermissions(roleCode: RoleCode, permissionCodes: PermissionCode[]): void {
+    const normalizedRoleCode = normalizeRoleCode(roleCode);
+    const nextPermissions =
+      normalizedRoleCode === "admin"
+        ? [...rolePermissionMatrix.admin]
+        : normalizePermissionCodes(permissionCodes).filter((code) => code !== "user:manage");
+
+    db.transaction((tx) => {
+      const role = tx
+        .select({ id: reportRoleTable.id })
+        .from(reportRoleTable)
+        .where(eq(reportRoleTable.code, normalizedRoleCode))
+        .get();
+      if (!role) {
+        throw new Error("Role not found.");
+      }
+
+      tx.delete(reportRolePermissionTable).where(eq(reportRolePermissionTable.roleId, role.id)).run();
+
+      if (nextPermissions.length > 0) {
+        const permissionRows = tx
+          .select({
+            code: reportPermissionTable.code,
+            id: reportPermissionTable.id
+          })
+          .from(reportPermissionTable)
+          .where(inArray(reportPermissionTable.code, nextPermissions))
+          .all();
+        const permissionMap = new Map(permissionRows.map((item) => [item.code, item.id]));
+        nextPermissions.forEach((permissionCode) => {
+          const permissionId = permissionMap.get(permissionCode);
+          if (!permissionId) {
+            return;
+          }
+          tx
+            .insert(reportRolePermissionTable)
+            .values({ roleId: role.id, permissionId })
+            .onConflictDoNothing({
+              target: [reportRolePermissionTable.roleId, reportRolePermissionTable.permissionId]
+            })
+            .run();
+        });
+      }
+    });
   }
 
   hasPermission(user: SessionUser | null, permissionCode: PermissionCode): boolean {

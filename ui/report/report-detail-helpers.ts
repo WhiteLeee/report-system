@@ -1,6 +1,6 @@
 import type { JsonValue } from "@/backend/shared/json";
 import type { ReportInspection, ReportIssue, ReportResult, ReportStore, ReviewFilterState } from "@/backend/report/report.types";
-import type { ReportResultSemanticState } from "@/ui/report-result-semantics";
+import type { ReportResultSemanticState } from "@/ui/report/report-result-semantics";
 
 export type DetailFilters = {
   organization: string;

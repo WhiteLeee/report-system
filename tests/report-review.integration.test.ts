@@ -36,7 +36,7 @@ let authService: typeof import("../backend/auth/auth.module");
 let reportServiceModule: typeof import("../backend/report/report.module");
 let systemSettingsModule: typeof import("../backend/system-settings/system-settings.module");
 let rectificationModule: typeof import("../backend/rectification/rectification.module");
-let ReportDetailView: typeof import("../ui/report-detail-view").ReportDetailView;
+let ReportDetailView: typeof import("../ui/report/report-detail-view").ReportDetailView;
 
 const publishPayload = {
   source_system: "vision-agent",
@@ -157,7 +157,7 @@ before(async () => {
     import("../backend/report/report.module"),
     import("../backend/system-settings/system-settings.module"),
     import("../backend/rectification/rectification.module"),
-    import("../ui/report-detail-view"),
+    import("../ui/report/report-detail-view"),
     import("../app/api/auth/login/route"),
     import("../app/api/reports/publish/route"),
     import("../app/api/reports/[reportId]/route"),

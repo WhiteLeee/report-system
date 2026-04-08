@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 import { buildRequestContext, requirePermission } from "@/backend/auth/session";
 import { createReportService } from "@/backend/report/report.module";
 import type { ReviewFilterState } from "@/backend/report/report.types";
-import { DETAIL_PAGE_SIZE_OPTIONS, type DetailFilters } from "@/ui/report-detail-helpers";
-import type { ReportResultSemanticState } from "@/ui/report-result-semantics";
-import { ReportDetailView } from "@/ui/report-detail-view";
+import { DETAIL_PAGE_SIZE_OPTIONS, type DetailFilters } from "@/ui/report/report-detail-helpers";
+import type { ReportResultSemanticState } from "@/ui/report/report-result-semantics";
+import { ReportDetailView } from "@/ui/report/report-detail-view";
 
 export const dynamic = "force-dynamic";
 

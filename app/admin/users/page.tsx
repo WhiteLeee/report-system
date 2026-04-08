@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import styles from "./admin-users-page.module.css";
 
@@ -14,8 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { DashboardHeader } from "@/ui/dashboard-header";
-import { SystemManagementTabs } from "@/ui/system-management-tabs";
+import { DashboardHeader } from "@/ui/shared/dashboard-header";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +116,9 @@ export default async function AdminUsersPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const currentUser = await requirePermission("user:manage", "/admin/users");
+  if (!currentUser.roles.includes("admin")) {
+    redirect("/reports");
+  }
   const users = authService.listUsers();
   const resolvedSearchParams = await searchParams;
   const dialog = typeof resolvedSearchParams.dialog === "string" ? resolvedSearchParams.dialog : "";
@@ -137,13 +140,9 @@ export default async function AdminUsersPage({
     <main className="page-shell">
       <DashboardHeader
         currentUser={currentUser}
-        subtitle="系统管理工作台"
-        title="系统管理 / 用户管理"
+        subtitle="独立管理用户账号、角色和授权范围。"
+        title="用户管理"
       />
-
-      <section className="section">
-        <SystemManagementTabs activeTab="users" />
-      </section>
 
       <section className="section">
         <Card className={styles.workspaceCard}>

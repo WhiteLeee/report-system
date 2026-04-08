@@ -5,29 +5,31 @@ import styles from "./analytics-page.module.css";
 import { createAnalyticsService } from "@/backend/analytics/analytics.module";
 import type { AnalyticsFilters } from "@/backend/analytics/contracts/analytics.filters";
 import { buildRequestContext, requirePermission } from "@/backend/auth/session";
+import { createMasterDataService } from "@/backend/master-data/master-data.module";
+import type { MasterDataOrganization } from "@/backend/master-data/master-data.types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DatePickerField } from "@/components/ui/date-picker-field";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AnalyticsGovernanceCharts } from "@/ui/analytics-governance-charts";
-import { AnalyticsOverviewCharts } from "@/ui/analytics-overview-charts";
-import { AnalyticsProblemCharts } from "@/ui/analytics-problem-charts";
-import { DashboardHeader } from "@/ui/dashboard-header";
+import { AnalyticsFilterForm } from "@/app/analytics/analytics-filter-form";
+import { AnalyticsGovernanceCharts } from "@/ui/analytics/analytics-governance-charts";
+import { AnalyticsOverviewCharts } from "@/ui/analytics/analytics-overview-charts";
+import { AnalyticsProblemCharts } from "@/ui/analytics/analytics-problem-charts";
+import { DashboardHeader } from "@/ui/shared/dashboard-header";
+import { formatReportType } from "@/ui/report/report-view";
 
 export const dynamic = "force-dynamic";
 
 const analyticsService = createAnalyticsService();
+const masterDataService = createMasterDataService();
 
 function buildFilters(searchParams: Record<string, string | string[] | undefined>): AnalyticsFilters {
   return {
     startDate: typeof searchParams.startDate === "string" ? searchParams.startDate.trim() : "",
     endDate: typeof searchParams.endDate === "string" ? searchParams.endDate.trim() : "",
-    enterpriseId: typeof searchParams.enterpriseId === "string" ? searchParams.enterpriseId.trim() : "",
+    enterpriseId: "",
     organizationId: typeof searchParams.organizationId === "string" ? searchParams.organizationId.trim() : "",
-    franchiseeName: typeof searchParams.franchiseeName === "string" ? searchParams.franchiseeName.trim() : "",
+    franchiseeName: "",
     storeId: typeof searchParams.storeId === "string" ? searchParams.storeId.trim() : "",
     reportType: typeof searchParams.reportType === "string" ? searchParams.reportType.trim() : "",
     topic: typeof searchParams.topic === "string" ? searchParams.topic.trim() : "",
@@ -77,51 +79,30 @@ function buildRectificationDrilldownHref(filters: AnalyticsFilters, keyword: str
   return `/rectifications?${params.toString()}`;
 }
 
-function buildFilterSummary(filters: AnalyticsFilters): Array<{ label: string; value: string }> {
-  const summary: Array<{ label: string; value: string }> = [];
-  if (filters.startDate || filters.endDate) {
-    summary.push({
-      label: "时间",
-      value: [filters.startDate || "未设开始", filters.endDate || "未设结束"].join(" ~ ")
-    });
-  }
-  if (filters.enterpriseId) {
-    summary.push({ label: "企业", value: filters.enterpriseId });
-  }
-  if (filters.organizationId) {
-    summary.push({ label: "组织", value: filters.organizationId });
-  }
-  if (filters.franchiseeName) {
-    summary.push({ label: "加盟商", value: filters.franchiseeName });
-  }
-  if (filters.storeId) {
-    summary.push({ label: "门店", value: filters.storeId });
-  }
-  if (filters.reportType) {
-    summary.push({ label: "报告类型", value: filters.reportType });
-  }
-  if (filters.topic) {
-    summary.push({ label: "主题", value: filters.topic });
-  }
-  if (filters.planId) {
-    summary.push({ label: "计划", value: filters.planId });
-  }
-  return summary;
-}
-
 function hasAdvancedFilters(filters: AnalyticsFilters): boolean {
-  return Boolean(filters.franchiseeName || filters.storeId || filters.topic || filters.planId);
+  return Boolean(filters.topic || filters.planId);
 }
 
-function getViewLabel(view: string): string {
-  switch (view) {
-    case "governance":
-      return "治理执行";
-    case "responsibility":
-      return "责任定位";
-    default:
-      return "经营概览";
-  }
+function flattenOrganizations(nodes: MasterDataOrganization[]): Array<{ value: string; label: string }> {
+  const items: Array<{ value: string; label: string }> = [];
+  const walk = (rows: MasterDataOrganization[]) => {
+    rows.forEach((row) => {
+      const code = row.organize_code.trim();
+      const name = row.organize_name.trim() || code;
+      if (code) {
+        items.push({ value: code, label: name });
+      }
+      if (row.child.length > 0) {
+        walk(row.child);
+      }
+    });
+  };
+  walk(nodes);
+  return items.sort(
+    (left, right) =>
+      left.label.localeCompare(right.label, "zh-Hans-CN") ||
+      left.value.localeCompare(right.value, "en")
+  );
 }
 
 export default async function AnalyticsPage({
@@ -138,8 +119,50 @@ export default async function AnalyticsPage({
       : "overview";
   const hasActiveFilters = Object.values(filters).some((value) => Boolean(value));
   const hasAdvancedFilterValues = hasAdvancedFilters(filters);
-  const filterSummary = buildFilterSummary(filters);
-  const dashboard = analyticsService.getDashboard(filters, buildRequestContext(currentUser), 10);
+  const requestContext = buildRequestContext(currentUser);
+  const masterDataEnterprises = masterDataService.listEnterprises(requestContext);
+  const activeEnterpriseId = masterDataEnterprises[0]?.enterprise_id || "";
+  const organizationFilterOptions = activeEnterpriseId
+    ? flattenOrganizations(masterDataService.listOrganizations(activeEnterpriseId, requestContext))
+    : [];
+  const storeFilterOptions = activeEnterpriseId
+    ? masterDataService
+        .listStores(
+          {
+            enterpriseId: activeEnterpriseId
+          },
+          requestContext
+        )
+        .map((item) => ({
+          value: item.store_id,
+          label: item.store_name || item.store_id,
+          organizationId: item.organize_code || ""
+        }))
+        .sort(
+          (left, right) =>
+            left.label.localeCompare(right.label, "zh-Hans-CN") ||
+            left.value.localeCompare(right.value, "en")
+        )
+    : [];
+  const dashboard = analyticsService.getDashboard(filters, requestContext, 10);
+  const baseFilterOptions = analyticsService.getFilterOptions(
+    {
+      ...filters,
+      organizationId: "",
+      storeId: "",
+      topic: "",
+      planId: ""
+    },
+    requestContext
+  );
+  const advancedFilterOptions = analyticsService.getFilterOptions(
+    {
+      ...filters,
+      topic: "",
+      planId: ""
+    },
+    requestContext
+  );
   const queryString = buildQueryString(filters);
   const isAdmin = currentUser.roles.includes("admin");
 
@@ -152,122 +175,29 @@ export default async function AnalyticsPage({
       />
 
       <section className={`section ${styles.hero}`}>
-        <Card className={styles.filterCard}>
-          <CardHeader>
-            <CardTitle>分析筛选</CardTitle>
-            <CardDescription>默认折叠。先看当前口径，再决定是否展开高级筛选。</CardDescription>
-          </CardHeader>
-          <CardContent className={styles.filterBody}>
-            <div className={styles.filterSummaryBar}>
-              <div className={styles.filterSummaryMeta}>
-                <strong>当前视图：{getViewLabel(currentView)}</strong>
-                <span>
-                  高频筛选默认展开：时间、企业、组织、报告类型。加盟商、门店、主题与计划收在高级筛选里。
-                </span>
-              </div>
-              <div className={styles.filterSummaryBadges}>
-                {filterSummary.length > 0 ? (
-                  filterSummary.map((item) => (
-                    <Badge key={`${item.label}:${item.value}`} variant="outline">
-                      {item.label}：{item.value}
-                    </Badge>
-                  ))
-                ) : (
-                  <Badge variant="secondary">当前查看全部范围</Badge>
-                )}
-                {hasAdvancedFilterValues ? <Badge variant="outline">已启用高级筛选</Badge> : null}
-              </div>
-            </div>
-            <details className={styles.filterDisclosure} open={hasActiveFilters}>
-              <summary className={styles.filterSummary}>
-                <span>{hasActiveFilters ? "已应用筛选，点击展开查看条件" : "点击展开筛选条件"}</span>
-              </summary>
-              <form className={styles.filterForm} method="get">
-                <input name="view" type="hidden" value={currentView} />
-                <div className={styles.filterSection}>
-                  <div className={styles.filterSectionHeader}>
-                    <strong>高频筛选</strong>
-                    <span>先按时间、企业、组织与报告类型收口分析范围。</span>
-                  </div>
-                  <div className={styles.filterGrid}>
-                    <div className="field">
-                      <label htmlFor="startDate">开始日期</label>
-                      <DatePickerField defaultValue={filters.startDate} id="startDate" name="startDate" />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="endDate">结束日期</label>
-                      <DatePickerField defaultValue={filters.endDate} id="endDate" name="endDate" />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="enterpriseId">企业 ID</label>
-                      <Input defaultValue={filters.enterpriseId} id="enterpriseId" name="enterpriseId" placeholder="enterprise-a" />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="organizationId">组织编码</label>
-                      <Input defaultValue={filters.organizationId} id="organizationId" name="organizationId" placeholder="ORG-001" />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="reportType">报告类型</label>
-                      <Input defaultValue={filters.reportType} id="reportType" name="reportType" placeholder="daily" />
-                    </div>
-                  </div>
-                </div>
-                <details className={styles.advancedDisclosure} open={hasAdvancedFilterValues}>
-                  <summary className={styles.advancedSummary}>
-                    <span>{hasAdvancedFilterValues ? "已启用高级筛选，点击查看详细条件" : "展开高级筛选"}</span>
-                  </summary>
-                  <div className={styles.filterSection}>
-                    <div className={styles.filterSectionHeader}>
-                      <strong>高级筛选</strong>
-                      <span>用于精细定位加盟商、门店或特定主题/计划。</span>
-                    </div>
-                    <div className={styles.filterGrid}>
-                      <div className="field">
-                        <label htmlFor="franchiseeName">加盟商</label>
-                        <Input defaultValue={filters.franchiseeName} id="franchiseeName" name="franchiseeName" placeholder="加盟商A" />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="storeId">门店 ID</label>
-                        <Input defaultValue={filters.storeId} id="storeId" name="storeId" placeholder="store-001" />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="topic">报告主题</label>
-                        <Input defaultValue={filters.topic} id="topic" name="topic" placeholder="智能巡检" />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="planId">计划 ID</label>
-                        <Input defaultValue={filters.planId} id="planId" name="planId" placeholder="plan-demo-001" />
-                      </div>
-                    </div>
-                  </div>
-                </details>
-                <div className={styles.filterActions}>
-                  <Button asChild size="sm" variant="secondary">
-                    <Link href="/analytics">重置</Link>
-                  </Button>
-                  <Button asChild size="sm" variant="secondary">
-                    <Link href={`/api/analytics/export${queryString}`}>导出 CSV</Link>
-                  </Button>
-                  {isAdmin ? (
-                    <Button asChild size="sm" variant="secondary">
-                      <Link href="/analytics/jobs">分析任务</Link>
-                    </Button>
-                  ) : null}
-                  <Button size="sm" type="submit">
-                    应用筛选
-                  </Button>
-                </div>
-              </form>
-            </details>
-          </CardContent>
-        </Card>
+        <AnalyticsFilterForm
+          currentView={currentView}
+          filters={filters}
+          hasActiveFilters={hasActiveFilters}
+          hasAdvancedFilterValues={hasAdvancedFilterValues}
+          isAdmin={isAdmin}
+          organizationOptions={organizationFilterOptions}
+          planOptions={advancedFilterOptions.plans}
+          queryString={queryString}
+          reportTypeOptions={baseFilterOptions.report_types.map((item) => ({
+            value: item.value,
+            label: formatReportType(item.label)
+          }))}
+          storeOptions={storeFilterOptions}
+          topicOptions={advancedFilterOptions.topics}
+        />
 
         <div className={styles.statsGrid}>
           <Card className={styles.statCard}>
             <CardContent className={styles.statBody}>
               <span className={styles.statLabel}>巡检批次数</span>
               <strong className={styles.statValue}>{dashboard.overview.report_count}</strong>
-              <span className={styles.statNote}>当前筛选范围内已发布批次</span>
+              <span className={styles.statNote}>已接收的批次</span>
             </CardContent>
           </Card>
           <Card className={styles.statCard}>
@@ -288,7 +218,7 @@ export default async function AnalyticsPage({
             <CardContent className={styles.statBody}>
               <span className={styles.statLabel}>问题总数</span>
               <strong className={styles.statValue}>{dashboard.overview.issue_count}</strong>
-              <span className={styles.statNote}>当前范围内问题项总数</span>
+              <span className={styles.statNote}>问题项总数</span>
             </CardContent>
           </Card>
           <Card className={styles.statCard}>

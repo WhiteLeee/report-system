@@ -41,3 +41,21 @@ export interface AnalyticsDashboard {
   overdue_franchisees: AnalyticsOverdueFranchiseeItem[];
   rectification_overview: AnalyticsRectificationOverviewMetrics;
 }
+
+export interface AnalyticsFilterOption {
+  value: string;
+  label: string;
+}
+
+export interface AnalyticsStoreFilterOption extends AnalyticsFilterOption {
+  organization_id: string;
+  organization_name: string;
+}
+
+export interface AnalyticsFilterOptions {
+  report_types: AnalyticsFilterOption[];
+  organizations: AnalyticsFilterOption[];
+  stores: AnalyticsStoreFilterOption[];
+  topics: AnalyticsFilterOption[];
+  plans: AnalyticsFilterOption[];
+}

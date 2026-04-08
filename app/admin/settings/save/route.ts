@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { ensureAnalyticsJobManagerStarted } from "@/backend/analytics/jobs/analytics-job.manager";
+import { createAuthService } from "@/backend/auth/auth.module";
 import { getSessionUserFromRequest, hasPermission } from "@/backend/auth/session";
+import type { PermissionCode } from "@/backend/auth/auth.types";
 import { ensureRectificationSyncManagerStarted } from "@/backend/rectification/rectification-sync.manager";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
 
 const systemSettingsService = createSystemSettingsService();
+const authService = createAuthService();
 
 function readPositiveNumber(value: FormDataEntryValue | null, fallback: number): number {
   const parsed = Number(String(value || "").trim());
@@ -17,12 +20,19 @@ function readNonNegativeNumber(value: FormDataEntryValue | null, fallback: numbe
   return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
 }
 
-function resolveSettingsTab(raw: FormDataEntryValue | null): "api" | "rectification" | "analytics" {
+function resolveSettingsTab(raw: FormDataEntryValue | null): "api" | "rectification" | "analytics" | "permission" {
   const value = String(raw || "").trim();
-  if (value === "rectification" || value === "analytics") {
+  if (value === "rectification" || value === "analytics" || value === "permission") {
     return value;
   }
   return "api";
+}
+
+function readPermissionCodes(formData: FormData, roleCode: "viewer" | "reviewer"): PermissionCode[] {
+  return formData
+    .getAll(`permissions_${roleCode}`)
+    .map((item) => String(item || "").trim())
+    .filter((item): item is PermissionCode => item === "report:read" || item === "review:write" || item === "user:manage");
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -75,7 +85,7 @@ export async function POST(request: Request): Promise<Response> {
         currentSettings.rectificationSyncBatchSize
       )
     });
-  } else {
+  } else if (tab === "analytics") {
     systemSettingsService.saveHuiYunYingApiSettings({
       ...currentSettings,
       analyticsFactRefreshIntervalMs: readNonNegativeNumber(
@@ -87,6 +97,9 @@ export async function POST(request: Request): Promise<Response> {
         currentSettings.analyticsSnapshotRefreshIntervalMs
       )
     });
+  } else {
+    authService.replaceRolePermissions("viewer", readPermissionCodes(formData, "viewer"));
+    authService.replaceRolePermissions("reviewer", readPermissionCodes(formData, "reviewer"));
   }
   ensureRectificationSyncManagerStarted();
   ensureAnalyticsJobManagerStarted();

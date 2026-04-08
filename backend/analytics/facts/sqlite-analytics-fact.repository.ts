@@ -157,13 +157,59 @@ function toAnalyticsRectificationFactRecord(
 }
 
 export class SqliteAnalyticsFactRepository implements AnalyticsFactRepository {
+  private static readonly INSERT_BATCH_SIZE = 20;
+
+  private insertResultFactsInBatches(
+    tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+    rows: Array<typeof analyticsResultFactTable.$inferInsert>
+  ): void {
+    for (let index = 0; index < rows.length; index += SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE) {
+      tx.insert(analyticsResultFactTable)
+        .values(rows.slice(index, index + SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE))
+        .run();
+    }
+  }
+
+  private insertIssueFactsInBatches(
+    tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+    rows: Array<typeof analyticsIssueFactTable.$inferInsert>
+  ): void {
+    for (let index = 0; index < rows.length; index += SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE) {
+      tx.insert(analyticsIssueFactTable)
+        .values(rows.slice(index, index + SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE))
+        .run();
+    }
+  }
+
+  private insertReviewFactsInBatches(
+    tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+    rows: Array<typeof analyticsReviewFactTable.$inferInsert>
+  ): void {
+    for (let index = 0; index < rows.length; index += SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE) {
+      tx.insert(analyticsReviewFactTable)
+        .values(rows.slice(index, index + SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE))
+        .run();
+    }
+  }
+
+  private insertRectificationFactsInBatches(
+    tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+    rows: Array<typeof analyticsRectificationFactTable.$inferInsert>
+  ): void {
+    for (let index = 0; index < rows.length; index += SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE) {
+      tx.insert(analyticsRectificationFactTable)
+        .values(rows.slice(index, index + SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE))
+        .run();
+    }
+  }
+
   replaceResultFacts(rows: Array<typeof analyticsResultFactTable.$inferInsert>): number {
     return db.transaction((tx) => {
       tx.delete(analyticsResultFactTable).run();
       if (rows.length === 0) {
         return 0;
       }
-      tx.insert(analyticsResultFactTable).values(rows).run();
+      this.insertResultFactsInBatches(tx, rows);
       return rows.length;
     });
   }
@@ -174,7 +220,7 @@ export class SqliteAnalyticsFactRepository implements AnalyticsFactRepository {
       if (rows.length === 0) {
         return 0;
       }
-      tx.insert(analyticsIssueFactTable).values(rows).run();
+      this.insertIssueFactsInBatches(tx, rows);
       return rows.length;
     });
   }
@@ -185,7 +231,7 @@ export class SqliteAnalyticsFactRepository implements AnalyticsFactRepository {
       if (rows.length === 0) {
         return 0;
       }
-      tx.insert(analyticsReviewFactTable).values(rows).run();
+      this.insertReviewFactsInBatches(tx, rows);
       return rows.length;
     });
   }
@@ -196,7 +242,7 @@ export class SqliteAnalyticsFactRepository implements AnalyticsFactRepository {
       if (rows.length === 0) {
         return 0;
       }
-      tx.insert(analyticsRectificationFactTable).values(rows).run();
+      this.insertRectificationFactsInBatches(tx, rows);
       return rows.length;
     });
   }

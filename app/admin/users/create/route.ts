@@ -28,7 +28,7 @@ function readScopeList(formData: FormData, fieldName: string): string[] {
 
 export async function POST(request: Request): Promise<Response> {
   const currentUser = getSessionUserFromRequest(request);
-  if (!hasPermission(currentUser, "user:manage")) {
+  if (!hasPermission(currentUser, "user:manage") || !currentUser?.roles.includes("admin")) {
     return Response.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 

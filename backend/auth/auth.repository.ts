@@ -1,4 +1,11 @@
-import type { CreateUserInput, PermissionCode, RoleCode, SessionUser, UserAccount } from "@/backend/auth/auth.types";
+import type {
+  CreateUserInput,
+  PermissionCode,
+  RoleCode,
+  RolePermissionMatrixItem,
+  SessionUser,
+  UserAccount
+} from "@/backend/auth/auth.types";
 
 export interface AuthRepository {
   ensureBootstrap(adminUsername: string, adminPassword: string, adminDisplayName: string): void;
@@ -13,5 +20,7 @@ export interface AuthRepository {
   replaceUserScopes(userId: number, enterpriseScopeIds: string[], organizationScopeIds: string[], storeScopeIds: string[]): void;
   updateUserPassword(userId: number, nextPassword: string): void;
   updateUserStatus(userId: number, status: "active" | "disabled"): void;
+  listRolePermissionMatrix(): RolePermissionMatrixItem[];
+  replaceRolePermissions(roleCode: RoleCode, permissionCodes: PermissionCode[]): void;
   hasPermission(user: SessionUser | null, permissionCode: PermissionCode): boolean;
 }

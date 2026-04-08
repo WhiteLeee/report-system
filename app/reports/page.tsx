@@ -11,14 +11,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NativeSelect } from "@/components/ui/native-select";
-import { DashboardHeader } from "@/ui/dashboard-header";
-import { QueryPagination } from "@/ui/query-pagination";
-import { ReviewStatusBadge } from "@/ui/review-status-badge";
+import { DashboardHeader } from "@/ui/shared/dashboard-header";
+import { QueryPagination } from "@/ui/shared/query-pagination";
+import { ReviewStatusBadge } from "@/ui/report/review-status-badge";
 import {
   formatDateRange,
   formatDisplayDate,
   formatReportType,
-} from "@/ui/report-view";
+} from "@/ui/report/report-view";
 
 export const dynamic = "force-dynamic";
 

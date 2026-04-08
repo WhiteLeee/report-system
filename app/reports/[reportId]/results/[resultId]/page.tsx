@@ -5,9 +5,9 @@ import { createRectificationService } from "@/backend/rectification/rectificatio
 import { createReportService } from "@/backend/report/report.module";
 import type { ReviewFilterState } from "@/backend/report/report.types";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
-import { DETAIL_PAGE_SIZE_OPTIONS, type DetailFilters } from "@/ui/report-detail-helpers";
-import type { ReportResultSemanticState } from "@/ui/report-result-semantics";
-import { ReportResultDetailView } from "@/ui/report-result-detail-view";
+import { DETAIL_PAGE_SIZE_OPTIONS, type DetailFilters } from "@/ui/report/report-detail-helpers";
+import type { ReportResultSemanticState } from "@/ui/report/report-result-semantics";
+import { ReportResultDetailView } from "@/ui/report/report-result-detail-view";
 
 export const dynamic = "force-dynamic";
 

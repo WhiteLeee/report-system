@@ -1,7 +1,7 @@
 import type { ProgressState, ResultReviewState } from "@/backend/report/report.types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { formatProgressState, formatResultReviewState } from "@/ui/report-view";
+import { formatProgressState, formatResultReviewState } from "@/ui/report/report-view";
 
 export function ReviewStatusBadge({
   className,

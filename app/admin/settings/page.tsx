@@ -7,6 +7,8 @@ import styles from "./system-settings-page.module.css";
 import { requirePermission } from "@/backend/auth/session";
 import { createAnalyticsJobService } from "@/backend/analytics/analytics.module";
 import type { AnalyticsPipelineHealthItem } from "@/backend/analytics/jobs/analytics-job.types";
+import { createAuthService } from "@/backend/auth/auth.module";
+import { permissionCodes } from "@/backend/auth/auth.types";
 import { createRectificationService } from "@/backend/rectification/rectification.module";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
 import type { HuiYunYingApiSettings } from "@/backend/system-settings/system-settings.types";
@@ -15,20 +17,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DashboardHeader } from "@/ui/dashboard-header";
-import { formatDisplayDate } from "@/ui/report-view";
-import { SystemManagementTabs } from "@/ui/system-management-tabs";
+import { DashboardHeader } from "@/ui/shared/dashboard-header";
+import { formatDisplayDate } from "@/ui/report/report-view";
+import { SystemManagementTabs } from "@/ui/shared/system-management-tabs";
 
 export const dynamic = "force-dynamic";
 
 const systemSettingsService = createSystemSettingsService();
 const analyticsJobService = createAnalyticsJobService();
 const rectificationService = createRectificationService();
+const authService = createAuthService();
 
 const tabs = [
   { key: "api", label: "API 基础设置", description: "维护慧运营 API 访问地址、Route、鉴权和限流参数。" },
   { key: "rectification", label: "整改单设置", description: "维护整改单创建、同步与约束参数。" },
-  { key: "analytics", label: "分析任务设置", description: "维护 facts / snapshots 定时刷新间隔。" }
+  { key: "analytics", label: "分析任务设置", description: "维护 facts / snapshots 定时刷新间隔。" },
+  { key: "permission", label: "权限管理", description: "管理角色可访问的功能权限，保障系统管理仅限管理员。" }
 ] as const;
 
 type SettingsTab = (typeof tabs)[number]["key"];
@@ -68,6 +72,12 @@ function resolveTab(raw: string | string[] | undefined): SettingsTab {
   const value = typeof raw === "string" ? raw.trim() : "";
   return tabs.some((item) => item.key === value) ? (value as SettingsTab) : "api";
 }
+
+const permissionMeta: Record<(typeof permissionCodes)[number], { label: string; description: string }> = {
+  "report:read": { label: "报告查看", description: "可访问报告、整改单和分析页的数据视图。" },
+  "review:write": { label: "复核操作", description: "可执行图片复核、提交复核记录及整改单闭环动作。" },
+  "user:manage": { label: "用户管理", description: "可管理用户账号、角色和权限。" }
+};
 
 function FormShell({
   children,
@@ -392,6 +402,66 @@ function AnalyticsSettingsForm({
   );
 }
 
+function PermissionSettingsForm() {
+  const matrix = authService.listRolePermissionMatrix();
+
+  return (
+    <FormShell tab="permission">
+      <div className={styles.permissionGrid}>
+        {matrix.map((roleItem) => {
+          const isAdminRole = roleItem.roleCode === "admin";
+          return (
+            <article className={styles.permissionCard} key={roleItem.roleCode}>
+              <div className={styles.permissionRoleHead}>
+                <div className={styles.settingSectionHeader}>
+                  <h4 className={styles.healthTitle}>
+                    {roleItem.roleName}（{roleItem.roleCode}）
+                  </h4>
+                  <p className={styles.settingSectionCopy}>{roleItem.roleDescription || "暂无角色说明。"}</p>
+                </div>
+                <Badge variant={isAdminRole ? "secondary" : "outline"}>
+                  {isAdminRole ? "固定" : "可配置"}
+                </Badge>
+              </div>
+              <div className={styles.permissionChecklist}>
+                {permissionCodes.map((permissionCode) => {
+                  const checked = roleItem.permissionCodes.includes(permissionCode);
+                  const disabled = isAdminRole || permissionCode === "user:manage";
+                  return (
+                    <label className={styles.permissionOption} key={`${roleItem.roleCode}-${permissionCode}`}>
+                      <input
+                        defaultChecked={checked}
+                        disabled={disabled}
+                        name={`permissions_${roleItem.roleCode}`}
+                        type="checkbox"
+                        value={permissionCode}
+                      />
+                      <span className={styles.permissionOptionBody}>
+                        <strong>{permissionMeta[permissionCode].label}</strong>
+                        <span>{permissionMeta[permissionCode].description}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className={styles.settingSectionCopy}>
+                {isAdminRole
+                  ? "管理员权限固定为全量，确保系统管理模块仅 admin 可访问。"
+                  : "普通角色不可配置“用户管理”权限，系统管理能力仅保留给管理员。"}
+              </p>
+            </article>
+          );
+        })}
+      </div>
+      <div className={styles.formActions}>
+        <Button size="sm" type="submit">
+          保存权限管理设置
+        </Button>
+      </div>
+    </FormShell>
+  );
+}
+
 function SettingsWorkspace({
   activeTab,
   settings,
@@ -438,6 +508,7 @@ function SettingsWorkspace({
               </>
             ) : null}
             {activeTab === "analytics" ? <AnalyticsSettingsForm healthItems={analyticsHealthItems} settings={settings} /> : null}
+            {activeTab === "permission" ? <PermissionSettingsForm /> : null}
           </TabsContent>
         </Tabs>
       </CardContent>

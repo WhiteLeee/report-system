@@ -1,6 +1,13 @@
 import { getReportSystemConfig } from "@/backend/config/report-system-config";
 import type { AuthRepository } from "@/backend/auth/auth.repository";
-import type { CreateUserInput, PermissionCode, RoleCode, SessionUser, UserAccount } from "@/backend/auth/auth.types";
+import type {
+  CreateUserInput,
+  PermissionCode,
+  RoleCode,
+  RolePermissionMatrixItem,
+  SessionUser,
+  UserAccount
+} from "@/backend/auth/auth.types";
 
 const SESSION_LIFETIME_MS = 1000 * 60 * 60 * 24 * 7;
 
@@ -67,6 +74,16 @@ export class AuthService {
   updateUserStatus(userId: number, status: "active" | "disabled"): void {
     this.ensureBootstrap();
     this.repository.updateUserStatus(userId, status);
+  }
+
+  listRolePermissionMatrix(): RolePermissionMatrixItem[] {
+    this.ensureBootstrap();
+    return this.repository.listRolePermissionMatrix();
+  }
+
+  replaceRolePermissions(roleCode: RoleCode, permissionCodes: PermissionCode[]): void {
+    this.ensureBootstrap();
+    this.repository.replaceRolePermissions(roleCode, permissionCodes);
   }
 
   hasPermission(user: SessionUser | null, permissionCode: PermissionCode): boolean {

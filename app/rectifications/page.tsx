@@ -19,9 +19,9 @@ import { DatePickerField } from "@/components/ui/date-picker-field";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { DashboardHeader } from "@/ui/dashboard-header";
-import { QueryPagination } from "@/ui/query-pagination";
-import { formatDisplayDate } from "@/ui/report-view";
+import { DashboardHeader } from "@/ui/shared/dashboard-header";
+import { QueryPagination } from "@/ui/shared/query-pagination";
+import { formatDisplayDate } from "@/ui/report/report-view";
 
 export const dynamic = "force-dynamic";
 

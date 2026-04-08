@@ -5,7 +5,7 @@ import {
   ISSUE_SELECTION_MODAL_MESSAGE,
   SHOULD_CORRECTED_REQUIRED_MESSAGE,
   validateCompletedReviewSubmission
-} from "../ui/result-review-workflow.validation";
+} from "../ui/report/result-review-workflow.validation";
 
 test("未勾选问题项时弹出确认模态提示", () => {
   const result = validateCompletedReviewSubmission({

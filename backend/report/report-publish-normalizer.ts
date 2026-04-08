@@ -130,12 +130,29 @@ function buildReportVersion(payload: ReportPublishPayload): string {
   return `${meta.start_date}~${meta.end_date}|${reportType}|${planId}|${topic}|${versionText}`;
 }
 
+const IMAGE_URL_PATTERN = /^(.+?\.(?:jpg|jpeg|png|webp|bmp|gif|avif|heic|heif))(?:$|\/)/i;
+
+function normalizeDisplayImageUrl(value: unknown): string {
+  const rawUrl = safeString(value);
+  if (!rawUrl) {
+    return "";
+  }
+
+  const withoutHash = rawUrl.split("#", 1)[0] ?? "";
+  const withoutQuery = withoutHash.split("?", 1)[0] ?? "";
+  const matched = withoutQuery.match(IMAGE_URL_PATTERN);
+  if (matched?.[1]) {
+    return matched[1];
+  }
+  return withoutQuery;
+}
+
 function resolveDisplayUrl(capture: ReportCaptureFact | undefined): string {
-  const previewUrl = safeString(capture?.preview_url);
-  const captureUrl = safeString(capture?.capture_url);
+  const previewUrl = normalizeDisplayImageUrl(capture?.preview_url);
   if (previewUrl) {
     return previewUrl;
   }
+  const captureUrl = normalizeDisplayImageUrl(capture?.capture_url);
   if (captureUrl) {
     return captureUrl;
   }

@@ -102,6 +102,12 @@ export function AnalyticsOverviewCharts({ dashboard }: Props) {
     ...dashboard.review_status_distribution.map((item) => ({
       key: item.review_state,
       label: item.label,
+      shortLabel:
+        item.review_state === "pending"
+          ? "待人工"
+          : item.review_state === "manual_completed"
+            ? "人工已复核"
+            : "自动已复核",
       value: item.count,
       fill:
         item.review_state === "pending"
@@ -113,8 +119,8 @@ export function AnalyticsOverviewCharts({ dashboard }: Props) {
   ];
 
   return (
-    <section className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-      <Card>
+    <section className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle>巡检结论分布</CardTitle>
           <CardDescription>先判断巡检结果的整体质量结构，再看后续治理动作。</CardDescription>
@@ -152,7 +158,7 @@ export function AnalyticsOverviewCharts({ dashboard }: Props) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle>整改闭环状态</CardTitle>
           <CardDescription>用单据状态判断当前治理动作是否真正推进。</CardDescription>
@@ -192,7 +198,7 @@ export function AnalyticsOverviewCharts({ dashboard }: Props) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle>近 14 日巡检趋势</CardTitle>
           <CardDescription>把巡检量、问题数和待复核积压放在一张图里，快速看出最近波动。</CardDescription>
@@ -213,19 +219,29 @@ export function AnalyticsOverviewCharts({ dashboard }: Props) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle>复核状态分布</CardTitle>
           <CardDescription>先看哪些结果还在待人工处理，再看人工复核团队的效率表现。</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4">
-          <ChartContainer className="h-[320px] w-full" config={reviewChartConfig}>
-            <BarChart data={reviewData} barSize={48}>
-              <CartesianGrid vertical={false} />
-              <XAxis axisLine={false} dataKey="label" tickLine={false} />
-              <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
-              <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value}`} />} />
-              <Bar dataKey="value" radius={[12, 12, 0, 0]}>
+        <CardContent className="grid min-w-0 gap-4">
+          <ChartContainer className="h-[320px] w-full min-w-0 overflow-hidden" config={reviewChartConfig}>
+            <BarChart data={reviewData} layout="vertical" margin={{ left: 8, right: 12, top: 6, bottom: 6 }}>
+              <CartesianGrid horizontal={false} />
+              <XAxis allowDecimals={false} axisLine={false} tickLine={false} type="number" />
+              <YAxis axisLine={false} dataKey="shortLabel" tickLine={false} type="category" width={88} />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={(value) => `${value}`}
+                    labelFormatter={(value) => {
+                      const row = reviewData.find((item) => item.shortLabel === value);
+                      return row?.label || String(value);
+                    }}
+                  />
+                }
+              />
+              <Bar barSize={24} dataKey="value" radius={[0, 12, 12, 0]}>
                 {reviewData.map((entry) => (
                   <Cell fill={entry.fill} key={entry.key} />
                 ))}

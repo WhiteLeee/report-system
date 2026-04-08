@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NativeSelect } from "@/components/ui/native-select";
-import { DashboardHeader } from "@/ui/dashboard-header";
+import { DashboardHeader } from "@/ui/shared/dashboard-header";
 import {
   DETAIL_PAGE_SIZE_OPTIONS,
   buildScopeStoreIds,
@@ -21,20 +21,20 @@ import {
   matchesIssueToImage,
   readMetadataString,
   type DetailFilters
-} from "@/ui/report-detail-helpers";
-import { ReviewStatusBadge } from "@/ui/review-status-badge";
+} from "@/ui/report/report-detail-helpers";
+import { ReviewStatusBadge } from "@/ui/report/review-status-badge";
 import {
   formatDateRange,
   formatDisplayDate,
   formatReportType,
   formatResultReviewState,
   getCompletionRatio
-} from "@/ui/report-view";
+} from "@/ui/report/report-view";
 import {
   classifyReportResultSemantics,
   getReportResultSemanticLabel,
   getReportResultSemanticTone
-} from "@/ui/report-result-semantics";
+} from "@/ui/report/report-result-semantics";
 
 function formatCompactDateTime(value: string | null | undefined): string {
   const normalized = String(value || "").trim();

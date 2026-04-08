@@ -6,7 +6,7 @@ import {
   classifyReportResultSemantics,
   getReportResultSemanticLabel,
   getReportResultSemanticSummaryLabel
-} from "../ui/report-result-semantics";
+} from "../ui/report/report-result-semantics";
 
 function createInspection(overrides: Partial<ReportInspection> = {}): ReportInspection {
   return {
@@ -55,6 +55,11 @@ test("有问题项时优先判定为发现问题", () => {
   assert.equal(state, "issue_found");
   assert.equal(getReportResultSemanticLabel(state, 1), "1");
   assert.equal(getReportResultSemanticSummaryLabel(state, 1), "发现 1 个问题");
+});
+
+test("发现问题语义在问题数缺失或为 0 时显示通用文案", () => {
+  assert.equal(getReportResultSemanticSummaryLabel("issue_found"), "发现问题");
+  assert.equal(getReportResultSemanticSummaryLabel("issue_found", 0), "发现问题");
 });
 
 test("无问题且 inspection 成功时判定为未发现问题", () => {

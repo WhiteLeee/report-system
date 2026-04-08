@@ -10,7 +10,7 @@ export async function POST(
   context: { params: Promise<{ userId: string }> }
 ): Promise<Response> {
   const currentUser = getSessionUserFromRequest(request);
-  if (!hasPermission(currentUser, "user:manage")) {
+  if (!hasPermission(currentUser, "user:manage") || !currentUser?.roles.includes("admin")) {
     return Response.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 
