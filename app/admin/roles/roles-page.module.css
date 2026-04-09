@@ -1,0 +1,116 @@
+.workspaceCard {
+  overflow: hidden;
+}
+
+.workspaceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.workspaceBody {
+  padding: 18px 24px 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.workspaceTitle {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+.workspaceCopy {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.saveNotice {
+  border: 1px solid rgba(48, 88, 65, 0.22);
+  border-radius: 0.75rem;
+  background: rgba(48, 88, 65, 0.08);
+  color: #2b523d;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.permissionGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.permissionCard {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(56, 49, 37, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.permissionRoleHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.permissionChecklist {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.permissionOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(56, 49, 37, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.permissionOption input {
+  margin-top: 3px;
+}
+
+.permissionOptionBody {
+  display: grid;
+  gap: 3px;
+}
+
+.permissionOptionBody strong {
+  font-size: 13px;
+  line-height: 1.3;
+  color: #18181b;
+}
+
+.permissionOptionBody span {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.settingSectionCopy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 860px) {
+  .permissionChecklist {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

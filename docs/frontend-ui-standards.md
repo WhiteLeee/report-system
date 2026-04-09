@@ -43,6 +43,18 @@
 6. 能复用就不要重复造
    如果某个结构会在两个以上页面重复出现，应优先抽成业务组件或基础组件，而不是继续复制 JSX。
 
+7. 第三方 UI 依赖必须收口到 `components/ui`
+   `app/` 与 `ui/` 业务层禁止直接 `import` 以下依赖：
+   - `recharts`
+   - `lucide-react`
+   - `react-day-picker`
+   - `@radix-ui/*`
+   业务层统一从 `@/components/ui/*` 引入对应封装。
+   示例：
+   - 图表能力走 `@/components/ui/chart`
+   - 图标走 `@/components/ui/icons`
+   - 日历能力走 `@/components/ui/calendar`
+
 ## 4. 推荐迁移顺序
 
 继续重构时，按下面顺序推进：
@@ -65,3 +77,18 @@
 - 不要把业务页面整体替换成 shadcn 示例页面
 - 不要为单页需求继续堆全局 class
 - 不要在多个页面重复手写同一套状态 badge、空态、筛选区结构
+- 不要在 `app/` 或 `ui/` 直接引入 `recharts`、`lucide-react`、`react-day-picker`、`@radix-ui/*`
+
+## 7. 自动检查
+
+已提供依赖边界检查脚本，并接入 `prebuild`/`pretest`：
+
+```bash
+npm run check:ui-imports
+```
+
+CI 会在 GitHub Actions 运行 `Frontend Guard` 工作流。要启用“阻塞合并”，请在仓库分支保护中把检查项 `UI Boundary And Typecheck` 设为 Required。
+
+检查通过标准：
+- `app/` 与 `ui/` 不出现上述第三方依赖的直接 import
+- 第三方 UI 依赖只在 `components/ui` 封装层出现

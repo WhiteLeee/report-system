@@ -1,21 +1,26 @@
-import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import styles from "./system-settings-page.module.css";
 
 import { requirePermission } from "@/backend/auth/session";
+import { createAuthService } from "@/backend/auth/auth.module";
 import { createAnalyticsJobService } from "@/backend/analytics/analytics.module";
 import type { AnalyticsPipelineHealthItem } from "@/backend/analytics/jobs/analytics-job.types";
-import { createAuthService } from "@/backend/auth/auth.module";
-import { permissionCodes } from "@/backend/auth/auth.types";
 import { createRectificationService } from "@/backend/rectification/rectification.module";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
-import type { HuiYunYingApiSettings } from "@/backend/system-settings/system-settings.types";
+import type { ManagedNavigationMenuItem, RoleCode } from "@/backend/auth/auth.types";
+import type {
+  AuthSecurityPolicy,
+  DeliveryMode,
+  HuiYunYingApiSettings
+} from "@/backend/system-settings/system-settings.types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardHeader } from "@/ui/shared/dashboard-header";
 import { formatDisplayDate } from "@/ui/report/report-view";
@@ -24,15 +29,16 @@ import { SystemManagementTabs } from "@/ui/shared/system-management-tabs";
 export const dynamic = "force-dynamic";
 
 const systemSettingsService = createSystemSettingsService();
+const authService = createAuthService();
 const analyticsJobService = createAnalyticsJobService();
 const rectificationService = createRectificationService();
-const authService = createAuthService();
 
 const tabs = [
   { key: "api", label: "API 基础设置", description: "维护慧运营 API 访问地址、Route、鉴权和限流参数。" },
   { key: "rectification", label: "整改单设置", description: "维护整改单创建、同步与约束参数。" },
   { key: "analytics", label: "分析任务设置", description: "维护 facts / snapshots 定时刷新间隔。" },
-  { key: "permission", label: "权限管理", description: "管理角色可访问的功能权限，保障系统管理仅限管理员。" }
+  { key: "navigation", label: "菜单与导航", description: "维护导航菜单显示顺序、可见性和角色授权。" },
+  { key: "security", label: "安全与交付", description: "维护交付模式，控制 customer 环境对平台账号的可见性。" }
 ] as const;
 
 type SettingsTab = (typeof tabs)[number]["key"];
@@ -72,12 +78,6 @@ function resolveTab(raw: string | string[] | undefined): SettingsTab {
   const value = typeof raw === "string" ? raw.trim() : "";
   return tabs.some((item) => item.key === value) ? (value as SettingsTab) : "api";
 }
-
-const permissionMeta: Record<(typeof permissionCodes)[number], { label: string; description: string }> = {
-  "report:read": { label: "报告查看", description: "可访问报告、整改单和分析页的数据视图。" },
-  "review:write": { label: "复核操作", description: "可执行图片复核、提交复核记录及整改单闭环动作。" },
-  "user:manage": { label: "用户管理", description: "可管理用户账号、角色和权限。" }
-};
 
 function FormShell({
   children,
@@ -402,60 +402,188 @@ function AnalyticsSettingsForm({
   );
 }
 
-function PermissionSettingsForm() {
-  const matrix = authService.listRolePermissionMatrix();
+function SecuritySettingsForm({
+  deliveryMode,
+  securityPolicy
+}: {
+  deliveryMode: DeliveryMode;
+  securityPolicy: AuthSecurityPolicy;
+}) {
+  return (
+    <FormShell tab="security">
+      <div className={styles.formGrid}>
+        <div className="field">
+          <label htmlFor="deliveryMode">交付模式</label>
+          <NativeSelect defaultValue={deliveryMode} id="deliveryMode" name="deliveryMode">
+            <option value="internal">internal（实施/内部全量可见）</option>
+            <option value="customer">customer（隐藏平台 admin 账号）</option>
+          </NativeSelect>
+        </div>
+        <div className="field">
+          <label htmlFor="passwordMinLength">密码最小长度</label>
+          <Input
+            defaultValue={String(securityPolicy.passwordMinLength)}
+            id="passwordMinLength"
+            inputMode="numeric"
+            min={8}
+            name="passwordMinLength"
+            required
+            type="number"
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="loginMaxFailures">最大失败次数</label>
+          <Input
+            defaultValue={String(securityPolicy.loginMaxFailures)}
+            id="loginMaxFailures"
+            inputMode="numeric"
+            min={1}
+            name="loginMaxFailures"
+            required
+            type="number"
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="loginLockDurationMs">锁定时长（ms）</label>
+          <Input
+            defaultValue={String(securityPolicy.loginLockDurationMs)}
+            id="loginLockDurationMs"
+            inputMode="numeric"
+            min={1000}
+            name="loginLockDurationMs"
+            required
+            type="number"
+          />
+        </div>
+      </div>
+      <div className={styles.permissionChecklist}>
+        <label className={styles.permissionOption}>
+          <input defaultChecked={securityPolicy.requireUppercase} name="requireUppercase" type="checkbox" value="1" />
+          <span className={styles.permissionOptionBody}>
+            <strong>密码要求大写字母</strong>
+            <span>启用后密码需包含至少 1 个 A-Z。</span>
+          </span>
+        </label>
+        <label className={styles.permissionOption}>
+          <input defaultChecked={securityPolicy.requireLowercase} name="requireLowercase" type="checkbox" value="1" />
+          <span className={styles.permissionOptionBody}>
+            <strong>密码要求小写字母</strong>
+            <span>启用后密码需包含至少 1 个 a-z。</span>
+          </span>
+        </label>
+        <label className={styles.permissionOption}>
+          <input defaultChecked={securityPolicy.requireNumber} name="requireNumber" type="checkbox" value="1" />
+          <span className={styles.permissionOptionBody}>
+            <strong>密码要求数字</strong>
+            <span>启用后密码需包含至少 1 个 0-9。</span>
+          </span>
+        </label>
+        <label className={styles.permissionOption}>
+          <input
+            defaultChecked={securityPolicy.requireSpecialCharacter}
+            name="requireSpecialCharacter"
+            type="checkbox"
+            value="1"
+          />
+          <span className={styles.permissionOptionBody}>
+            <strong>密码要求特殊字符</strong>
+            <span>启用后密码需包含至少 1 个符号（非字母数字）。</span>
+          </span>
+        </label>
+      </div>
+      <p className={styles.settingSectionCopy}>
+        customer 模式下，平台 bootstrap admin 账号将不在用户管理页面展示，且禁止通过 API 编辑该账号。
+      </p>
+      <div className={styles.formActions}>
+        <Button size="sm" type="submit">
+          保存安全与交付设置
+        </Button>
+      </div>
+    </FormShell>
+  );
+}
+
+function NavigationSettingsForm({ menuItems }: { menuItems: ManagedNavigationMenuItem[] }) {
+  const mutableRoles: RoleCode[] = ["manage", "reviewer", "viewer"];
+  const roleLabels: Record<RoleCode, string> = {
+    admin: "admin",
+    manage: "manage",
+    reviewer: "reviewer",
+    viewer: "viewer"
+  };
 
   return (
-    <FormShell tab="permission">
-      <div className={styles.permissionGrid}>
-        {matrix.map((roleItem) => {
-          const isAdminRole = roleItem.roleCode === "admin";
-          return (
-            <article className={styles.permissionCard} key={roleItem.roleCode}>
-              <div className={styles.permissionRoleHead}>
-                <div className={styles.settingSectionHeader}>
-                  <h4 className={styles.healthTitle}>
-                    {roleItem.roleName}（{roleItem.roleCode}）
-                  </h4>
-                  <p className={styles.settingSectionCopy}>{roleItem.roleDescription || "暂无角色说明。"}</p>
-                </div>
-                <Badge variant={isAdminRole ? "secondary" : "outline"}>
-                  {isAdminRole ? "固定" : "可配置"}
-                </Badge>
-              </div>
-              <div className={styles.permissionChecklist}>
-                {permissionCodes.map((permissionCode) => {
-                  const checked = roleItem.permissionCodes.includes(permissionCode);
-                  const disabled = isAdminRole || permissionCode === "user:manage";
-                  return (
-                    <label className={styles.permissionOption} key={`${roleItem.roleCode}-${permissionCode}`}>
-                      <input
-                        defaultChecked={checked}
-                        disabled={disabled}
-                        name={`permissions_${roleItem.roleCode}`}
-                        type="checkbox"
-                        value={permissionCode}
-                      />
-                      <span className={styles.permissionOptionBody}>
-                        <strong>{permissionMeta[permissionCode].label}</strong>
-                        <span>{permissionMeta[permissionCode].description}</span>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-              <p className={styles.settingSectionCopy}>
-                {isAdminRole
-                  ? "管理员权限固定为全量，确保系统管理模块仅 admin 可访问。"
-                  : "普通角色不可配置“用户管理”权限，系统管理能力仅保留给管理员。"}
-              </p>
-            </article>
-          );
-        })}
+    <FormShell tab="navigation">
+      <div className={styles.settingSection}>
+        <div className={styles.settingSectionHeader}>
+          <h4 className={styles.settingSectionTitle}>菜单授权矩阵</h4>
+          <p className={styles.settingSectionCopy}>admin 菜单授权固定为全开；manage/reviewer/viewer 可按菜单配置显示权限。</p>
+        </div>
+        <div className={styles.syncTableWrap}>
+          <table className={styles.syncTable}>
+            <thead>
+              <tr>
+                <th>菜单</th>
+                <th>路由</th>
+                <th>排序</th>
+                <th>显示</th>
+                <th>admin</th>
+                <th>manage</th>
+                <th>reviewer</th>
+                <th>viewer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {menuItems.map((item) => (
+                <tr key={item.code}>
+                  <td>
+                    <div className={styles.menuCodeCell}>
+                      <strong>{item.label}</strong>
+                      <span>{item.code}</span>
+                    </div>
+                    <input name={`menuCode:${item.code}`} type="hidden" value={item.code} />
+                    <input name={`menuLabel:${item.code}`} type="hidden" value={item.label} />
+                    <input name={`menuHref:${item.code}`} type="hidden" value={item.href} />
+                    <input name={`menuIcon:${item.code}`} type="hidden" value={item.icon} />
+                  </td>
+                  <td>{item.href}</td>
+                  <td>
+                    <Input defaultValue={String(item.sortOrder)} inputMode="numeric" min={0} name={`menuSortOrder:${item.code}`} type="number" />
+                  </td>
+                  <td>
+                    <input defaultChecked={item.visible} name={`menuVisible:${item.code}`} type="checkbox" value="1" />
+                  </td>
+                  <td>
+                    <input checked disabled type="checkbox" />
+                  </td>
+                  {mutableRoles.map((roleCode) => {
+                    const adminOnlyMenu = item.code === "system";
+                    const checked = item.roleCodes.includes(roleCode);
+                    return (
+                      <td key={`${item.code}:${roleCode}`}>
+                        <input
+                          defaultChecked={checked}
+                          disabled={adminOnlyMenu}
+                          name={`menuRole:${roleCode}:${item.code}`}
+                          type="checkbox"
+                          value="1"
+                        />
+                        {adminOnlyMenu ? <span className={styles.menuRoleHint}>仅 admin</span> : null}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className={styles.settingSectionCopy}>
+          角色说明：{mutableRoles.map((roleCode) => roleLabels[roleCode]).join(" / ")}。
+        </p>
       </div>
       <div className={styles.formActions}>
         <Button size="sm" type="submit">
-          保存权限管理设置
+          保存菜单与导航设置
         </Button>
       </div>
     </FormShell>
@@ -465,11 +593,17 @@ function PermissionSettingsForm() {
 function SettingsWorkspace({
   activeTab,
   settings,
-  analyticsHealthItems
+  analyticsHealthItems,
+  deliveryMode,
+  securityPolicy,
+  navigationMenus
 }: {
   activeTab: SettingsTab;
   settings: HuiYunYingApiSettings;
   analyticsHealthItems: AnalyticsPipelineHealthItem[];
+  deliveryMode: DeliveryMode;
+  securityPolicy: AuthSecurityPolicy;
+  navigationMenus: ManagedNavigationMenuItem[];
 }) {
   const active = tabs.find((item) => item.key === activeTab) || tabs[0];
 
@@ -508,7 +642,10 @@ function SettingsWorkspace({
               </>
             ) : null}
             {activeTab === "analytics" ? <AnalyticsSettingsForm healthItems={analyticsHealthItems} settings={settings} /> : null}
-            {activeTab === "permission" ? <PermissionSettingsForm /> : null}
+            {activeTab === "navigation" ? <NavigationSettingsForm menuItems={navigationMenus} /> : null}
+            {activeTab === "security" ? (
+              <SecuritySettingsForm deliveryMode={deliveryMode} securityPolicy={securityPolicy} />
+            ) : null}
           </TabsContent>
         </Tabs>
       </CardContent>
@@ -521,7 +658,7 @@ export default async function AdminSettingsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const currentUser = await requirePermission("user:manage", "/admin/settings");
+  const currentUser = await requirePermission("system:settings:read", "/admin/settings");
   if (!currentUser.roles.includes("admin")) {
     redirect("/reports");
   }
@@ -529,6 +666,9 @@ export default async function AdminSettingsPage({
   const settings = systemSettingsService.getHuiYunYingApiSettings();
   const resolvedSearchParams = await searchParams;
   const activeTab = resolveTab(resolvedSearchParams.tab);
+  const deliveryMode = systemSettingsService.getDeliveryMode();
+  const securityPolicy = systemSettingsService.getAuthSecurityPolicy();
+  const navigationMenus = authService.listManagedNavigationMenus();
   const analyticsHealthItems = analyticsJobService.getHealthSummary({
     result_fact_rebuild: settings.analyticsFactRefreshIntervalMs,
     daily_snapshot_rebuild: settings.analyticsSnapshotRefreshIntervalMs
@@ -537,6 +677,7 @@ export default async function AdminSettingsPage({
   return (
     <main className="page-shell">
       <DashboardHeader
+        activePath="/admin/settings"
         currentUser={currentUser}
         subtitle="系统管理工作台"
         title="系统管理 / 系统设置"
@@ -547,7 +688,14 @@ export default async function AdminSettingsPage({
       </section>
 
       <section className="section">
-        <SettingsWorkspace activeTab={activeTab} analyticsHealthItems={analyticsHealthItems} settings={settings} />
+        <SettingsWorkspace
+          activeTab={activeTab}
+          analyticsHealthItems={analyticsHealthItems}
+          deliveryMode={deliveryMode}
+          navigationMenus={navigationMenus}
+          securityPolicy={securityPolicy}
+          settings={settings}
+        />
       </section>
     </main>
   );

@@ -2,9 +2,16 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/backend/database/client";
 import { systemSettingTable } from "@/backend/database/schema";
-import type { HuiYunYingApiSettings, SystemSettingsRepository } from "@/backend/system-settings/system-settings.types";
+import type {
+  AuthSecurityPolicy,
+  DeliveryMode,
+  HuiYunYingApiSettings,
+  SystemSettingsRepository
+} from "@/backend/system-settings/system-settings.types";
 
 const HUIYUNYING_API_KEY = "huiyunying_api";
+const DELIVERY_MODE_KEY = "auth_delivery_mode";
+const AUTH_SECURITY_POLICY_KEY = "auth_security_policy";
 
 const defaultHuiYunYingApiSettings: HuiYunYingApiSettings = {
   uri: "",
@@ -23,6 +30,16 @@ const defaultHuiYunYingApiSettings: HuiYunYingApiSettings = {
   rectificationSyncBatchSize: 50,
   analyticsFactRefreshIntervalMs: 0,
   analyticsSnapshotRefreshIntervalMs: 0
+};
+
+const defaultAuthSecurityPolicy: AuthSecurityPolicy = {
+  passwordMinLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecialCharacter: false,
+  loginMaxFailures: 5,
+  loginLockDurationMs: 300000
 };
 
 function safeParseSettings(value: string): HuiYunYingApiSettings {
@@ -84,6 +101,42 @@ function safeParseSettings(value: string): HuiYunYingApiSettings {
   }
 }
 
+function safeParseAuthSecurityPolicy(value: string): AuthSecurityPolicy {
+  try {
+    const parsed = JSON.parse(value) as Partial<AuthSecurityPolicy>;
+    return {
+      passwordMinLength:
+        Number.isFinite(parsed.passwordMinLength) && Number(parsed.passwordMinLength) >= 8
+          ? Math.floor(Number(parsed.passwordMinLength))
+          : defaultAuthSecurityPolicy.passwordMinLength,
+      requireUppercase:
+        typeof parsed.requireUppercase === "boolean"
+          ? parsed.requireUppercase
+          : defaultAuthSecurityPolicy.requireUppercase,
+      requireLowercase:
+        typeof parsed.requireLowercase === "boolean"
+          ? parsed.requireLowercase
+          : defaultAuthSecurityPolicy.requireLowercase,
+      requireNumber:
+        typeof parsed.requireNumber === "boolean" ? parsed.requireNumber : defaultAuthSecurityPolicy.requireNumber,
+      requireSpecialCharacter:
+        typeof parsed.requireSpecialCharacter === "boolean"
+          ? parsed.requireSpecialCharacter
+          : defaultAuthSecurityPolicy.requireSpecialCharacter,
+      loginMaxFailures:
+        Number.isFinite(parsed.loginMaxFailures) && Number(parsed.loginMaxFailures) > 0
+          ? Math.floor(Number(parsed.loginMaxFailures))
+          : defaultAuthSecurityPolicy.loginMaxFailures,
+      loginLockDurationMs:
+        Number.isFinite(parsed.loginLockDurationMs) && Number(parsed.loginLockDurationMs) > 0
+          ? Math.floor(Number(parsed.loginLockDurationMs))
+          : defaultAuthSecurityPolicy.loginLockDurationMs
+    };
+  } catch {
+    return defaultAuthSecurityPolicy;
+  }
+}
+
 export class SqliteSystemSettingsRepository implements SystemSettingsRepository {
   getHuiYunYingApiSettings(): HuiYunYingApiSettings {
     const row = db
@@ -114,6 +167,81 @@ export class SqliteSystemSettingsRepository implements SystemSettingsRepository 
         set: {
           category: "integration",
           valueJson: JSON.stringify(settings),
+          updatedAt: now
+        }
+      })
+      .run();
+  }
+
+  getDeliveryMode(): DeliveryMode {
+    const row = db
+      .select()
+      .from(systemSettingTable)
+      .where(eq(systemSettingTable.settingKey, DELIVERY_MODE_KEY))
+      .get();
+
+    if (!row) {
+      return "internal";
+    }
+
+    try {
+      const parsed = JSON.parse(row.valueJson) as { mode?: string };
+      return parsed.mode === "customer" ? "customer" : "internal";
+    } catch {
+      return "internal";
+    }
+  }
+
+  saveDeliveryMode(mode: DeliveryMode): void {
+    const now = new Date().toISOString();
+    const normalizedMode: DeliveryMode = mode === "customer" ? "customer" : "internal";
+    db.insert(systemSettingTable)
+      .values({
+        settingKey: DELIVERY_MODE_KEY,
+        category: "auth",
+        valueJson: JSON.stringify({ mode: normalizedMode }),
+        createdAt: now,
+        updatedAt: now
+      })
+      .onConflictDoUpdate({
+        target: systemSettingTable.settingKey,
+        set: {
+          category: "auth",
+          valueJson: JSON.stringify({ mode: normalizedMode }),
+          updatedAt: now
+        }
+      })
+      .run();
+  }
+
+  getAuthSecurityPolicy(): AuthSecurityPolicy {
+    const row = db
+      .select()
+      .from(systemSettingTable)
+      .where(eq(systemSettingTable.settingKey, AUTH_SECURITY_POLICY_KEY))
+      .get();
+
+    if (!row) {
+      return defaultAuthSecurityPolicy;
+    }
+    return safeParseAuthSecurityPolicy(row.valueJson);
+  }
+
+  saveAuthSecurityPolicy(policy: AuthSecurityPolicy): void {
+    const now = new Date().toISOString();
+    db.insert(systemSettingTable)
+      .values({
+        settingKey: AUTH_SECURITY_POLICY_KEY,
+        category: "auth",
+        valueJson: JSON.stringify(policy),
+        createdAt: now,
+        updatedAt: now
+      })
+      .onConflictDoUpdate({
+        target: systemSettingTable.settingKey,
+        set: {
+          category: "auth",
+          valueJson: JSON.stringify(policy),
           updatedAt: now
         }
       })

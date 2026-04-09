@@ -198,7 +198,7 @@ export default async function MasterDataPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const currentUser = await requirePermission("report:read", "/master-data");
+  const currentUser = await requirePermission("master-data:read", "/master-data");
   if (!currentUser.roles.includes("admin")) {
     redirect("/reports");
   }
@@ -269,6 +269,7 @@ export default async function MasterDataPage({
   return (
     <main className="page-shell">
       <DashboardHeader
+        activePath="/master-data"
         currentUser={currentUser}
         subtitle="系统管理工作台"
         title="系统管理 / 门店主数据"

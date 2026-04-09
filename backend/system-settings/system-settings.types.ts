@@ -17,7 +17,23 @@ export interface HuiYunYingApiSettings {
   analyticsSnapshotRefreshIntervalMs: number;
 }
 
+export type DeliveryMode = "internal" | "customer";
+
+export interface AuthSecurityPolicy {
+  passwordMinLength: number;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireNumber: boolean;
+  requireSpecialCharacter: boolean;
+  loginMaxFailures: number;
+  loginLockDurationMs: number;
+}
+
 export interface SystemSettingsRepository {
   getHuiYunYingApiSettings(): HuiYunYingApiSettings;
   saveHuiYunYingApiSettings(settings: HuiYunYingApiSettings): void;
+  getDeliveryMode(): DeliveryMode;
+  saveDeliveryMode(mode: DeliveryMode): void;
+  getAuthSecurityPolicy(): AuthSecurityPolicy;
+  saveAuthSecurityPolicy(policy: AuthSecurityPolicy): void;
 }

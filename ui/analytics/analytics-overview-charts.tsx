@@ -1,28 +1,25 @@
 "use client";
 
+import type { AnalyticsDashboard } from "@/backend/analytics/contracts/analytics.types";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  XAxis,
-  YAxis
-} from "recharts";
-
-import type { AnalyticsDashboard } from "@/backend/analytics/contracts/analytics.types";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-  type ChartConfig
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  type ChartConfig,
+  XAxis,
+  YAxis
 } from "@/components/ui/chart";
 
 type Props = {

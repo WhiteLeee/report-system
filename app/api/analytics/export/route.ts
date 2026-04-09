@@ -310,7 +310,7 @@ function buildCsv(dashboard: ReturnType<typeof analyticsService.getDashboard>): 
 
 export async function GET(request: Request): Promise<Response> {
   const currentUser = getSessionUserFromRequest(request);
-  if (!hasPermission(currentUser, "report:read")) {
+  if (!hasPermission(currentUser, "analytics:read")) {
     return Response.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 

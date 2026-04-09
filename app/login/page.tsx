@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
-import { ArrowRight } from "lucide-react";
 
 import { getCurrentSessionUser } from "@/backend/auth/session";
+import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
 import { Button } from "@/components/ui/button";
+import { ArrowRight } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 
 export const dynamic = "force-dynamic";
+const systemSettingsService = createSystemSettingsService();
 
 export default async function LoginPage({
   searchParams
@@ -20,6 +22,7 @@ export default async function LoginPage({
   const resolvedSearchParams = await searchParams;
   const error = typeof resolvedSearchParams.error === "string" ? decodeURIComponent(resolvedSearchParams.error) : "";
   const nextPath = typeof resolvedSearchParams.next === "string" ? resolvedSearchParams.next : "/reports";
+  const securityPolicy = systemSettingsService.getAuthSecurityPolicy();
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950">
@@ -74,8 +77,9 @@ export default async function LoginPage({
                   <Input
                     autoComplete="current-password"
                     id="password"
+                    minLength={securityPolicy.passwordMinLength}
                     name="password"
-                    placeholder="请输入密码"
+                    placeholder={`请输入密码（至少 ${securityPolicy.passwordMinLength} 位）`}
                     required
                     type="password"
                   />

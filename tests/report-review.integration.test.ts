@@ -32,6 +32,7 @@ let publishRoute: typeof import("../app/api/reports/publish/route");
 let reportRoute: typeof import("../app/api/reports/[reportId]/route");
 let reviewRoute: typeof import("../app/api/reports/[reportId]/images/[imageId]/review-status/route");
 let reviewLogsRoute: typeof import("../app/api/reports/[reportId]/review-logs/route");
+let rolesSaveRoute: typeof import("../app/admin/roles/save/route");
 let authService: typeof import("../backend/auth/auth.module");
 let reportServiceModule: typeof import("../backend/report/report.module");
 let systemSettingsModule: typeof import("../backend/system-settings/system-settings.module");
@@ -151,7 +152,8 @@ before(async () => {
     importedPublishRoute,
     importedReportRoute,
     importedReviewRoute,
-    importedReviewLogsRoute
+    importedReviewLogsRoute,
+    importedRolesSaveRoute
   ] = await Promise.all([
     import("../backend/auth/auth.module"),
     import("../backend/report/report.module"),
@@ -162,7 +164,8 @@ before(async () => {
     import("../app/api/reports/publish/route"),
     import("../app/api/reports/[reportId]/route"),
     import("../app/api/reports/[reportId]/images/[imageId]/review-status/route"),
-    import("../app/api/reports/[reportId]/review-logs/route")
+    import("../app/api/reports/[reportId]/review-logs/route"),
+    import("../app/admin/roles/save/route")
   ]);
   authService = authModule;
   reportServiceModule = reportModule;
@@ -174,6 +177,7 @@ before(async () => {
   reportRoute = importedReportRoute;
   reviewRoute = importedReviewRoute;
   reviewLogsRoute = importedReviewLogsRoute;
+  rolesSaveRoute = importedRolesSaveRoute;
   authService.createAuthService().ensureBootstrap();
   systemSettingsModule.createSystemSettingsService().saveHuiYunYingApiSettings({
     uri: "https://huiyunying.example.com",
@@ -733,5 +737,285 @@ test("inspection failed result also completes locally without creating rectifica
     assert.equal(rectificationModule.createRectificationService().listByResultId(imageId).length, 0);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("roles save route updates viewer/reviewer permissions for admin", async () => {
+  const auth = authService.createAuthService();
+  const matrixBefore = auth.listRolePermissionMatrix();
+  const viewerBefore = matrixBefore.find((item) => item.roleCode === "viewer")?.permissionCodes || [];
+  const reviewerBefore = matrixBefore.find((item) => item.roleCode === "reviewer")?.permissionCodes || [];
+
+  try {
+    const loginResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "ChangeMe123!");
+          return formData;
+        })()
+      })
+    );
+    const sessionCookie = loginResp.headers.get("set-cookie") || "";
+
+    const formData = new FormData();
+    formData.append("permissions_viewer", "report:read");
+    formData.append("permissions_viewer", "rectification:read");
+    formData.append("permissions_viewer", "system:settings:write");
+    formData.append("permissions_reviewer", "report:read");
+    formData.append("permissions_reviewer", "review:write");
+    formData.append("permissions_reviewer", "analytics:read");
+    formData.append("permissions_reviewer", "role:write");
+
+    const saveResp = await rolesSaveRoute.POST(
+      new Request("http://127.0.0.1:3000/admin/roles/save", {
+        method: "POST",
+        headers: { cookie: sessionCookie },
+        body: formData
+      })
+    );
+
+    assert.equal(saveResp.status, 303);
+    assert.equal(saveResp.headers.get("location"), "http://127.0.0.1:3000/admin/roles?saved=1");
+
+    const matrixAfter = auth.listRolePermissionMatrix();
+    const viewerAfter = matrixAfter.find((item) => item.roleCode === "viewer")?.permissionCodes || [];
+    const reviewerAfter = matrixAfter.find((item) => item.roleCode === "reviewer")?.permissionCodes || [];
+
+    assert.deepEqual(viewerAfter, ["report:read", "rectification:read"]);
+    assert.deepEqual(reviewerAfter, ["report:read", "review:write", "analytics:read", "role:write"]);
+  } finally {
+    auth.replaceRolePermissions("viewer", viewerBefore);
+    auth.replaceRolePermissions("reviewer", reviewerBefore);
+  }
+});
+
+test("roles save route rejects non-admin role write", async () => {
+  const auth = authService.createAuthService();
+  const username = `viewer_scope_${Date.now()}`;
+  auth.createUser({
+    username,
+    displayName: "仅查看用户",
+    password: "ViewerPass123!Aa",
+    roleCode: "viewer",
+    enterpriseScopeIds: [],
+    organizationScopeIds: [],
+    storeScopeIds: []
+  });
+
+  const loginResp = await loginRoute.POST(
+    new Request("http://127.0.0.1:3000/api/auth/login", {
+      method: "POST",
+      body: (() => {
+        const formData = new FormData();
+        formData.set("username", username);
+        formData.set("password", "ViewerPass123!Aa");
+        return formData;
+      })()
+    })
+  );
+  const sessionCookie = loginResp.headers.get("set-cookie") || "";
+  assert.ok(sessionCookie.includes("report_system_session="));
+
+  const formData = new FormData();
+  formData.append("permissions_viewer", "report:read");
+
+  const saveResp = await rolesSaveRoute.POST(
+    new Request("http://127.0.0.1:3000/admin/roles/save", {
+      method: "POST",
+      headers: { cookie: sessionCookie },
+      body: formData
+    })
+  );
+  assert.equal(saveResp.status, 403);
+});
+
+test("service rejects creating user with admin role", () => {
+  const auth = authService.createAuthService();
+  assert.throws(
+    () =>
+      auth.createUser({
+        username: `admin_like_${Date.now()}`,
+        displayName: "非法管理员",
+        password: "StrongPass1234!Aa",
+        roleCode: "admin",
+        enterpriseScopeIds: [],
+        organizationScopeIds: [],
+        storeScopeIds: []
+      }),
+    /Admin role is reserved/
+  );
+});
+
+test("service rejects assigning admin role to non-bootstrap user", () => {
+  const auth = authService.createAuthService();
+  const created = auth.createUser({
+    username: `manage_case_${Date.now()}`,
+    displayName: "业务管理员用户",
+    password: "StrongPass1234!Aa",
+    roleCode: "manage",
+    enterpriseScopeIds: [],
+    organizationScopeIds: [],
+    storeScopeIds: []
+  });
+
+  assert.throws(() => auth.updateUserRole(created.id, "admin"), /Admin role is reserved/);
+});
+
+test("service profile update is atomic when password policy validation fails", () => {
+  const auth = authService.createAuthService();
+  const systemSettingsService = systemSettingsModule.createSystemSettingsService();
+  const previousPolicy = systemSettingsService.getAuthSecurityPolicy();
+  systemSettingsService.saveAuthSecurityPolicy({
+    ...previousPolicy,
+    passwordMinLength: 16,
+    requireUppercase: true,
+    requireLowercase: true,
+    requireNumber: true,
+    requireSpecialCharacter: true
+  });
+
+  try {
+    const created = auth.createUser({
+      username: `atomic_case_${Date.now()}`,
+      displayName: "原子更新测试用户",
+      password: "AtomicPass1234!Aa",
+      roleCode: "manage",
+      enterpriseScopeIds: [],
+      organizationScopeIds: [],
+      storeScopeIds: []
+    });
+    const before = auth.listUsers().find((item) => item.id === created.id);
+    assert.ok(before);
+    assert.equal(before?.status, "active");
+
+    assert.throws(
+      () =>
+        auth.updateUserProfile({
+          userId: created.id,
+          status: "disabled",
+          password: "short"
+        }),
+      /密码|password|Password|至少|minimum/
+    );
+
+    const after = auth.listUsers().find((item) => item.id === created.id);
+    assert.ok(after);
+    assert.equal(after?.status, "active");
+  } finally {
+    systemSettingsService.saveAuthSecurityPolicy(previousPolicy);
+  }
+});
+
+test("login applies lock policy after max failures", async () => {
+  const systemSettingsService = systemSettingsModule.createSystemSettingsService();
+  const previousPolicy = systemSettingsService.getAuthSecurityPolicy();
+  systemSettingsService.saveAuthSecurityPolicy({
+    ...previousPolicy,
+    loginMaxFailures: 2,
+    loginLockDurationMs: 600000
+  });
+
+  try {
+    function readLoginError(location: string): string {
+      const url = new URL(location, "http://127.0.0.1:3000");
+      const errorParam = url.searchParams.get("error") || "";
+      return decodeURIComponent(errorParam);
+    }
+
+    const firstWrongResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "wrong-password-1");
+          return formData;
+        })()
+      })
+    );
+    assert.equal(firstWrongResp.status, 303);
+    const firstWrongLocation = firstWrongResp.headers.get("location") || "";
+    assert.ok(firstWrongLocation.includes("/login?"));
+    assert.ok(readLoginError(firstWrongLocation).includes("账号或密码错误"));
+
+    const secondWrongResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "wrong-password-2");
+          return formData;
+        })()
+      })
+    );
+    assert.equal(secondWrongResp.status, 303);
+    const secondWrongLocation = secondWrongResp.headers.get("location") || "";
+    assert.ok(readLoginError(secondWrongLocation).includes("账号已锁定"));
+
+    const validPasswordWhileLockedResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "ChangeMe123!");
+          return formData;
+        })()
+      })
+    );
+    assert.equal(validPasswordWhileLockedResp.status, 303);
+    const lockedLocation = validPasswordWhileLockedResp.headers.get("location") || "";
+    assert.ok(readLoginError(lockedLocation).includes("账号已锁定"));
+  } finally {
+    systemSettingsService.saveAuthSecurityPolicy(previousPolicy);
+  }
+});
+
+test("password policy is enforced for create and reset password", () => {
+  const systemSettingsService = systemSettingsModule.createSystemSettingsService();
+  const previousPolicy = systemSettingsService.getAuthSecurityPolicy();
+  systemSettingsService.saveAuthSecurityPolicy({
+    ...previousPolicy,
+    passwordMinLength: 16,
+    requireUppercase: true,
+    requireLowercase: true,
+    requireNumber: true,
+    requireSpecialCharacter: true
+  });
+
+  const auth = authService.createAuthService();
+  try {
+    assert.throws(
+      () =>
+        auth.createUser({
+          username: "policy-user-weak",
+          displayName: "策略用户弱密码",
+          password: "12345678",
+          roleCode: "viewer",
+          enterpriseScopeIds: [],
+          organizationScopeIds: [],
+          storeScopeIds: []
+        }),
+      /密码不符合安全策略/
+    );
+
+    const createdUser = auth.createUser({
+      username: "policy-user-strong",
+      displayName: "策略用户强密码",
+      password: "StrongPass1234!Aa",
+      roleCode: "viewer",
+      enterpriseScopeIds: [],
+      organizationScopeIds: [],
+      storeScopeIds: []
+    });
+    assert.ok(createdUser.id > 0);
+
+    assert.throws(() => auth.updateUserPassword(createdUser.id, "weak"), /密码不符合安全策略/);
+  } finally {
+    systemSettingsService.saveAuthSecurityPolicy(previousPolicy);
   }
 });

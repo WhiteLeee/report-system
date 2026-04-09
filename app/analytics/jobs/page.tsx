@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-
 import styles from "./jobs-page.module.css";
 
 import { createAnalyticsJobRepository, createAnalyticsJobService } from "@/backend/analytics/analytics.module";
@@ -98,10 +96,7 @@ function pipelineTone(status: string): "default" | "secondary" | "outline" {
 }
 
 export default async function AnalyticsJobsPage() {
-  const currentUser = await requirePermission("user:manage", "/analytics/jobs");
-  if (!currentUser.roles.includes("admin")) {
-    redirect("/analytics");
-  }
+  const currentUser = await requirePermission("analytics:job:manage", "/analytics/jobs");
 
   const runs = analyticsJobRepository.listRuns(30);
   const checkpoints = analyticsJobRepository.listCheckpoints();
@@ -114,6 +109,7 @@ export default async function AnalyticsJobsPage() {
   return (
     <main className="page-shell">
       <DashboardHeader
+        activePath="/analytics"
         currentUser={currentUser}
         subtitle="查看分析任务执行记录，并手动触发分析事实与日快照重建。"
         title="分析任务"

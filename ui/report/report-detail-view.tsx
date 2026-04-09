@@ -124,6 +124,7 @@ export function ReportDetailView({
   return (
     <main className="page-shell">
       <DashboardHeader
+        activePath="/reports"
         currentUser={currentUser}
         subtitle="围绕巡检结果清单、复核备注和协作记录处理当前报告。"
         title={`报告复核台`}

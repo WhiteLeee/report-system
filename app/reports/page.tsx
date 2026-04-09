@@ -72,6 +72,7 @@ export default async function ReportsPage({
   return (
     <main className="page-shell">
       <DashboardHeader
+        activePath="/reports"
         currentUser={currentUser}
         subtitle="按批次管理报告。"
         title={`报告工作台`}

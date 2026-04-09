@@ -110,7 +110,7 @@ export default async function AnalyticsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const currentUser = await requirePermission("report:read", "/analytics");
+  const currentUser = await requirePermission("analytics:read", "/analytics");
   const resolvedSearchParams = await searchParams;
   const filters = buildFilters(resolvedSearchParams);
   const currentView =
@@ -164,11 +164,12 @@ export default async function AnalyticsPage({
     requestContext
   );
   const queryString = buildQueryString(filters);
-  const isAdmin = currentUser.roles.includes("admin");
+  const canManageUsers = currentUser.permissions.includes("system:settings:write");
 
   return (
     <main className="page-shell">
       <DashboardHeader
+        activePath="/analytics"
         currentUser={currentUser}
         subtitle="基于 report-system 已落盘业务数据进行巡检质量、复核效率和整改闭环分析。"
         title="数据分析"
@@ -180,7 +181,7 @@ export default async function AnalyticsPage({
           filters={filters}
           hasActiveFilters={hasActiveFilters}
           hasAdvancedFilterValues={hasAdvancedFilterValues}
-          isAdmin={isAdmin}
+          isAdmin={canManageUsers}
           organizationOptions={organizationFilterOptions}
           planOptions={advancedFilterOptions.plans}
           queryString={queryString}

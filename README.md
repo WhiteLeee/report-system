@@ -196,6 +196,7 @@ npm run tenant:init -- \
 2. 生成 `config/tenant.json`
 3. 初始化 SQLite 所需目录
 4. 自动执行 `npm run db:migrate`
+5. 自动执行 `npm run auth:seed`（初始化角色、权限、菜单映射与 bootstrap admin 用户）
 
 ### 6.4 本地快速重置
 
@@ -561,8 +562,15 @@ report_publish:
 - 当前约定使用 `new-york` style
 - Tailwind 使用 v4 方式接入
 - 基础组件目录固定为 `@/components/ui`
+- `app/` 与 `ui/` 业务层禁止直接依赖 `recharts`、`lucide-react`、`react-day-picker`、`@radix-ui/*`，统一走 `@/components/ui/*` 封装
 - 页面独有样式优先写在页面级 `*.module.css`
 - `app/globals.css` 只保留更抽象的全局样式
+
+可执行检查：
+
+```bash
+npm run check:ui-imports
+```
 
 详细规则见：
 

@@ -698,6 +698,25 @@ export const reportPermissionTable = sqliteTable(
   })
 );
 
+export const reportMenuTable = sqliteTable(
+  "report_menu",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    path: text("path").notNull(),
+    icon: text("icon").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(0),
+    visible: integer("visible").notNull().default(1),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    codeUnique: uniqueIndex("report_menu_code_unique").on(table.code),
+    visibleIdx: index("idx_report_menu_visible").on(table.visible, table.sortOrder)
+  })
+);
+
 export const reportUserRoleTable = sqliteTable(
   "report_user_role",
   {
@@ -713,6 +732,24 @@ export const reportUserRoleTable = sqliteTable(
   (table) => ({
     userRoleUnique: uniqueIndex("report_user_role_unique").on(table.userId, table.roleId),
     roleIdx: index("idx_report_user_role_role").on(table.roleId)
+  })
+);
+
+export const reportRoleMenuTable = sqliteTable(
+  "report_role_menu",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    roleId: integer("role_id")
+      .notNull()
+      .references(() => reportRoleTable.id, { onDelete: "cascade" }),
+    menuId: integer("menu_id")
+      .notNull()
+      .references(() => reportMenuTable.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    roleMenuUnique: uniqueIndex("report_role_menu_unique").on(table.roleId, table.menuId),
+    menuIdx: index("idx_report_role_menu_menu").on(table.menuId)
   })
 );
 
@@ -752,6 +789,23 @@ export const reportSessionTable = sqliteTable(
   })
 );
 
+export const authLoginGuardTable = sqliteTable(
+  "auth_login_guard",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    username: text("username").notNull(),
+    failedCount: integer("failed_count").notNull().default(0),
+    lockedUntil: text("locked_until"),
+    lastFailedAt: text("last_failed_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    usernameUnique: uniqueIndex("auth_login_guard_username_unique").on(table.username),
+    lockedUntilIdx: index("idx_auth_login_guard_locked_until").on(table.lockedUntil, table.updatedAt)
+  })
+);
+
 export const reportUserScopeTable = sqliteTable(
   "report_user_scope",
   {
@@ -766,5 +820,29 @@ export const reportUserScopeTable = sqliteTable(
   (table) => ({
     userScopeUnique: uniqueIndex("report_user_scope_unique").on(table.userId, table.scopeType, table.scopeValue),
     userScopeIdx: index("idx_report_user_scope_user_type").on(table.userId, table.scopeType)
+  })
+);
+
+export const authAuditLogTable = sqliteTable(
+  "auth_audit_log",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    operatorUserId: integer("operator_user_id").references(() => reportUserTable.id, { onDelete: "set null" }),
+    operatorUsername: text("operator_username").notNull().default(""),
+    targetUserId: integer("target_user_id").references(() => reportUserTable.id, { onDelete: "set null" }),
+    targetUsername: text("target_username").notNull().default(""),
+    action: text("action").notNull(),
+    beforeJson: text("before_json").notNull().default("{}"),
+    afterJson: text("after_json").notNull().default("{}"),
+    requestId: text("request_id").notNull().default(""),
+    ipAddress: text("ip_address").notNull().default(""),
+    userAgent: text("user_agent").notNull().default(""),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
+  },
+  (table) => ({
+    actionIdx: index("idx_auth_audit_log_action").on(table.action, table.createdAt),
+    operatorIdx: index("idx_auth_audit_log_operator").on(table.operatorUserId, table.createdAt),
+    targetIdx: index("idx_auth_audit_log_target").on(table.targetUserId, table.createdAt),
+    requestIdx: index("idx_auth_audit_log_request").on(table.requestId)
   })
 );

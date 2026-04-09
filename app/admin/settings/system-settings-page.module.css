@@ -124,6 +124,30 @@
   font-size: 13px;
 }
 
+.menuCodeCell {
+  display: grid;
+  gap: 2px;
+}
+
+.menuCodeCell strong {
+  font-size: 13px;
+  line-height: 1.3;
+  color: #18181b;
+}
+
+.menuCodeCell span {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.menuRoleHint {
+  display: inline-flex;
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .settingSectionHeader {
   display: grid;
   gap: 4px;

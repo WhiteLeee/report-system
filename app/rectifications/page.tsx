@@ -67,7 +67,7 @@ export default async function RectificationsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const currentUser = await requirePermission("report:read", "/rectifications");
+  const currentUser = await requirePermission("rectification:read", "/rectifications");
   const resolvedSearchParams = await searchParams;
   const filters = buildFilters(resolvedSearchParams);
   const requestContext = buildRequestContext(currentUser);
@@ -91,6 +91,7 @@ export default async function RectificationsPage({
   return (
     <main className="page-shell">
       <DashboardHeader
+        activePath="/rectifications"
         currentUser={currentUser}
         subtitle="查看当前权限范围内全部整改单及闭环状态。"
         title="整改单"

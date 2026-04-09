@@ -1,7 +1,5 @@
 "use client";
 
-import { CircleHelp } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
+import { CircleHelp } from "@/components/ui/icons";
 
 type JobHelpType = "facts" | "snapshot";
 
@@ -72,4 +71,3 @@ export function JobHelpDialog({ type }: JobHelpDialogProps) {
     </Dialog>
   );
 }
-

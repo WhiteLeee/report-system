@@ -1,34 +1,15 @@
 import { NextResponse } from "next/server";
 
-import { createAuthService } from "@/backend/auth/auth.module";
-import { getSessionUserFromRequest, hasPermission } from "@/backend/auth/session";
+function redirectToUsers(request: Request): Response {
+  const url = new URL("/admin/users", request.url);
+  url.searchParams.set("error", encodeURIComponent("旧版密码重置接口已停用，请刷新页面后通过“编辑用户-保存修改”提交。"));
+  return NextResponse.redirect(url, 303);
+}
 
-const authService = createAuthService();
+export async function POST(request: Request): Promise<Response> {
+  return redirectToUsers(request);
+}
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ userId: string }> }
-): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
-  if (!hasPermission(currentUser, "user:manage") || !currentUser?.roles.includes("admin")) {
-    return Response.json({ success: false, error: "Forbidden" }, { status: 403 });
-  }
-
-  const { userId } = await context.params;
-  const numericUserId = Number(userId);
-  if (!Number.isInteger(numericUserId) || numericUserId <= 0) {
-    return Response.json({ success: false, error: "Invalid user id." }, { status: 400 });
-  }
-
-  const formData = await request.formData().catch(() => new FormData());
-  try {
-    authService.updateUserPassword(numericUserId, String(formData.get("password") || "").trim());
-  } catch (error) {
-    return Response.json(
-      { success: false, error: error instanceof Error ? error.message : "Failed to reset password." },
-      { status: 400 }
-    );
-  }
-
-  return NextResponse.redirect(new URL("/admin/users", request.url), 303);
+export async function GET(request: Request): Promise<Response> {
+  return redirectToUsers(request);
 }

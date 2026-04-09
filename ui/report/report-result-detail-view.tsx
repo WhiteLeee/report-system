@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { Store } from "lucide-react";
 
 import styles from "./report-result-detail-view.module.css";
 
@@ -13,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Store } from "@/components/ui/icons";
 import {
   buildScopeStoreIds,
   buildSearch,
@@ -339,6 +339,7 @@ export function ReportResultDetailView({
   return (
     <main className="page-shell">
       <DashboardHeader
+        activePath="/reports"
         currentUser={currentUser}
         subtitle="围绕单条巡检记录完成核查、备注和复核动作。"
         title="巡检结果处理"

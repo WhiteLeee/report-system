@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { BarChart3, FileText, LogOut, Settings2, ShieldUser, User, Wrench } from "lucide-react";
+import type { ComponentType } from "react";
 
-import type { SessionUser } from "@/backend/auth/auth.types";
+import type { NavigationMenuItem, SessionUser } from "@/backend/auth/auth.types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,47 +13,94 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { BarChart3, FileText, LogOut, Settings2, ShieldUser, User, Wrench } from "@/components/ui/icons";
 import { TabsList, TabsTrigger, tabsTriggerVariants } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 export function DashboardHeader({
   currentUser,
   title,
-  subtitle
+  subtitle,
+  activePath = ""
 }: {
   currentUser: SessionUser;
   title: string;
   subtitle: string;
+  activePath?: string;
 }) {
-  const pathname = usePathname();
-  const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isAdmin = currentUser.roles.includes("admin");
-  const navigationItems = [
-    { href: "/reports", label: "报告列表", icon: FileText, active: pathname.startsWith("/reports") },
-    { href: "/rectifications", label: "整改单", icon: Wrench, active: pathname.startsWith("/rectifications") },
-    { href: "/analytics", label: "数据分析", icon: BarChart3, active: pathname.startsWith("/analytics") },
-    ...(isAdmin
+  const canManageUsers =
+    isAdmin ||
+    currentUser.permissions.includes("user:read") ||
+    currentUser.permissions.includes("user:write") ||
+    currentUser.permissions.includes("role:read") ||
+    currentUser.permissions.includes("role:write") ||
+    currentUser.permissions.includes("scope:write");
+  const canManageSystem = isAdmin;
+  const normalizedActivePath = activePath.trim();
+  const fallbackNavigationItems = [
+    {
+      href: "/reports",
+      label: "报告列表",
+      icon: "file-text",
+      active: normalizedActivePath.startsWith("/reports")
+    },
+    {
+      href: "/rectifications",
+      label: "整改单",
+      icon: "wrench",
+      active: normalizedActivePath.startsWith("/rectifications")
+    },
+    {
+      href: "/analytics",
+      label: "数据分析",
+      icon: "bar-chart-3",
+      active: normalizedActivePath.startsWith("/analytics")
+    },
+    ...(canManageUsers
       ? [
           {
             href: "/admin/users",
             label: "用户管理",
-            icon: ShieldUser,
-            active: pathname.startsWith("/admin/users")
+            icon: "shield-user",
+            active:
+              normalizedActivePath.startsWith("/admin/users") ||
+              normalizedActivePath.startsWith("/admin/roles")
           }
         ]
       : []),
-    ...(isAdmin
+    ...(canManageSystem
       ? [
           {
             href: "/master-data",
             label: "系统管理",
-            icon: Settings2,
-            active: pathname.startsWith("/master-data") || pathname.startsWith("/admin/settings")
+            icon: "settings-2",
+            active:
+              normalizedActivePath.startsWith("/master-data") ||
+              normalizedActivePath.startsWith("/admin/settings") ||
+              normalizedActivePath.startsWith("/admin/audit")
           }
         ]
       : [])
   ] as const;
+  const menuIconMap: Record<string, ComponentType<{ className?: string }>> = {
+    "file-text": FileText,
+    wrench: Wrench,
+    "bar-chart-3": BarChart3,
+    "shield-user": ShieldUser,
+    "settings-2": Settings2
+  };
+  const resolvedNavigationItems = (
+    Array.isArray(currentUser.navigationMenus) && currentUser.navigationMenus.length > 0
+      ? currentUser.navigationMenus.map((menu: NavigationMenuItem) => ({
+          href: menu.href,
+          label: menu.label,
+          icon: menu.icon || "file-text",
+          active: normalizedActivePath.startsWith(menu.href)
+        }))
+      : fallbackNavigationItems
+  ).filter((item) => item.href !== "/master-data" || canManageSystem);
 
   async function handleLogout() {
     if (isLoggingOut) {
@@ -69,7 +115,6 @@ export function DashboardHeader({
       });
     } finally {
       window.location.assign("/login");
-      router.refresh();
     }
   }
 
@@ -83,8 +128,8 @@ export function DashboardHeader({
       <div className="flex flex-col items-start gap-3 lg:min-w-[420px] lg:items-end">
         <div className="flex w-full items-center justify-end gap-2">
           <TabsList className="rounded-full border border-zinc-200 bg-zinc-100/80 shadow-sm">
-            {navigationItems.map((item) => {
-              const Icon = item.icon;
+            {resolvedNavigationItems.map((item) => {
+              const Icon = menuIconMap[item.icon] || FileText;
               return (
                 <TabsTrigger asChild isActive={item.active} key={item.href}>
                   <Link href={item.href}>

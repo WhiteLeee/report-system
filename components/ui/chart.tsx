@@ -148,3 +148,13 @@ export function ChartLegendContent({
 
 export const ChartTooltip = RechartsPrimitive.Tooltip;
 export const ChartLegend = RechartsPrimitive.Legend;
+export const Bar = RechartsPrimitive.Bar;
+export const BarChart = RechartsPrimitive.BarChart;
+export const CartesianGrid = RechartsPrimitive.CartesianGrid;
+export const Cell = RechartsPrimitive.Cell;
+export const Line = RechartsPrimitive.Line;
+export const LineChart = RechartsPrimitive.LineChart;
+export const Pie = RechartsPrimitive.Pie;
+export const PieChart = RechartsPrimitive.PieChart;
+export const XAxis = RechartsPrimitive.XAxis;
+export const YAxis = RechartsPrimitive.YAxis;

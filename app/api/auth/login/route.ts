@@ -16,9 +16,17 @@ export async function POST(request: Request): Promise<Response> {
   const nextPath = readString(formData, "next") || "/reports";
 
   const result = authService.authenticate(username, password);
-  if (!result) {
+  if (!result.ok) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("error", encodeURIComponent("账号或密码错误"));
+    if (result.reason === "locked") {
+      const lockText = result.lockedUntil ? result.lockedUntil.replace("T", " ").slice(0, 16) : "";
+      loginUrl.searchParams.set(
+        "error",
+        encodeURIComponent(lockText ? `账号已锁定，请在 ${lockText} 后重试` : "账号已锁定，请稍后重试")
+      );
+    } else {
+      loginUrl.searchParams.set("error", encodeURIComponent("账号或密码错误"));
+    }
     loginUrl.searchParams.set("next", nextPath);
     return NextResponse.redirect(loginUrl, 303);
   }
