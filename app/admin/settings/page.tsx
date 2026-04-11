@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import styles from "./system-settings-page.module.css";
+import { ColorSettingField } from "./color-setting-field";
 
 import { requirePermission } from "@/backend/auth/session";
 import { createAuthService } from "@/backend/auth/auth.module";
@@ -14,13 +15,16 @@ import type { ManagedNavigationMenuItem, RoleCode } from "@/backend/auth/auth.ty
 import type {
   AuthSecurityPolicy,
   DeliveryMode,
+  EnterpriseBrandingSettings,
   HuiYunYingApiSettings
 } from "@/backend/system-settings/system-settings.types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardHeader } from "@/ui/shared/dashboard-header";
 import { formatDisplayDate } from "@/ui/report/report-view";
@@ -34,9 +38,10 @@ const analyticsJobService = createAnalyticsJobService();
 const rectificationService = createRectificationService();
 
 const tabs = [
+  { key: "branding", label: "企业品牌配置", description: "维护项目级企业名称、Logo、favicon 与主配色。" },
   { key: "api", label: "API 基础设置", description: "维护慧运营 API 访问地址、Route、鉴权和限流参数。" },
   { key: "rectification", label: "整改单设置", description: "维护整改单创建、同步与约束参数。" },
-  { key: "analytics", label: "分析任务设置", description: "维护 facts / snapshots 定时刷新间隔。" },
+  { key: "analytics", label: "分析任务设置", description: "维护分析事实刷新与日快照刷新的定时任务间隔。" },
   { key: "navigation", label: "菜单与导航", description: "维护导航菜单显示顺序、可见性和角色授权。" },
   { key: "security", label: "安全与交付", description: "维护交付模式，控制 customer 环境对平台账号的可见性。" }
 ] as const;
@@ -81,16 +86,100 @@ function resolveTab(raw: string | string[] | undefined): SettingsTab {
 
 function FormShell({
   children,
-  tab
+  tab,
+  multipart = false
 }: {
   children: ReactNode;
   tab: SettingsTab;
+  multipart?: boolean;
 }) {
   return (
-    <form action="/admin/settings/save" className={styles.settingsForm} method="post">
+    <form
+      action="/admin/settings/save"
+      className={styles.settingsForm}
+      encType={multipart ? "multipart/form-data" : undefined}
+      method="post"
+    >
       <input name="tab" type="hidden" value={tab} />
       {children}
     </form>
+  );
+}
+
+function BrandingSettingsForm({ settings }: { settings: EnterpriseBrandingSettings }) {
+  return (
+    <FormShell multipart tab="branding">
+      <div className={styles.formGrid}>
+        <div className="field">
+          <label htmlFor="enterpriseName">企业名称</label>
+          <Input defaultValue={settings.enterpriseName} id="enterpriseName" name="enterpriseName" required />
+        </div>
+        <ColorSettingField
+          defaultValue={settings.primaryColor}
+          id="primaryColor"
+          label="主色（Hex）"
+          name="primaryColor"
+          placeholder="#8b5a2b"
+        />
+        <ColorSettingField
+          defaultValue={settings.primaryColorStrong}
+          id="primaryColorStrong"
+          label="深色（Hex）"
+          name="primaryColorStrong"
+          placeholder="#6b421d"
+        />
+        <div className="field">
+          <label htmlFor="logoFile">Logo 上传</label>
+          <Input accept=".png,.jpg,.jpeg,.webp" id="logoFile" name="logoFile" type="file" />
+        </div>
+        <div className="field">
+          <label htmlFor="faviconFile">Favicon 上传</label>
+          <Input accept=".ico,.png" id="faviconFile" name="faviconFile" type="file" />
+        </div>
+      </div>
+
+      <div className={styles.healthGrid}>
+        <article className={styles.healthCard}>
+          <h5 className={styles.healthTitle}>当前 Logo</h5>
+          {settings.logoUrl ? (
+            <img alt="当前 Logo" className={styles.brandingImagePreview} src={settings.logoUrl} />
+          ) : (
+            <p className={styles.settingSectionCopy}>未配置 Logo。</p>
+          )}
+        </article>
+        <article className={styles.healthCard}>
+          <h5 className={styles.healthTitle}>当前 Favicon</h5>
+          {settings.faviconUrl ? (
+            <img alt="当前 Favicon" className={styles.brandingIconPreview} src={settings.faviconUrl} />
+          ) : (
+            <p className={styles.settingSectionCopy}>未配置 favicon。</p>
+          )}
+        </article>
+        <article className={styles.healthCard}>
+          <h5 className={styles.healthTitle}>主配色预览</h5>
+          <div className={styles.brandingColorPreviewRow}>
+            <span className={styles.brandingColorLabel}>主色 {settings.primaryColor}</span>
+            <span
+              className={styles.brandingColorSwatch}
+              style={{ backgroundColor: settings.primaryColor }}
+            />
+          </div>
+          <div className={styles.brandingColorPreviewRow}>
+            <span className={styles.brandingColorLabel}>深色 {settings.primaryColorStrong}</span>
+            <span
+              className={styles.brandingColorSwatch}
+              style={{ backgroundColor: settings.primaryColorStrong }}
+            />
+          </div>
+        </article>
+      </div>
+
+      <div className={styles.formActions}>
+        <Button size="sm" type="submit">
+          保存企业品牌配置
+        </Button>
+      </div>
+    </FormShell>
   );
 }
 
@@ -298,34 +387,34 @@ function RectificationSyncDashboardSection() {
       </div>
       {syncDashboard.daily_stats.length > 0 ? (
         <div className={styles.syncTableWrap}>
-          <table className={styles.syncTable}>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>批次</th>
-                <th>扫描</th>
-                <th>成功</th>
-                <th>失败</th>
-                <th>未命中</th>
-                <th>跳过</th>
-                <th>平均耗时</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className={styles.syncTable}>
+            <TableHeader>
+              <TableRow>
+                <TableHead>日期</TableHead>
+                <TableHead>批次</TableHead>
+                <TableHead>扫描</TableHead>
+                <TableHead>成功</TableHead>
+                <TableHead>失败</TableHead>
+                <TableHead>未命中</TableHead>
+                <TableHead>跳过</TableHead>
+                <TableHead>平均耗时</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {syncDashboard.daily_stats.map((item) => (
-                <tr key={item.sync_date}>
-                  <td>{item.sync_date}</td>
-                  <td>{item.batch_count}</td>
-                  <td>{item.scanned_count}</td>
-                  <td>{item.success_count}</td>
-                  <td>{item.failed_count}</td>
-                  <td>{item.not_found_count}</td>
-                  <td>{item.skipped_count}</td>
-                  <td>{item.average_response_time_ms ? `${item.average_response_time_ms} ms` : "-"}</td>
-                </tr>
+                <TableRow key={item.sync_date}>
+                  <TableCell>{item.sync_date}</TableCell>
+                  <TableCell>{item.batch_count}</TableCell>
+                  <TableCell>{item.scanned_count}</TableCell>
+                  <TableCell>{item.success_count}</TableCell>
+                  <TableCell>{item.failed_count}</TableCell>
+                  <TableCell>{item.not_found_count}</TableCell>
+                  <TableCell>{item.skipped_count}</TableCell>
+                  <TableCell>{item.average_response_time_ms ? `${item.average_response_time_ms} ms` : "-"}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       ) : (
         <div className={styles.healthEmpty}>最近 7 天暂无同步统计。</div>
@@ -458,31 +547,31 @@ function SecuritySettingsForm({
       </div>
       <div className={styles.permissionChecklist}>
         <label className={styles.permissionOption}>
-          <input defaultChecked={securityPolicy.requireUppercase} name="requireUppercase" type="checkbox" value="1" />
+          <Checkbox className={styles.permissionCheckbox} defaultChecked={securityPolicy.requireUppercase} name="requireUppercase" value="1" />
           <span className={styles.permissionOptionBody}>
             <strong>密码要求大写字母</strong>
             <span>启用后密码需包含至少 1 个 A-Z。</span>
           </span>
         </label>
         <label className={styles.permissionOption}>
-          <input defaultChecked={securityPolicy.requireLowercase} name="requireLowercase" type="checkbox" value="1" />
+          <Checkbox className={styles.permissionCheckbox} defaultChecked={securityPolicy.requireLowercase} name="requireLowercase" value="1" />
           <span className={styles.permissionOptionBody}>
             <strong>密码要求小写字母</strong>
             <span>启用后密码需包含至少 1 个 a-z。</span>
           </span>
         </label>
         <label className={styles.permissionOption}>
-          <input defaultChecked={securityPolicy.requireNumber} name="requireNumber" type="checkbox" value="1" />
+          <Checkbox className={styles.permissionCheckbox} defaultChecked={securityPolicy.requireNumber} name="requireNumber" value="1" />
           <span className={styles.permissionOptionBody}>
             <strong>密码要求数字</strong>
             <span>启用后密码需包含至少 1 个 0-9。</span>
           </span>
         </label>
         <label className={styles.permissionOption}>
-          <input
+          <Checkbox
+            className={styles.permissionCheckbox}
             defaultChecked={securityPolicy.requireSpecialCharacter}
             name="requireSpecialCharacter"
-            type="checkbox"
             value="1"
           />
           <span className={styles.permissionOptionBody}>
@@ -520,23 +609,23 @@ function NavigationSettingsForm({ menuItems }: { menuItems: ManagedNavigationMen
           <p className={styles.settingSectionCopy}>admin 菜单授权固定为全开；manage/reviewer/viewer 可按菜单配置显示权限。</p>
         </div>
         <div className={styles.syncTableWrap}>
-          <table className={styles.syncTable}>
-            <thead>
-              <tr>
-                <th>菜单</th>
-                <th>路由</th>
-                <th>排序</th>
-                <th>显示</th>
-                <th>admin</th>
-                <th>manage</th>
-                <th>reviewer</th>
-                <th>viewer</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className={styles.syncTable}>
+            <TableHeader>
+              <TableRow>
+                <TableHead>菜单</TableHead>
+                <TableHead>路由</TableHead>
+                <TableHead>排序</TableHead>
+                <TableHead>显示</TableHead>
+                <TableHead>admin</TableHead>
+                <TableHead>manage</TableHead>
+                <TableHead>reviewer</TableHead>
+                <TableHead>viewer</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {menuItems.map((item) => (
-                <tr key={item.code}>
-                  <td>
+                <TableRow key={item.code}>
+                  <TableCell>
                     <div className={styles.menuCodeCell}>
                       <strong>{item.label}</strong>
                       <span>{item.code}</span>
@@ -545,37 +634,37 @@ function NavigationSettingsForm({ menuItems }: { menuItems: ManagedNavigationMen
                     <input name={`menuLabel:${item.code}`} type="hidden" value={item.label} />
                     <input name={`menuHref:${item.code}`} type="hidden" value={item.href} />
                     <input name={`menuIcon:${item.code}`} type="hidden" value={item.icon} />
-                  </td>
-                  <td>{item.href}</td>
-                  <td>
+                  </TableCell>
+                  <TableCell>{item.href}</TableCell>
+                  <TableCell>
                     <Input defaultValue={String(item.sortOrder)} inputMode="numeric" min={0} name={`menuSortOrder:${item.code}`} type="number" />
-                  </td>
-                  <td>
-                    <input defaultChecked={item.visible} name={`menuVisible:${item.code}`} type="checkbox" value="1" />
-                  </td>
-                  <td>
-                    <input checked disabled type="checkbox" />
-                  </td>
+                  </TableCell>
+                  <TableCell>
+                    <Checkbox className={styles.tableCheckbox} defaultChecked={item.visible} name={`menuVisible:${item.code}`} value="1" />
+                  </TableCell>
+                  <TableCell>
+                    <Checkbox className={styles.tableCheckbox} defaultChecked disabled />
+                  </TableCell>
                   {mutableRoles.map((roleCode) => {
                     const adminOnlyMenu = item.code === "system";
                     const checked = item.roleCodes.includes(roleCode);
                     return (
-                      <td key={`${item.code}:${roleCode}`}>
-                        <input
+                      <TableCell key={`${item.code}:${roleCode}`}>
+                        <Checkbox
                           defaultChecked={checked}
                           disabled={adminOnlyMenu}
                           name={`menuRole:${roleCode}:${item.code}`}
-                          type="checkbox"
+                          className={styles.tableCheckbox}
                           value="1"
                         />
                         {adminOnlyMenu ? <span className={styles.menuRoleHint}>仅 admin</span> : null}
-                      </td>
+                      </TableCell>
                     );
                   })}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
         <p className={styles.settingSectionCopy}>
           角色说明：{mutableRoles.map((roleCode) => roleLabels[roleCode]).join(" / ")}。
@@ -593,17 +682,21 @@ function NavigationSettingsForm({ menuItems }: { menuItems: ManagedNavigationMen
 function SettingsWorkspace({
   activeTab,
   settings,
+  brandingSettings,
   analyticsHealthItems,
   deliveryMode,
   securityPolicy,
-  navigationMenus
+  navigationMenus,
+  errorMessage
 }: {
   activeTab: SettingsTab;
   settings: HuiYunYingApiSettings;
+  brandingSettings: EnterpriseBrandingSettings;
   analyticsHealthItems: AnalyticsPipelineHealthItem[];
   deliveryMode: DeliveryMode;
   securityPolicy: AuthSecurityPolicy;
   navigationMenus: ManagedNavigationMenuItem[];
+  errorMessage: string;
 }) {
   const active = tabs.find((item) => item.key === activeTab) || tabs[0];
 
@@ -630,10 +723,17 @@ function SettingsWorkspace({
           </TabsList>
 
           <TabsContent className={styles.tabPanel}>
+            {errorMessage ? (
+              <div className={styles.saveErrorBanner}>
+                <strong>保存失败：</strong>
+                {errorMessage}
+              </div>
+            ) : null}
             <div className={styles.settingSectionHeader}>
               <h3 className={styles.settingSectionTitle}>{active.label}</h3>
               <p className={styles.settingSectionCopy}>{active.description}</p>
             </div>
+            {activeTab === "branding" ? <BrandingSettingsForm settings={brandingSettings} /> : null}
             {activeTab === "api" ? <ApiSettingsForm settings={settings} /> : null}
             {activeTab === "rectification" ? (
               <>
@@ -664,8 +764,11 @@ export default async function AdminSettingsPage({
   }
 
   const settings = systemSettingsService.getHuiYunYingApiSettings();
+  const brandingSettings = systemSettingsService.getEnterpriseBrandingSettings();
   const resolvedSearchParams = await searchParams;
   const activeTab = resolveTab(resolvedSearchParams.tab);
+  const errorMessage =
+    typeof resolvedSearchParams.error === "string" ? decodeURIComponent(resolvedSearchParams.error) : "";
   const deliveryMode = systemSettingsService.getDeliveryMode();
   const securityPolicy = systemSettingsService.getAuthSecurityPolicy();
   const navigationMenus = authService.listManagedNavigationMenus();
@@ -691,7 +794,9 @@ export default async function AdminSettingsPage({
         <SettingsWorkspace
           activeTab={activeTab}
           analyticsHealthItems={analyticsHealthItems}
+          brandingSettings={brandingSettings}
           deliveryMode={deliveryMode}
+          errorMessage={errorMessage}
           navigationMenus={navigationMenus}
           securityPolicy={securityPolicy}
           settings={settings}

@@ -34,8 +34,8 @@
 ```json
 {
   "enterpriseName": "某某企业",
-  "logoAssetPath": "/uploads/branding/logo-20260409.png",
-  "faviconAssetPath": "/uploads/branding/favicon-20260409.ico",
+  "logoUrl": "/uploads/branding/logo-20260409.png",
+  "faviconUrl": "/uploads/branding/favicon-20260409.ico",
   "primaryColor": "#8b5a2b",
   "primaryColorStrong": "#6b421d",
   "updatedBy": "admin",
@@ -48,6 +48,7 @@
 - 上传目标目录：`public/uploads/branding/`。
 - 命名策略：`{type}-{timestamp}.{ext}`，避免覆盖历史文件。
 - 访问路径统一使用站内相对路径（如 `/uploads/branding/logo-*.png`）。
+- 安全限制：Logo 仅支持 `png/jpg/jpeg/webp`，favicon 仅支持 `ico/png`，并做服务端文件内容校验。
 
 ### 4.3 生效机制
 - `app/layout.tsx` 在服务端读取品牌配置，并注入 CSS 变量：
@@ -57,7 +58,7 @@
 - favicon 使用动态 metadata 读取配置值，确保浏览器标签页图标同步。
 
 ### 4.4 权限与审计
-- 仅 `admin`（具备 `user:manage`）可编辑品牌配置。
+- 仅 `admin`（具备 `system:settings:write`）可编辑品牌配置。
 - 其他角色可见但不可编辑（或不可进入该页，按现有系统管理权限策略执行）。
 - 保存动作写入审计日志：
   - action: `system.settings.branding.update`

@@ -64,15 +64,15 @@
 }
 
 .dateBadge {
-  color: #1d4ed8;
-  border-color: #bfdbfe;
-  background: #eff6ff;
+  color: var(--info-text);
+  border-color: var(--info-border);
+  background: var(--info-bg);
 }
 
 .alertBadge {
-  color: #dc2626;
-  border-color: #fecaca;
-  background: #fef2f2;
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
 }
 
 .breadcrumbSlash {
@@ -93,8 +93,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.75rem;
-  background: #18181b;
-  color: #fafafa;
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
 }
 
 .overviewTitle {
@@ -133,7 +133,7 @@
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  background: #f4f4f5;
+  background: var(--surface-code);
 }
 
 .previewButton {
@@ -160,13 +160,13 @@
 }
 
 .tabLinkActive {
-  border-bottom-color: #18181b;
-  color: #18181b;
+  border-bottom-color: var(--surface-inverse);
+  color: var(--surface-inverse);
 }
 
 .reviewTabLinkActive {
-  border-bottom-color: #ef4444;
-  color: #ef4444;
+  border-bottom-color: var(--danger-tab);
+  color: var(--danger-tab);
 }
 
 .tabCount {
@@ -176,8 +176,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  background: color-mix(in srgb, var(--danger-tab) 12%, transparent);
+  color: var(--danger-strong-text);
   font-size: 11px;
   font-weight: 600;
 }
@@ -197,12 +197,12 @@
 .alertPanel {
   padding: 16px 18px;
   border-radius: 0.75rem;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
 }
 
 .alertHead {
-  color: #dc2626;
+  color: var(--danger-text);
   font-weight: 800;
 }
 
@@ -211,12 +211,12 @@
   width: fit-content;
   align-items: center;
   border-radius: 999px;
-  border: 1px solid rgba(220, 38, 38, 0.14);
+  border: 1px solid var(--danger-soft);
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
-  color: rgba(127, 29, 29, 0.9);
-  background: rgba(255, 255, 255, 0.78);
+  color: color-mix(in srgb, var(--danger-strong-text) 90%, transparent);
+  background: var(--surface-frost);
 }
 
 .selectionToolbar {
@@ -227,7 +227,7 @@
   border: 0;
   padding: 0;
   background: transparent;
-  color: #dc2626;
+  color: var(--danger-text);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -259,10 +259,7 @@
 
 .issueCheckbox {
   margin-top: 3px;
-  width: 18px;
-  height: 18px;
-  accent-color: #ef4444;
-  cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .issueChecklistText {
@@ -345,8 +342,8 @@
   margin: 0;
   padding: 16px 18px;
   border-radius: 0.75rem;
-  background: #18181b;
-  color: #fafafa;
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
   font-size: 13px;
   line-height: 1.7;
   white-space: pre-wrap;
@@ -357,7 +354,7 @@
 .inlineCode {
   padding: 2px 6px;
   border-radius: 8px;
-  background: #f4f4f5;
+  background: var(--surface-code);
   color: var(--text);
   font-size: 0.92em;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
@@ -383,7 +380,7 @@
 .timelineNote {
   padding: 12px 14px;
   border-radius: 0.625rem;
-  background: #f4f4f5;
+  background: var(--surface-code);
   line-height: 1.7;
 }
 
@@ -392,18 +389,18 @@
 }
 
 .reviewInputError {
-  border-color: #fca5a5;
-  background: #fef2f2;
+  border-color: color-mix(in srgb, var(--danger-border) 80%, white);
+  background: var(--danger-bg);
 }
 
 .reviewInputError:focus {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 1px #ef4444;
+  border-color: var(--danger-tab);
+  box-shadow: 0 0 0 1px var(--danger-tab);
 }
 
 .reviewFieldError {
   margin-top: 8px;
-  color: #dc2626;
+  color: var(--danger-text);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -411,9 +408,9 @@
 .reviewError {
   padding: 12px 14px;
   border-radius: 0.625rem;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-strong-text);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -430,7 +427,7 @@
 .reviewModalBackdrop {
   position: absolute;
   inset: 0;
-  background: rgba(9, 9, 11, 0.48);
+  background: var(--overlay-strong);
   backdrop-filter: blur(4px);
 }
 
@@ -443,7 +440,7 @@
   padding: 24px 26px;
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: 0 20px 50px rgba(9, 9, 11, 0.18);
+  box-shadow: var(--elevation-shadow-strong);
   display: grid;
   gap: 18px;
 }
@@ -460,7 +457,7 @@
 .processingBackdrop {
   position: absolute;
   inset: 0;
-  background: rgba(9, 9, 11, 0.4);
+  background: var(--overlay-weak);
   backdrop-filter: blur(4px);
 }
 
@@ -472,7 +469,7 @@
   padding: 24px 28px;
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: 0 20px 50px rgba(9, 9, 11, 0.18);
+  box-shadow: var(--elevation-shadow-strong);
   display: flex;
   align-items: center;
   gap: 16px;
@@ -488,8 +485,8 @@
   height: 28px;
   flex: 0 0 28px;
   border-radius: 999px;
-  border: 3px solid #e4e4e7;
-  border-top-color: #18181b;
+  border: 3px solid var(--spinner-base);
+  border-top-color: var(--surface-inverse);
   animation: processingSpin 0.9s linear infinite;
 }
 
@@ -543,7 +540,7 @@
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  background: #f4f4f5;
+  background: var(--surface-code);
 }
 
 .previewOrderCard {
@@ -566,8 +563,8 @@
   margin: 0;
   padding: 14px 16px;
   border-radius: 16px;
-  background: rgba(44, 37, 28, 0.96);
-  color: rgba(255, 250, 242, 0.96);
+  background: var(--description-bg);
+  color: var(--description-text);
   font-size: 13px;
   line-height: 1.7;
   white-space: pre-wrap;
@@ -591,7 +588,7 @@
 }
 
 .imageModalBackdrop {
-  background: rgba(9, 9, 11, 0.48);
+  background: var(--overlay-strong);
   backdrop-filter: blur(4px);
 }
 
@@ -605,7 +602,7 @@
   width: min(1080px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   overflow: auto;
-  box-shadow: 0 20px 50px rgba(9, 9, 11, 0.18);
+  box-shadow: var(--elevation-shadow-strong);
 }
 
 .imageModalBody {
@@ -629,7 +626,7 @@
   width: 100%;
   max-height: calc(100vh - 180px);
   object-fit: contain;
-  background: #f4f4f5;
+  background: var(--surface-code);
 }
 
 @media (max-width: 1180px) {

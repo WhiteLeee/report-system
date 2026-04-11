@@ -1,9 +1,17 @@
 import type {
   AuthSecurityPolicy,
   DeliveryMode,
+  EnterpriseBrandingSettings,
   HuiYunYingApiSettings,
   SystemSettingsRepository
 } from "@/backend/system-settings/system-settings.types";
+
+const HEX_COLOR_PATTERN = /^#([0-9a-fA-F]{6})$/;
+
+function normalizeHexColor(value: string, fallback: string): string {
+  const normalized = value.trim();
+  return HEX_COLOR_PATTERN.test(normalized) ? normalized.toLowerCase() : fallback;
+}
 
 export class SystemSettingsService {
   constructor(private readonly repository: SystemSettingsRepository) {}
@@ -54,6 +62,23 @@ export class SystemSettingsService {
       requireSpecialCharacter: Boolean(policy.requireSpecialCharacter),
       loginMaxFailures: Math.max(1, Math.floor(policy.loginMaxFailures)),
       loginLockDurationMs: Math.max(1000, Math.floor(policy.loginLockDurationMs))
+    });
+  }
+
+  getEnterpriseBrandingSettings(): EnterpriseBrandingSettings {
+    return this.repository.getEnterpriseBrandingSettings();
+  }
+
+  saveEnterpriseBrandingSettings(settings: EnterpriseBrandingSettings): void {
+    const fallback = this.repository.getEnterpriseBrandingSettings();
+    this.repository.saveEnterpriseBrandingSettings({
+      enterpriseName: settings.enterpriseName.trim() || fallback.enterpriseName,
+      logoUrl: settings.logoUrl.trim(),
+      faviconUrl: settings.faviconUrl.trim(),
+      primaryColor: normalizeHexColor(settings.primaryColor, fallback.primaryColor),
+      primaryColorStrong: normalizeHexColor(settings.primaryColorStrong, fallback.primaryColorStrong),
+      updatedBy: settings.updatedBy.trim() || fallback.updatedBy,
+      updatedAt: settings.updatedAt.trim() || fallback.updatedAt || new Date().toISOString()
     });
   }
 }

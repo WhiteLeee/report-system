@@ -16,6 +16,7 @@ import {
 import { BarChart3, FileText, LogOut, Settings2, ShieldUser, User, Wrench } from "@/components/ui/icons";
 import { TabsList, TabsTrigger, tabsTriggerVariants } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useBranding } from "@/ui/shared/branding-provider";
 
 export function DashboardHeader({
   currentUser,
@@ -29,6 +30,7 @@ export function DashboardHeader({
   activePath?: string;
 }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const branding = useBranding();
   const isAdmin = currentUser.roles.includes("admin");
   const canManageUsers =
     isAdmin ||
@@ -119,15 +121,24 @@ export function DashboardHeader({
   }
 
   return (
-    <header className="mb-8 flex flex-col gap-6 border-b border-zinc-200 pb-6 lg:flex-row lg:items-start lg:justify-between">
+    <header className="mb-8 flex flex-col gap-6 border-b border-[var(--line)] pb-6 lg:flex-row lg:items-start lg:justify-between">
       <div className="max-w-3xl">
-        <p className="eyebrow">Report Workspace</p>
-        <h1 className="mt-0 text-4xl font-semibold tracking-tight text-zinc-950 lg:text-5xl">{title}</h1>
-        <p className="mt-3 text-sm leading-6 text-zinc-500 sm:text-base">{subtitle}</p>
+        <div className="mb-2 flex items-center gap-2">
+          {branding.logoUrl ? (
+            <img
+              alt={`${branding.enterpriseName || "企业"} Logo`}
+              className="h-6 w-6 rounded-md border border-[var(--line)] bg-[var(--surface)] object-contain p-0.5"
+              src={branding.logoUrl}
+            />
+          ) : null}
+          <p className="eyebrow">{branding.enterpriseName || "Report Workspace"}</p>
+        </div>
+        <h1 className="mt-0 text-4xl font-semibold tracking-tight text-[var(--text)] lg:text-5xl">{title}</h1>
+        <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">{subtitle}</p>
       </div>
       <div className="flex flex-col items-start gap-3 lg:min-w-[420px] lg:items-end">
         <div className="flex w-full items-center justify-end gap-2">
-          <TabsList className="rounded-full border border-zinc-200 bg-zinc-100/80 shadow-sm">
+          <TabsList className="rounded-full border border-[var(--line)] bg-[var(--bg-accent)] shadow-sm">
             {resolvedNavigationItems.map((item) => {
               const Icon = menuIconMap[item.icon] || FileText;
               return (
@@ -158,8 +169,8 @@ export function DashboardHeader({
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="space-y-0.5">
-                    <div className="text-sm font-medium text-zinc-950">{currentUser.username}</div>
-                    <div className="text-xs text-zinc-500">当前登录账号</div>
+                    <div className="text-sm font-medium text-[var(--text)]">{currentUser.username}</div>
+                    <div className="text-xs text-[var(--muted)]">当前登录账号</div>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

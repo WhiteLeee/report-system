@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import styles from "./report-result-detail-view.module.css";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type ReviewIssueOption = {
   id: number;
@@ -76,13 +77,12 @@ export function ReviewIssueSelector({
               return (
                 <li className={styles.issueChecklistItem} key={issue.id}>
                   <label className={styles.issueChecklistLabel}>
-                    <input
+                    <Checkbox
+                      aria-label={`选择问题：${issue.title}`}
                       checked={checked}
                       className={styles.issueCheckbox}
                       disabled={disabled}
-                      form={formId}
-                      onChange={() => toggleIssue(issue.id)}
-                      type="checkbox"
+                      onCheckedChange={() => toggleIssue(issue.id)}
                     />
                     <span className={styles.issueChecklistText}>{issue.title}</span>
                   </label>

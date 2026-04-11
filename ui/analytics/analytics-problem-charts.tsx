@@ -96,10 +96,10 @@ export function AnalyticsProblemCharts({ dashboard }: Props) {
               </ChartContainer>
               <div className="grid gap-2 sm:grid-cols-2">
                 {skillData.slice(0, 4).map((item) => (
-                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3" key={`summary:${item.skillId || item.name}`}>
-                    <div className="text-sm font-medium text-zinc-950">{item.name}</div>
-                    <div className="mt-1 text-2xl font-semibold text-zinc-950">{item.count}</div>
-                    <div className="mt-1 text-xs text-zinc-500">
+                  <div className="rounded-xl border border-[var(--line)] bg-[var(--bg-accent)] px-4 py-3" key={`summary:${item.skillId || item.name}`}>
+                    <div className="text-sm font-medium text-[var(--text)]">{item.name}</div>
+                    <div className="mt-1 text-2xl font-semibold text-[var(--text)]">{item.count}</div>
+                    <div className="mt-1 text-xs text-[var(--muted)]">
                       覆盖 {item.storeCount} 家门店 · {item.resultCount} 条结果
                     </div>
                   </div>
@@ -107,7 +107,7 @@ export function AnalyticsProblemCharts({ dashboard }: Props) {
               </div>
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-zinc-300 p-6">
+            <div className="rounded-xl border border-dashed border-[var(--line)] p-6">
               <EmptyState>当前筛选范围还没有技能命中数据。</EmptyState>
             </div>
           )}
@@ -141,10 +141,10 @@ export function AnalyticsProblemCharts({ dashboard }: Props) {
               </ChartContainer>
               <div className="grid gap-2 sm:grid-cols-2">
                 {severityData.map((item) => (
-                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3" key={`severity:${item.severity}`}>
-                    <div className="text-sm font-medium text-zinc-950">{item.label}</div>
-                    <div className="mt-1 text-2xl font-semibold text-zinc-950">{item.count}</div>
-                    <div className="mt-1 text-xs text-zinc-500">
+                  <div className="rounded-xl border border-[var(--line)] bg-[var(--bg-accent)] px-4 py-3" key={`severity:${item.severity}`}>
+                    <div className="text-sm font-medium text-[var(--text)]">{item.label}</div>
+                    <div className="mt-1 text-2xl font-semibold text-[var(--text)]">{item.count}</div>
+                    <div className="mt-1 text-xs text-[var(--muted)]">
                       覆盖 {item.storeCount} 家门店 · {item.resultCount} 条结果
                     </div>
                   </div>
@@ -152,7 +152,7 @@ export function AnalyticsProblemCharts({ dashboard }: Props) {
               </div>
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-zinc-300 p-6">
+            <div className="rounded-xl border border-dashed border-[var(--line)] p-6">
               <EmptyState>当前筛选范围还没有严重程度数据。</EmptyState>
             </div>
           )}

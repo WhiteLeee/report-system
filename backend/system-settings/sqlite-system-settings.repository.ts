@@ -1,10 +1,12 @@
 import { eq } from "drizzle-orm";
 
+import { getReportSystemConfig } from "@/backend/config/report-system-config";
 import { db } from "@/backend/database/client";
 import { systemSettingTable } from "@/backend/database/schema";
 import type {
   AuthSecurityPolicy,
   DeliveryMode,
+  EnterpriseBrandingSettings,
   HuiYunYingApiSettings,
   SystemSettingsRepository
 } from "@/backend/system-settings/system-settings.types";
@@ -12,6 +14,7 @@ import type {
 const HUIYUNYING_API_KEY = "huiyunying_api";
 const DELIVERY_MODE_KEY = "auth_delivery_mode";
 const AUTH_SECURITY_POLICY_KEY = "auth_security_policy";
+const ENTERPRISE_BRANDING_KEY = "enterprise_branding_v1";
 
 const defaultHuiYunYingApiSettings: HuiYunYingApiSettings = {
   uri: "",
@@ -40,6 +43,17 @@ const defaultAuthSecurityPolicy: AuthSecurityPolicy = {
   requireSpecialCharacter: false,
   loginMaxFailures: 5,
   loginLockDurationMs: 300000
+};
+
+const config = getReportSystemConfig();
+const defaultEnterpriseBrandingSettings: EnterpriseBrandingSettings = {
+  enterpriseName: config.tenantName,
+  logoUrl: config.logoUrl,
+  faviconUrl: config.logoUrl,
+  primaryColor: config.primaryColor,
+  primaryColorStrong: config.primaryColorStrong,
+  updatedBy: "",
+  updatedAt: ""
 };
 
 function safeParseSettings(value: string): HuiYunYingApiSettings {
@@ -134,6 +148,24 @@ function safeParseAuthSecurityPolicy(value: string): AuthSecurityPolicy {
     };
   } catch {
     return defaultAuthSecurityPolicy;
+  }
+}
+
+function safeParseEnterpriseBrandingSettings(value: string): EnterpriseBrandingSettings {
+  try {
+    const parsed = JSON.parse(value) as Partial<EnterpriseBrandingSettings>;
+    return {
+      enterpriseName: String(parsed.enterpriseName || "").trim() || defaultEnterpriseBrandingSettings.enterpriseName,
+      logoUrl: String(parsed.logoUrl || "").trim(),
+      faviconUrl: String(parsed.faviconUrl || "").trim(),
+      primaryColor: String(parsed.primaryColor || "").trim() || defaultEnterpriseBrandingSettings.primaryColor,
+      primaryColorStrong:
+        String(parsed.primaryColorStrong || "").trim() || defaultEnterpriseBrandingSettings.primaryColorStrong,
+      updatedBy: String(parsed.updatedBy || "").trim(),
+      updatedAt: String(parsed.updatedAt || "").trim()
+    };
+  } catch {
+    return defaultEnterpriseBrandingSettings;
   }
 }
 
@@ -242,6 +274,40 @@ export class SqliteSystemSettingsRepository implements SystemSettingsRepository 
         set: {
           category: "auth",
           valueJson: JSON.stringify(policy),
+          updatedAt: now
+        }
+      })
+      .run();
+  }
+
+  getEnterpriseBrandingSettings(): EnterpriseBrandingSettings {
+    const row = db
+      .select()
+      .from(systemSettingTable)
+      .where(eq(systemSettingTable.settingKey, ENTERPRISE_BRANDING_KEY))
+      .get();
+
+    if (!row) {
+      return defaultEnterpriseBrandingSettings;
+    }
+    return safeParseEnterpriseBrandingSettings(row.valueJson);
+  }
+
+  saveEnterpriseBrandingSettings(settings: EnterpriseBrandingSettings): void {
+    const now = new Date().toISOString();
+    db.insert(systemSettingTable)
+      .values({
+        settingKey: ENTERPRISE_BRANDING_KEY,
+        category: "branding",
+        valueJson: JSON.stringify(settings),
+        createdAt: now,
+        updatedAt: now
+      })
+      .onConflictDoUpdate({
+        target: systemSettingTable.settingKey,
+        set: {
+          category: "branding",
+          valueJson: JSON.stringify(settings),
           updatedAt: now
         }
       })

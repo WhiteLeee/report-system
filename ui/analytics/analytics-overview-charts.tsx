@@ -145,10 +145,10 @@ export function AnalyticsOverviewCharts({ dashboard }: Props) {
           </ChartContainer>
           <div className="grid gap-2 sm:grid-cols-2">
             {semanticData.map((item) => (
-              <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3" key={item.key}>
-                <div className="text-sm font-medium text-zinc-950">{item.name}</div>
-                <div className="mt-1 text-2xl font-semibold text-zinc-950">{item.value}</div>
-                <div className="mt-1 text-xs text-zinc-500">关联问题 {item.issueCount}</div>
+              <div className="rounded-xl border border-[var(--line)] bg-[var(--bg-accent)] px-4 py-3" key={item.key}>
+                <div className="text-sm font-medium text-[var(--text)]">{item.name}</div>
+                <div className="mt-1 text-2xl font-semibold text-[var(--text)]">{item.value}</div>
+                <div className="mt-1 text-xs text-[var(--muted)]">关联问题 {item.issueCount}</div>
               </div>
             ))}
           </div>
@@ -175,21 +175,21 @@ export function AnalyticsOverviewCharts({ dashboard }: Props) {
             </BarChart>
           </ChartContainer>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+            <div className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--bg-accent)] px-4 py-3">
               <div className="grid gap-1">
-                <span className="text-sm font-medium text-zinc-950">整改闭环率</span>
-                <span className="text-xs text-zinc-500">已整改 / 已下发整改单</span>
+                <span className="text-sm font-medium text-[var(--text)]">整改闭环率</span>
+                <span className="text-xs text-[var(--muted)]">已整改 / 已下发整改单</span>
               </div>
               <Badge variant={dashboard.rectification_overview.close_rate >= 80 ? "secondary" : dashboard.rectification_overview.close_rate >= 50 ? "outline" : "default"}>
                 {dashboard.rectification_overview.close_rate}%
               </Badge>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-              <div className="text-sm font-medium text-zinc-950">平均整改时长</div>
-              <div className="mt-1 text-2xl font-semibold text-zinc-950">
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--bg-accent)] px-4 py-3">
+              <div className="text-sm font-medium text-[var(--text)]">平均整改时长</div>
+              <div className="mt-1 text-2xl font-semibold text-[var(--text)]">
                 {dashboard.rectification_overview.average_rectification_duration_days} 天
               </div>
-              <div className="mt-1 text-xs text-zinc-500">按已整改整改单的创建到完成时间计算</div>
+              <div className="mt-1 text-xs text-[var(--muted)]">按已整改整改单的创建到完成时间计算</div>
             </div>
           </div>
         </CardContent>
@@ -246,21 +246,21 @@ export function AnalyticsOverviewCharts({ dashboard }: Props) {
             </BarChart>
           </ChartContainer>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-              <div className="text-sm font-medium text-zinc-950">平均复核时长</div>
-              <div className="mt-1 text-2xl font-semibold text-zinc-950">
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--bg-accent)] px-4 py-3">
+              <div className="text-sm font-medium text-[var(--text)]">平均复核时长</div>
+              <div className="mt-1 text-2xl font-semibold text-[var(--text)]">
                 {dashboard.review_efficiency.average_review_latency_hours} 小时
               </div>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-              <div className="text-sm font-medium text-zinc-950">人工复核动作数</div>
-              <div className="mt-1 text-2xl font-semibold text-zinc-950">
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--bg-accent)] px-4 py-3">
+              <div className="text-sm font-medium text-[var(--text)]">人工复核动作数</div>
+              <div className="mt-1 text-2xl font-semibold text-[var(--text)]">
                 {dashboard.review_efficiency.review_action_count}
               </div>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-              <div className="text-sm font-medium text-zinc-950">参与复核人数</div>
-              <div className="mt-1 text-2xl font-semibold text-zinc-950">
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--bg-accent)] px-4 py-3">
+              <div className="text-sm font-medium text-[var(--text)]">参与复核人数</div>
+              <div className="mt-1 text-2xl font-semibold text-[var(--text)]">
                 {dashboard.review_efficiency.operator_count}
               </div>
             </div>

@@ -98,6 +98,7 @@ export function ensureAnalyticsJobManagerStarted(): void {
     state.resultFactRefreshTimer = setInterval(() => {
       void triggerResultFactRefresh();
     }, resultFactIntervalMs);
+    state.resultFactRefreshTimer.unref?.();
   }
 
   if (!state.snapshotRefreshTimer && snapshotIntervalMs > 0) {
@@ -105,6 +106,7 @@ export function ensureAnalyticsJobManagerStarted(): void {
     state.snapshotRefreshTimer = setInterval(() => {
       void triggerSnapshotRefresh();
     }, snapshotIntervalMs);
+    state.snapshotRefreshTimer.unref?.();
   }
 
   globalThis.__reportSystemAnalyticsJobManager = state;

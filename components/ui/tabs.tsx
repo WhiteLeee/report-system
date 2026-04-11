@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-const tabsListVariants = cva("inline-flex items-center gap-1 rounded-lg bg-zinc-100 p-1 text-zinc-500", {
+const tabsListVariants = cva("inline-flex items-center gap-1 rounded-lg bg-[var(--bg-accent)] p-1 text-[var(--muted)]", {
   variants: {
     orientation: {
       horizontal: "flex-row flex-wrap",
@@ -17,12 +17,12 @@ const tabsListVariants = cva("inline-flex items-center gap-1 rounded-lg bg-zinc-
 });
 
 const tabsTriggerVariants = cva(
-  "inline-flex min-h-9 items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950",
+  "inline-flex min-h-9 items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--brand-strong)]",
   {
     variants: {
       state: {
-        active: "bg-white text-zinc-950 shadow-sm",
-        inactive: "text-zinc-600 hover:text-zinc-950"
+        active: "bg-white text-[var(--brand-strong)] shadow-sm",
+        inactive: "text-[var(--muted)] hover:text-[var(--brand-strong)]"
       },
       orientation: {
         horizontal: "",

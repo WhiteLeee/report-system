@@ -76,7 +76,7 @@
   background: rgba(255, 255, 255, 0.82);
 }
 
-.permissionOption input {
+.permissionCheckbox {
   margin-top: 3px;
 }
 

@@ -167,6 +167,12 @@ report-system/
 npm install
 ```
 
+如果你刚切过 Node 版本（或看到 `better-sqlite3` 的 `NODE_MODULE_VERSION` 报错），先执行：
+
+```bash
+npm rebuild better-sqlite3
+```
+
 ### 6.2 初始化数据库
 
 ```bash
@@ -269,11 +275,59 @@ PORT=3000 npm run start
 - [.env.example](/Users/wick/Desktop/ZhiQing%20Selection/SourceCode/report-system/.env.example)
 - [config/tenant.example.json](/Users/wick/Desktop/ZhiQing%20Selection/SourceCode/report-system/config/tenant.example.json)
 
-### 6.8 复检联调测试
+### 6.8 多环境部署脚本（staging / prod）
+
+仓库已提供两套完整脚本集：
+
+- staging（目标机器：`192.169.65.70`）：
+  [deploy/staging/](/Users/wick/Desktop/ZhiQing%20Selection/SourceCode/report-system/deploy/staging)
+- prod（目标域名：`http://vision.weipos.com`）：
+  [deploy/prod/](/Users/wick/Desktop/ZhiQing%20Selection/SourceCode/report-system/deploy/prod)
+
+共享执行库：
+- [deploy/shared/lib.sh](/Users/wick/Desktop/ZhiQing%20Selection/SourceCode/report-system/deploy/shared/lib.sh)
+
+每套脚本都包含：
+
+1. 前置检查：`check-prereqs.sh`
+2. 首次初始化：`first-init.sh`（初始化租户配置、环境文件、数据库）
+3. systemd 安装：`install-systemd.sh`
+4. 日常发布：`deploy.sh`（自动备份、构建、迁移、重启、健康检查）
+5. 服务运维：`start.sh` / `stop.sh` / `restart.sh` / `status.sh`
+6. 数据库运维：`backup-db.sh` / `restore-db.sh`
+7. 健康检查：`healthcheck.sh`
+
+首次初始化示例（staging）：
+
+```bash
+cd /srv/report-system
+chmod +x deploy/shared/lib.sh deploy/staging/*.sh
+ADMIN_PASSWORD='请设置强密码' ./deploy/staging/first-init.sh
+./deploy/staging/install-systemd.sh
+sudo systemctl start report-system-staging
+```
+
+日常发布示例（prod）：
+
+```bash
+cd /srv/report-system
+./deploy/prod/deploy.sh
+```
+
+注意：
+
+- 生产/测试都使用 `next build + next start`，不要用 `next dev`。
+- `first-init.sh` 仅首次部署用，发布时只执行 `deploy.sh`。
+- `deploy.sh` 内置 SQLite 备份，默认保留天数在配置文件中可调。
+- 切勿在生产执行 `reinit:local`、`business:clear`、`--reset-db`。
+
+### 6.9 复检联调测试
 
 ```bash
 npm test
 ```
+
+如果测试前刚切换过 Node 版本，建议先执行 `npm rebuild better-sqlite3`，避免原生模块 ABI 不匹配。
 
 该测试覆盖：
 
@@ -497,14 +551,15 @@ GET /api/reports/{reportId}
 
 - `POST /admin/users/create`
   用途：创建用户
+- `POST /admin/users/{userId}/update`
+  用途：统一更新用户资料（角色、状态、密码、范围）
+
+以下四个旧接口已封口（兼容跳转提示，不再落库）：
+
 - `POST /admin/users/{userId}/role`
-  用途：更新用户角色
 - `POST /admin/users/{userId}/scopes`
-  用途：更新用户企业范围和门店范围
 - `POST /admin/users/{userId}/password`
-  用途：重置用户密码
 - `POST /admin/users/{userId}/status`
-  用途：启用或禁用用户
 
 ## 11. 与 VisionAgent 联调
 
@@ -540,19 +595,19 @@ report_publish:
 
 ## 12. 当前限制
 
-1. 还没有权限体系
-2. 还没有复检状态写回接口
-3. `camera / inspection` 事实还未拆成独立持久化表
-4. 当前仍以 SQLite 单机部署为主
+1. 当前未启用 API Token 鉴权，默认适配内网与受控环境。
+2. 当前数据库仍以 SQLite 单机部署为主，不适合高并发多副本写入。
+3. 当前尚未接入 SSO/IAM，登录方式仍为本地账号密码。
+4. 品牌主题仍在持续收口，部分页面样式仍有历史硬编码色值待替换。
 
 ## 13. 下一步建议
 
 建议下一批按这个顺序继续：
 
-1. 增加复检状态更新接口
-2. 在详情页补连续复检交互
-3. 新增 `camera / inspection` 独立表
-4. 再考虑 API 鉴权与客户权限体系
+1. 完成品牌配置收口（上传安全校验、favicon 缓存版本、全站主题变量统一）。
+2. 继续收敛前端 UI 到 shadcn 组件与语义色板。
+3. 增加发布接口 API Token 鉴权（可配置开启）。
+4. 评估并准备 PostgreSQL 切换路径（仅基础设施层切换）。
 
 ## 15. 前端 UI 基线
 

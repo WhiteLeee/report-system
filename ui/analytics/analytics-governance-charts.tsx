@@ -83,10 +83,10 @@ export function AnalyticsGovernanceCharts({ dashboard }: Props) {
             </BarChart>
           </ChartContainer>
           {topGovernance ? (
-            <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+            <div className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--bg-accent)] px-4 py-3">
               <div className="grid gap-1">
-                <span className="text-sm font-medium text-zinc-950">当前最需督导组织</span>
-                <span className="text-xs text-zinc-500">
+                <span className="text-sm font-medium text-[var(--text)]">当前最需督导组织</span>
+                <span className="text-xs text-[var(--muted)]">
                   {topGovernance.organization_name} · 待复核 {topGovernance.pending_review_count} · 超期 {topGovernance.overdue_count}
                 </span>
               </div>
@@ -128,10 +128,10 @@ export function AnalyticsGovernanceCharts({ dashboard }: Props) {
             </BarChart>
           </ChartContainer>
           {lowestCloseRate ? (
-            <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+            <div className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--bg-accent)] px-4 py-3">
               <div className="grid gap-1">
-                <span className="text-sm font-medium text-zinc-950">当前闭环最弱加盟商</span>
-                <span className="text-xs text-zinc-500">
+                <span className="text-sm font-medium text-[var(--text)]">当前闭环最弱加盟商</span>
+                <span className="text-xs text-[var(--muted)]">
                   {lowestCloseRate.franchisee_name} · 整改单 {lowestCloseRate.order_count} · 超期 {lowestCloseRate.overdue_count}
                 </span>
               </div>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/ui/shared/dashboard-header";
 import { SystemManagementTabs } from "@/ui/shared/system-management-tabs";
 
@@ -139,66 +140,66 @@ export default async function AdminAuditPage({
               <input name="pageSize" type="hidden" value={String(auditLogPage.pageSize)} />
             </form>
 
-            <div className="overflow-x-auto rounded-xl border border-zinc-200">
-              <table className="min-w-full text-sm">
-                <thead className="bg-zinc-100/80 text-zinc-600">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium">时间</th>
-                    <th className="px-3 py-2 text-left font-medium">操作人</th>
-                    <th className="px-3 py-2 text-left font-medium">目标账号</th>
-                    <th className="px-3 py-2 text-left font-medium">动作</th>
-                    <th className="px-3 py-2 text-left font-medium">来源</th>
-                    <th className="px-3 py-2 text-left font-medium">详情</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <div className="overflow-x-auto rounded-xl border border-[var(--line)]">
+              <Table className="min-w-full text-sm">
+                <TableHeader className="bg-[var(--bg-accent)] text-[var(--muted)]">
+                  <TableRow>
+                    <TableHead className="px-3 py-2 font-medium">时间</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">操作人</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">目标账号</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">动作</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">来源</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">详情</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {auditLogPage.items.length > 0 ? (
                     auditLogPage.items.map((log) => (
-                      <tr className="border-t border-zinc-200 align-top" key={log.id}>
-                        <td className="px-3 py-2">{formatDateLabel(log.createdAt)}</td>
-                        <td className="px-3 py-2">{log.operatorUsername || "-"}</td>
-                        <td className="px-3 py-2">{log.targetUsername || "-"}</td>
-                        <td className="px-3 py-2">
+                      <TableRow className="border-[var(--line)] align-top" key={log.id}>
+                        <TableCell className="px-3 py-2">{formatDateLabel(log.createdAt)}</TableCell>
+                        <TableCell className="px-3 py-2">{log.operatorUsername || "-"}</TableCell>
+                        <TableCell className="px-3 py-2">{log.targetUsername || "-"}</TableCell>
+                        <TableCell className="px-3 py-2">
                           <Badge variant="outline">{log.action}</Badge>
-                        </td>
-                        <td className="px-3 py-2 text-xs text-zinc-500">
+                        </TableCell>
+                        <TableCell className="px-3 py-2 text-xs text-[var(--muted)]">
                           <div>req: {log.requestId || "-"}</div>
                           <div>ip: {log.ipAddress || "-"}</div>
-                        </td>
-                        <td className="px-3 py-2">
-                          <details className="rounded-lg border border-zinc-200 p-2">
-                            <summary className="cursor-pointer text-zinc-700">查看</summary>
+                        </TableCell>
+                        <TableCell className="px-3 py-2">
+                          <details className="rounded-lg border border-[var(--line)] p-2">
+                            <summary className="cursor-pointer text-[var(--muted)]">查看</summary>
                             <div className="mt-2 space-y-2 text-xs">
                               <div>
                                 <strong>before</strong>
-                                <pre className="mt-1 max-h-48 overflow-auto rounded bg-zinc-100 p-2 text-[11px] leading-5">
+                                <pre className="mt-1 max-h-48 overflow-auto rounded bg-[var(--bg-accent)] p-2 text-[11px] leading-5">
                                   {log.beforeJson || "{}"}
                                 </pre>
                               </div>
                               <div>
                                 <strong>after</strong>
-                                <pre className="mt-1 max-h-48 overflow-auto rounded bg-zinc-100 p-2 text-[11px] leading-5">
+                                <pre className="mt-1 max-h-48 overflow-auto rounded bg-[var(--bg-accent)] p-2 text-[11px] leading-5">
                                   {log.afterJson || "{}"}
                                 </pre>
                               </div>
                             </div>
                           </details>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))
                   ) : (
-                    <tr>
-                      <td className="px-3 py-8 text-center text-zinc-500" colSpan={6}>
+                    <TableRow>
+                      <TableCell className="px-3 py-8 text-center text-[var(--muted)]" colSpan={6}>
                         当前筛选条件下没有审计记录。
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
 
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-zinc-600">
+              <div className="text-sm text-[var(--muted)]">
                 共 {auditLogPage.total} 条，第 {auditLogPage.page} / {totalPages} 页
               </div>
               <div className="flex items-center gap-2">

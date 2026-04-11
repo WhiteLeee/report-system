@@ -42,7 +42,7 @@ function DialogContent({ className, children, ...props }: React.ComponentProps<t
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-[50%] left-[50%] z-[230] grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl border border-zinc-200 bg-white p-6 text-zinc-950 shadow-2xl duration-200 sm:max-w-lg",
+          "fixed top-[50%] left-[50%] z-[230] grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--text)] shadow-2xl duration-200 sm:max-w-lg",
           className
         )}
         {...props}
@@ -82,11 +82,11 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
 
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
-      className={cn("text-sm text-zinc-600", className)}
-      {...props}
-    />
+      <DialogPrimitive.Description
+        data-slot="dialog-description"
+        className={cn("text-sm text-[var(--muted)]", className)}
+        {...props}
+      />
   );
 }
 

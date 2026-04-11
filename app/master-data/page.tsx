@@ -11,6 +11,7 @@ import type { MasterDataOrganization, MasterDataStore } from "@/backend/master-d
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardHeader } from "@/ui/shared/dashboard-header";
 import { SystemManagementTabs } from "@/ui/shared/system-management-tabs";
 
@@ -403,36 +404,36 @@ export default async function MasterDataPage({
 
               <div className={styles.tableWrap}>
                 {pagedStores.length > 0 ? (
-                  <table className={styles.storeTable}>
-                    <thead>
-                      <tr>
-                        <th>门店名称</th>
-                        <th>门店编号</th>
-                        <th>门店类型</th>
-                        <th>运营组织</th>
-                        <th>加盟商名称</th>
-                        <th>员工数量</th>
-                        <th>负责督导</th>
-                        <th>门店状态</th>
-                        <th>营业执照</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  <Table className={styles.storeTable}>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>门店名称</TableHead>
+                        <TableHead>门店编号</TableHead>
+                        <TableHead>门店类型</TableHead>
+                        <TableHead>运营组织</TableHead>
+                        <TableHead>加盟商名称</TableHead>
+                        <TableHead>员工数量</TableHead>
+                        <TableHead>负责督导</TableHead>
+                        <TableHead>门店状态</TableHead>
+                        <TableHead>营业执照</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {pagedStores.map((item) => (
-                        <tr key={item.store_id}>
-                          <td title={item.store_name}>{item.store_name}</td>
-                          <td>{item.store_code || item.store_id}</td>
-                          <td>{item.store_type || "-"}</td>
-                          <td title={item.organize_name}>{item.organize_name || item.organize_code || "-"}</td>
-                          <td title={item.franchisee_name}>{item.franchisee_name || "-"}</td>
-                          <td>{item.emp_count || 0}</td>
-                          <td title={item.employee_name || item.supervisor}>{item.employee_name || item.supervisor || "-"}</td>
-                          <td>{renderStoreStatus(item.status)}</td>
-                          <td>{renderDocStatus(item.business_status)}</td>
-                        </tr>
+                        <TableRow key={item.store_id}>
+                          <TableCell title={item.store_name}>{item.store_name}</TableCell>
+                          <TableCell>{item.store_code || item.store_id}</TableCell>
+                          <TableCell>{item.store_type || "-"}</TableCell>
+                          <TableCell title={item.organize_name}>{item.organize_name || item.organize_code || "-"}</TableCell>
+                          <TableCell title={item.franchisee_name}>{item.franchisee_name || "-"}</TableCell>
+                          <TableCell>{item.emp_count || 0}</TableCell>
+                          <TableCell title={item.employee_name || item.supervisor}>{item.employee_name || item.supervisor || "-"}</TableCell>
+                          <TableCell>{renderStoreStatus(item.status)}</TableCell>
+                          <TableCell>{renderDocStatus(item.business_status)}</TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 ) : (
                   <div className={styles.empty}>当前筛选条件下没有可展示的门店主数据。</div>
                 )}

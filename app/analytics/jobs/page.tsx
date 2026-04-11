@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { JobHelpDialog } from "@/app/analytics/jobs/job-help-dialog";
 import { DashboardHeader } from "@/ui/shared/dashboard-header";
 import { formatDisplayDate } from "@/ui/report/report-view";
@@ -261,31 +262,31 @@ export default async function AnalyticsJobsPage() {
           <CardContent>
             {runs.length > 0 ? (
               <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>任务</th>
-                      <th>状态</th>
-                      <th>指标</th>
-                      <th>开始时间</th>
-                      <th>结束时间</th>
-                      <th>错误</th>
-                      <th>操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table className={styles.table}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>任务</TableHead>
+                      <TableHead>状态</TableHead>
+                      <TableHead>指标</TableHead>
+                      <TableHead>开始时间</TableHead>
+                      <TableHead>结束时间</TableHead>
+                      <TableHead>错误</TableHead>
+                      <TableHead>操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {runs.map((run) => (
-                      <tr key={run.job_key}>
-                        <td>
+                      <TableRow key={run.job_key}>
+                        <TableCell>
                           <div className={styles.primaryCell}>
                             <strong>{jobTypeLabel(run.job_type)}</strong>
                             <span className={styles.cellMeta}>{run.job_key}</span>
                           </div>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant={statusTone(run.status)}>{runStatusLabel(run.status)}</Badge>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <div className={styles.primaryCell}>
                             {Object.keys(run.metrics).length > 0 ? (
                               Object.entries(run.metrics).map(([key, value]) => (
@@ -297,13 +298,13 @@ export default async function AnalyticsJobsPage() {
                               <span className={styles.cellMeta}>-</span>
                             )}
                           </div>
-                        </td>
-                        <td>{formatDisplayDate(run.started_at)}</td>
-                        <td>{run.finished_at ? formatDisplayDate(run.finished_at) : "-"}</td>
-                        <td>
+                        </TableCell>
+                        <TableCell>{formatDisplayDate(run.started_at)}</TableCell>
+                        <TableCell>{run.finished_at ? formatDisplayDate(run.finished_at) : "-"}</TableCell>
+                        <TableCell>
                           <span className={styles.cellMeta}>{run.error_message || "-"}</span>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           {run.status === "failed" ? (
                             <form action="/api/analytics/jobs/run" method="post">
                               <input name="retryJobKey" type="hidden" value={run.job_key} />
@@ -312,11 +313,11 @@ export default async function AnalyticsJobsPage() {
                           ) : (
                             <span className={styles.cellMeta}>-</span>
                           )}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             ) : (
               <EmptyState>当前还没有分析任务执行记录。</EmptyState>

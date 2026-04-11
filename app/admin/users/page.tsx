@@ -15,8 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { DashboardHeader } from "@/ui/shared/dashboard-header";
 import { AccessManagementTabs } from "@/ui/shared/access-management-tabs";
@@ -107,11 +109,10 @@ function renderOrganizationNode(
   const itemValue = `${fieldName}-${node.organize_code}`;
   const row = (
     <label className={styles.organizationNodeLabel}>
-      <input
+      <Checkbox
         className={styles.scopeCheckbox}
         defaultChecked={selectedValues.has(node.organize_code)}
         name={fieldName}
-        type="checkbox"
         value={node.organize_code}
       />
       <span className={styles.scopeOptionBody}>
@@ -220,9 +221,7 @@ export default async function AdminUsersPage({
           <CardHeader className={styles.workspaceHeader}>
             <div>
               <CardTitle className={styles.workspaceTitle}>用户列表</CardTitle>
-              <CardDescription className={styles.workspaceCopy}>
-                先查看当前用户清单，再通过弹窗完成新增和修改，不再把所有操作揉在主页面里。
-              </CardDescription>
+           
             </div>
             {canWriteUsers ? (
               <Button asChild>
@@ -233,30 +232,30 @@ export default async function AdminUsersPage({
           <CardContent className={styles.workspaceBody}>
             <div className={styles.tableShell}>
               <div className={styles.tableWrap}>
-                <table className={styles.userTable}>
-                  <thead>
-                    <tr>
-                      <th>账号</th>
-                      <th>显示名</th>
-                      <th>角色</th>
-                      <th>权限</th>
-                      <th>企业范围</th>
-                      <th>组织范围</th>
-                      <th>状态</th>
-                      <th>更新时间</th>
-                      <th>操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table className={styles.userTable}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>账号</TableHead>
+                      <TableHead>显示名</TableHead>
+                      <TableHead>角色</TableHead>
+                      <TableHead>权限</TableHead>
+                      <TableHead>企业范围</TableHead>
+                      <TableHead>组织范围</TableHead>
+                      <TableHead>状态</TableHead>
+                      <TableHead>更新时间</TableHead>
+                      <TableHead>操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {users.map((user) => (
-                      <tr className={styles.userRow} key={user.id}>
-                        <td>
+                      <TableRow className={styles.userRow} key={user.id}>
+                        <TableCell>
                           <span className={styles.cellValue}>{user.username}</span>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <span className={styles.cellValue}>{user.displayName}</span>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           {user.roles.length > 0 ? (
                             user.roles.map((role) => (
                               <Badge className={styles.roleBadge} key={role} variant="outline">
@@ -266,34 +265,34 @@ export default async function AdminUsersPage({
                           ) : (
                             <span className={styles.cellMeta}>-</span>
                           )}
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <span className={styles.permissionText} title={user.permissions.join(", ") || "-"}>
                             {user.permissions.join(", ") || "-"}
                           </span>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <span className={styles.scopeText} title={user.enterpriseScopeIds.join(", ") || "全部企业"}>
                             {user.enterpriseScopeIds.join(", ") || "全部企业"}
                           </span>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <span
                             className={styles.scopeText}
                             title={user.organizationScopeIds.join(", ") || "全部组织"}
                           >
                             {user.organizationScopeIds.join(", ") || "全部组织"}
                           </span>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <Badge className={cn(styles.statusBadge, statusBadgeClass(user.status))} variant="secondary">
                             {user.status}
                           </Badge>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <span className={styles.cellMeta}>{user.updatedAt || "-"}</span>
-                        </td>
-                        <td className={styles.actionCell}>
+                        </TableCell>
+                        <TableCell className={styles.actionCell}>
                           {canOpenEditDialog ? (
                             <Button asChild className={styles.inlineActionButton} size="sm" variant="secondary">
                               <Link href={`/admin/users?dialog=edit&userId=${user.id}`}>编辑</Link>
@@ -301,11 +300,11 @@ export default async function AdminUsersPage({
                           ) : (
                             <span className={styles.cellMeta}>-</span>
                           )}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </div>
           </CardContent>

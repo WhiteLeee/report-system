@@ -10,6 +10,7 @@ import type { MasterDataOrganization } from "@/backend/master-data/master-data.t
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnalyticsFilterForm } from "@/app/analytics/analytics-filter-form";
 import { AnalyticsGovernanceCharts } from "@/ui/analytics/analytics-governance-charts";
@@ -210,7 +211,7 @@ export default async function AnalyticsPage({
           </Card>
           <Card className={styles.statCard}>
             <CardContent className={styles.statBody}>
-              <span className={styles.statLabel}>巡检结果数</span>
+              <span className={styles.statLabel}>巡检图片数</span>
               <strong className={styles.statValue}>{dashboard.overview.result_count}</strong>
               <span className={styles.statNote}>图片级巡检结果</span>
             </CardContent>
@@ -285,20 +286,20 @@ export default async function AnalyticsPage({
                   </CardHeader>
                   <CardContent className={styles.panelBody}>
                     {dashboard.overdue_franchisees.length > 0 ? (
-                      <table className={styles.table}>
-                        <thead>
-                          <tr>
-                            <th>加盟商</th>
-                            <th>涉及门店</th>
-                            <th>超期单数</th>
-                            <th>待整改单数</th>
-                            <th>最近到期日</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table className={styles.table}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>加盟商</TableHead>
+                            <TableHead>涉及门店</TableHead>
+                            <TableHead>超期单数</TableHead>
+                            <TableHead>待整改单数</TableHead>
+                            <TableHead>最近到期日</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {dashboard.overdue_franchisees.map((item) => (
-                            <tr key={item.franchisee_name}>
-                              <td>
+                            <TableRow key={item.franchisee_name}>
+                              <TableCell>
                                 <div className={styles.primaryCell}>
                                   <strong>{item.franchisee_name}</strong>
                                   <Link
@@ -308,15 +309,15 @@ export default async function AnalyticsPage({
                                     查看加盟商
                                   </Link>
                                 </div>
-                              </td>
-                              <td>{item.store_count}</td>
-                              <td>{item.overdue_count}</td>
-                              <td>{item.pending_count}</td>
-                              <td>{item.nearest_due_date || "-"}</td>
-                            </tr>
+                              </TableCell>
+                              <TableCell>{item.store_count}</TableCell>
+                              <TableCell>{item.overdue_count}</TableCell>
+                              <TableCell>{item.pending_count}</TableCell>
+                              <TableCell>{item.nearest_due_date || "-"}</TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     ) : (
                       <div className={styles.emptyBlock}>
                         <EmptyState>当前筛选范围没有超期加盟商。</EmptyState>
@@ -332,21 +333,21 @@ export default async function AnalyticsPage({
                   </CardHeader>
                   <CardContent className={styles.panelBody}>
                     {dashboard.high_risk_franchisees.length > 0 ? (
-                      <table className={styles.table}>
-                        <thead>
-                          <tr>
-                            <th>加盟商</th>
-                            <th>门店数</th>
-                            <th>问题数</th>
-                            <th>待复核</th>
-                            <th>超期</th>
-                            <th>风险分</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table className={styles.table}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>加盟商</TableHead>
+                            <TableHead>门店数</TableHead>
+                            <TableHead>问题数</TableHead>
+                            <TableHead>待复核</TableHead>
+                            <TableHead>超期</TableHead>
+                            <TableHead>风险分</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {dashboard.high_risk_franchisees.map((item) => (
-                            <tr key={item.franchisee_name}>
-                              <td>
+                            <TableRow key={item.franchisee_name}>
+                              <TableCell>
                                 <div className={styles.primaryCell}>
                                   <strong>{item.franchisee_name}</strong>
                                   <Link
@@ -356,20 +357,20 @@ export default async function AnalyticsPage({
                                     下钻责任视图
                                   </Link>
                                 </div>
-                              </td>
-                              <td>{item.store_count}</td>
-                              <td>{item.issue_count}</td>
-                              <td>{item.pending_review_count}</td>
-                              <td>{item.overdue_count}</td>
-                              <td>
+                              </TableCell>
+                              <TableCell>{item.store_count}</TableCell>
+                              <TableCell>{item.issue_count}</TableCell>
+                              <TableCell>{item.pending_review_count}</TableCell>
+                              <TableCell>{item.overdue_count}</TableCell>
+                              <TableCell>
                                 <Badge variant={item.risk_score >= 10 ? "default" : item.risk_score >= 5 ? "outline" : "secondary"}>
                                   {item.risk_score}
                                 </Badge>
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     ) : (
                       <div className={styles.emptyBlock}>
                         <EmptyState>当前筛选范围还没有高风险加盟商数据。</EmptyState>
@@ -385,29 +386,29 @@ export default async function AnalyticsPage({
                   </CardHeader>
                   <CardContent className={styles.panelBody}>
                     {dashboard.rectification_overdue_ranking.length > 0 ? (
-                      <table className={styles.table}>
-                        <thead>
-                          <tr>
-                            <th>门店</th>
-                            <th>组织</th>
-                            <th>超期单数</th>
-                            <th>未闭环单数</th>
-                            <th>最早截止日</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table className={styles.table}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>门店</TableHead>
+                            <TableHead>组织</TableHead>
+                            <TableHead>超期单数</TableHead>
+                            <TableHead>未闭环单数</TableHead>
+                            <TableHead>最早截止日</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {dashboard.rectification_overdue_ranking.map((item) => (
-                            <tr key={item.store_id}>
-                              <td>
+                            <TableRow key={item.store_id}>
+                              <TableCell>
                                 <div className={styles.primaryCell}>
                                   <strong>{item.store_name}</strong>
                                   <span className={styles.cellMeta}>{item.store_id}</span>
                                 </div>
-                              </td>
-                              <td>{item.organization_name}</td>
-                              <td>{item.overdue_count}</td>
-                              <td>{item.pending_count}</td>
-                              <td>
+                              </TableCell>
+                              <TableCell>{item.organization_name}</TableCell>
+                              <TableCell>{item.overdue_count}</TableCell>
+                              <TableCell>{item.pending_count}</TableCell>
+                              <TableCell>
                                 <div className={styles.actionStack}>
                                   <span>{item.nearest_due_date || "-"}</span>
                                   <Link
@@ -420,11 +421,11 @@ export default async function AnalyticsPage({
                                     查看整改单
                                   </Link>
                                 </div>
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     ) : (
                       <div className={styles.emptyBlock}>
                         <EmptyState>当前筛选范围没有超期整改单。</EmptyState>
@@ -448,31 +449,31 @@ export default async function AnalyticsPage({
                   </CardHeader>
                   <CardContent className={styles.panelBody}>
                     {dashboard.recurring_stores.length > 0 ? (
-                      <table className={styles.table}>
-                        <thead>
-                          <tr>
-                            <th>门店</th>
-                            <th>加盟商</th>
-                            <th>组织</th>
-                            <th>异常结果</th>
-                            <th>异常天数</th>
-                            <th>待复核</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table className={styles.table}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>门店</TableHead>
+                            <TableHead>加盟商</TableHead>
+                            <TableHead>组织</TableHead>
+                            <TableHead>异常结果</TableHead>
+                            <TableHead>异常天数</TableHead>
+                            <TableHead>待复核</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {dashboard.recurring_stores.map((item) => (
-                            <tr key={item.store_id}>
-                              <td>
+                            <TableRow key={item.store_id}>
+                              <TableCell>
                                 <div className={styles.primaryCell}>
                                   <strong>{item.store_name}</strong>
                                   <span className={styles.cellMeta}>{item.store_id}</span>
                                 </div>
-                              </td>
-                              <td>{item.franchisee_name || "-"}</td>
-                              <td>{item.organization_name}</td>
-                              <td>{item.abnormal_result_count}</td>
-                              <td>{item.abnormal_day_count}</td>
-                              <td>
+                              </TableCell>
+                              <TableCell>{item.franchisee_name || "-"}</TableCell>
+                              <TableCell>{item.organization_name}</TableCell>
+                              <TableCell>{item.abnormal_result_count}</TableCell>
+                              <TableCell>{item.abnormal_day_count}</TableCell>
+                              <TableCell>
                                 <div className={styles.actionStack}>
                                   <span>{item.pending_review_count}</span>
                                   <Link
@@ -485,11 +486,11 @@ export default async function AnalyticsPage({
                                     整改单
                                   </Link>
                                 </div>
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     ) : (
                       <div className={styles.emptyBlock}>
                         <EmptyState>当前筛选范围还没有反复异常门店。</EmptyState>
@@ -505,21 +506,21 @@ export default async function AnalyticsPage({
                   </CardHeader>
                   <CardContent className={styles.panelBody}>
                     {dashboard.recurring_franchisees.length > 0 ? (
-                      <table className={styles.table}>
-                        <thead>
-                          <tr>
-                            <th>加盟商</th>
-                            <th>反复异常门店</th>
-                            <th>异常结果</th>
-                            <th>异常天数</th>
-                            <th>超期</th>
-                            <th>治理分</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table className={styles.table}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>加盟商</TableHead>
+                            <TableHead>反复异常门店</TableHead>
+                            <TableHead>异常结果</TableHead>
+                            <TableHead>异常天数</TableHead>
+                            <TableHead>超期</TableHead>
+                            <TableHead>治理分</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {dashboard.recurring_franchisees.map((item) => (
-                            <tr key={item.franchisee_name}>
-                              <td>
+                            <TableRow key={item.franchisee_name}>
+                              <TableCell>
                                 <div className={styles.primaryCell}>
                                   <strong>{item.franchisee_name}</strong>
                                   <span className={styles.cellMeta}>{item.store_count} 家涉及门店</span>
@@ -530,20 +531,20 @@ export default async function AnalyticsPage({
                                     下钻加盟商
                                   </Link>
                                 </div>
-                              </td>
-                              <td>{item.recurring_store_count}</td>
-                              <td>{item.abnormal_result_count}</td>
-                              <td>{item.abnormal_day_count}</td>
-                              <td>{item.overdue_count}</td>
-                              <td>
+                              </TableCell>
+                              <TableCell>{item.recurring_store_count}</TableCell>
+                              <TableCell>{item.abnormal_result_count}</TableCell>
+                              <TableCell>{item.abnormal_day_count}</TableCell>
+                              <TableCell>{item.overdue_count}</TableCell>
+                              <TableCell>
                                 <Badge variant={item.risk_score >= 12 ? "default" : item.risk_score >= 6 ? "outline" : "secondary"}>
                                   {item.risk_score}
                                 </Badge>
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     ) : (
                       <div className={styles.emptyBlock}>
                         <EmptyState>当前筛选范围还没有反复异常加盟商。</EmptyState>
@@ -559,30 +560,30 @@ export default async function AnalyticsPage({
                   </CardHeader>
                   <CardContent className={styles.panelBody}>
                     {dashboard.issue_type_ranking.length > 0 ? (
-                      <table className={styles.table}>
-                        <thead>
-                          <tr>
-                            <th>问题类型</th>
-                            <th>问题数</th>
-                            <th>门店数</th>
-                            <th>结果数</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table className={styles.table}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>问题类型</TableHead>
+                            <TableHead>问题数</TableHead>
+                            <TableHead>门店数</TableHead>
+                            <TableHead>结果数</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {dashboard.issue_type_ranking.map((item) => (
-                            <tr key={item.issue_type}>
-                              <td>
+                            <TableRow key={item.issue_type}>
+                              <TableCell>
                                 <div className={styles.primaryCell}>
                                   <strong>{item.issue_type}</strong>
                                 </div>
-                              </td>
-                              <td>{item.count}</td>
-                              <td>{item.store_count}</td>
-                              <td>{item.result_count}</td>
-                            </tr>
+                              </TableCell>
+                              <TableCell>{item.count}</TableCell>
+                              <TableCell>{item.store_count}</TableCell>
+                              <TableCell>{item.result_count}</TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     ) : (
                       <div className={styles.emptyBlock}>
                         <EmptyState>当前筛选范围还没有问题项数据。</EmptyState>
@@ -598,21 +599,21 @@ export default async function AnalyticsPage({
                   </CardHeader>
                   <CardContent className={styles.panelBody}>
                     {dashboard.organization_ranking.length > 0 ? (
-                      <table className={styles.table}>
-                        <thead>
-                          <tr>
-                            <th>组织</th>
-                            <th>编码</th>
-                            <th>门店数</th>
-                            <th>问题数</th>
-                            <th>待复核</th>
-                            <th>需整改</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table className={styles.table}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>组织</TableHead>
+                            <TableHead>编码</TableHead>
+                            <TableHead>门店数</TableHead>
+                            <TableHead>问题数</TableHead>
+                            <TableHead>待复核</TableHead>
+                            <TableHead>需整改</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {dashboard.organization_ranking.map((item) => (
-                            <tr key={`${item.organization_code || "unknown"}:${item.organization_name}`}>
-                              <td>
+                            <TableRow key={`${item.organization_code || "unknown"}:${item.organization_name}`}>
+                              <TableCell>
                                 <div className={styles.primaryCell}>
                                   <strong>{item.organization_name}</strong>
                                   <span className={styles.cellMeta}>{item.result_count} 条巡检结果</span>
@@ -625,16 +626,16 @@ export default async function AnalyticsPage({
                                     </Link>
                                   ) : null}
                                 </div>
-                              </td>
-                              <td>{item.organization_code || "-"}</td>
-                              <td>{item.store_count}</td>
-                              <td>{item.issue_count}</td>
-                              <td>{item.pending_review_count}</td>
-                              <td>{item.rectification_required_count}</td>
-                            </tr>
+                              </TableCell>
+                              <TableCell>{item.organization_code || "-"}</TableCell>
+                              <TableCell>{item.store_count}</TableCell>
+                              <TableCell>{item.issue_count}</TableCell>
+                              <TableCell>{item.pending_review_count}</TableCell>
+                              <TableCell>{item.rectification_required_count}</TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     ) : (
                       <div className={styles.emptyBlock}>
                         <EmptyState>当前筛选范围还没有组织排行数据。</EmptyState>
@@ -650,20 +651,20 @@ export default async function AnalyticsPage({
                   </CardHeader>
                   <CardContent className={styles.panelBody}>
                     {dashboard.franchisee_ranking.length > 0 ? (
-                      <table className={styles.table}>
-                        <thead>
-                          <tr>
-                            <th>加盟商</th>
-                            <th>门店数</th>
-                            <th>问题数</th>
-                            <th>待复核</th>
-                            <th>需整改</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table className={styles.table}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>加盟商</TableHead>
+                            <TableHead>门店数</TableHead>
+                            <TableHead>问题数</TableHead>
+                            <TableHead>待复核</TableHead>
+                            <TableHead>需整改</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {dashboard.franchisee_ranking.map((item) => (
-                            <tr key={item.franchisee_name}>
-                              <td>
+                            <TableRow key={item.franchisee_name}>
+                              <TableCell>
                                 <div className={styles.primaryCell}>
                                   <strong>{item.franchisee_name}</strong>
                                   <span className={styles.cellMeta}>{item.result_count} 条巡检结果</span>
@@ -674,15 +675,15 @@ export default async function AnalyticsPage({
                                     查看加盟商
                                   </Link>
                                 </div>
-                              </td>
-                              <td>{item.store_count}</td>
-                              <td>{item.issue_count}</td>
-                              <td>{item.pending_review_count}</td>
-                              <td>{item.rectification_required_count}</td>
-                            </tr>
+                              </TableCell>
+                              <TableCell>{item.store_count}</TableCell>
+                              <TableCell>{item.issue_count}</TableCell>
+                              <TableCell>{item.pending_review_count}</TableCell>
+                              <TableCell>{item.rectification_required_count}</TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     ) : (
                       <div className={styles.emptyBlock}>
                         <EmptyState>当前筛选范围还没有加盟商排行数据。</EmptyState>
@@ -698,31 +699,31 @@ export default async function AnalyticsPage({
                   </CardHeader>
                   <CardContent className={styles.panelBody}>
                     {dashboard.store_ranking.length > 0 ? (
-                      <table className={styles.table}>
-                        <thead>
-                          <tr>
-                            <th>门店</th>
-                            <th>加盟商</th>
-                            <th>组织</th>
-                            <th>问题数</th>
-                            <th>待复核</th>
-                            <th>需整改</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table className={styles.table}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>门店</TableHead>
+                            <TableHead>加盟商</TableHead>
+                            <TableHead>组织</TableHead>
+                            <TableHead>问题数</TableHead>
+                            <TableHead>待复核</TableHead>
+                            <TableHead>需整改</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {dashboard.store_ranking.map((item) => (
-                            <tr key={item.store_id}>
-                              <td>
+                            <TableRow key={item.store_id}>
+                              <TableCell>
                                 <div className={styles.primaryCell}>
                                   <strong>{item.store_name}</strong>
                                   <span className={styles.cellMeta}>{item.store_id}</span>
                                 </div>
-                              </td>
-                              <td>{item.franchisee_name || "-"}</td>
-                              <td>{item.organization_name}</td>
-                              <td>{item.issue_count}</td>
-                              <td>{item.pending_review_count}</td>
-                              <td>
+                              </TableCell>
+                              <TableCell>{item.franchisee_name || "-"}</TableCell>
+                              <TableCell>{item.organization_name}</TableCell>
+                              <TableCell>{item.issue_count}</TableCell>
+                              <TableCell>{item.pending_review_count}</TableCell>
+                              <TableCell>
                                 <div className={styles.actionStack}>
                                   <span>{item.rectification_required_count}</span>
                                   <Link
@@ -735,11 +736,11 @@ export default async function AnalyticsPage({
                                     整改单
                                   </Link>
                                 </div>
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     ) : (
                       <div className={styles.emptyBlock}>
                         <EmptyState>当前筛选范围还没有门店排行数据。</EmptyState>

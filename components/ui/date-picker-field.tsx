@@ -63,8 +63,8 @@ export function DatePickerField({
         <PopoverTrigger asChild>
           <Button
             className={cn(
-              "h-9 w-full justify-between rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm font-normal text-zinc-950 shadow-sm hover:bg-white",
-              !selectedDate && "text-zinc-500",
+              "h-9 w-full justify-between rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1 text-sm font-normal text-[var(--text)] shadow-sm hover:bg-[var(--surface)]",
+              !selectedDate && "text-[var(--muted)]",
               className
             )}
             disabled={disabled}
@@ -73,20 +73,25 @@ export function DatePickerField({
             variant="outline"
           >
             {selectedDate ? format(selectedDate, "yyyy-MM-dd") : placeholder}
-            <CalendarIcon className="h-4 w-4 text-zinc-500" />
+            <CalendarIcon className="h-4 w-4 text-[var(--muted)]" />
           </Button>
         </PopoverTrigger>
         <PopoverContent
           align="start"
-          className="z-[120] w-auto rounded-xl border border-zinc-200 bg-white p-0 shadow-md"
+          className="z-[120] w-auto rounded-xl border border-[var(--line)] bg-[var(--surface)] p-0 shadow-md"
         >
           <Calendar
             mode="single"
             onSelect={(date) => commitValue(formatDateValue(date))}
             selected={selectedDate}
           />
-          <div className="flex items-center justify-between border-t border-zinc-200 px-3 py-2">
-            <Button className="h-auto px-0 py-0 text-zinc-500 hover:text-zinc-950" onClick={() => commitValue("")} type="button" variant="link">
+          <div className="flex items-center justify-between border-t border-[var(--line)] px-3 py-2">
+            <Button
+              className="h-auto px-0 py-0 text-[var(--muted)] hover:text-[var(--brand-strong)]"
+              onClick={() => commitValue("")}
+              type="button"
+              variant="link"
+            >
               清除
             </Button>
           </div>

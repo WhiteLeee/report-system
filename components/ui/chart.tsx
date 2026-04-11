@@ -49,7 +49,7 @@ export function ChartContainer({
     <ChartContext.Provider value={{ config }}>
       <div
         className={cn(
-          "[&_.recharts-cartesian-axis-tick_text]:fill-zinc-500 [&_.recharts-cartesian-grid_line]:stroke-zinc-200 [&_.recharts-legend-item-text]:text-zinc-700 [&_.recharts-pie-label-text]:fill-zinc-700 [&_.recharts-reference-line-line]:stroke-zinc-300 flex aspect-video justify-center text-xs",
+          "[&_.recharts-cartesian-axis-tick_text]:fill-[var(--muted)] [&_.recharts-cartesian-grid_line]:stroke-[var(--line)] [&_.recharts-legend-item-text]:text-[var(--muted)] [&_.recharts-pie-label-text]:fill-[var(--muted)] [&_.recharts-reference-line-line]:stroke-[var(--line-strong)] flex aspect-video justify-center text-xs",
           className
         )}
         data-chart={resolvedId}
@@ -88,8 +88,8 @@ export function ChartTooltipContent({
   }
 
   return (
-    <div className="grid min-w-40 gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs shadow-md">
-      <div className="font-medium text-zinc-950">
+    <div className="grid min-w-40 gap-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-xs shadow-md">
+      <div className="font-medium text-[var(--text)]">
         {labelFormatter ? labelFormatter(label) : label}
       </div>
       <div className="grid gap-1.5">
@@ -98,14 +98,14 @@ export function ChartTooltipContent({
           const meta = config[key];
           return (
             <div className="flex items-center justify-between gap-4" key={key}>
-              <div className="flex items-center gap-2 text-zinc-600">
+              <div className="flex items-center gap-2 text-[var(--muted)]">
                 <span
                   className="h-2.5 w-2.5 rounded-full"
                   style={{ backgroundColor: item.color || meta?.color || "currentColor" }}
                 />
                 <span>{meta?.label || item.name}</span>
               </div>
-              <span className="font-medium text-zinc-950">
+              <span className="font-medium text-[var(--text)]">
                 {formatter ? formatter(Number(item.value || 0), key) : item.value}
               </span>
             </div>
@@ -133,7 +133,7 @@ export function ChartLegendContent({
         const key = String(item.dataKey || item.value || "");
         const meta = config[key];
         return (
-          <div className="flex items-center gap-2 text-xs text-zinc-600" key={key}>
+          <div className="flex items-center gap-2 text-xs text-[var(--muted)]" key={key}>
             <span
               className="h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: item.color || meta?.color || "currentColor" }}

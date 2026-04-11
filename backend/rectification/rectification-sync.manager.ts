@@ -65,6 +65,7 @@ export function ensureRectificationSyncManagerStarted(): void {
     state.timer = setInterval(() => {
       void triggerRectificationSync();
     }, intervalMs);
+    state.timer.unref?.();
   }
 
   globalThis.__reportSystemRectificationSyncManager = state;

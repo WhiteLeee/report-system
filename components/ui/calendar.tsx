@@ -29,22 +29,24 @@ function Calendar({
         button_next: cn(buttonVariants({ variant: "ghost", size: "icon" }), "absolute right-1 top-1 h-7 w-7"),
         month_caption: "flex h-7 items-center justify-center",
         weekdays: "flex",
-        weekday: "w-9 text-[0.8rem] font-normal text-zinc-500",
+        weekday: "w-9 text-[0.8rem] font-normal text-[var(--muted)]",
         week: "mt-2 flex w-full",
-        day: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-zinc-100/50 [&:has([aria-selected])]:bg-zinc-100 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+        day: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-[var(--bg-accent)] [&:has([aria-selected])]:bg-[var(--bg-accent)] first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
         day_button: cn(
           buttonVariants({ variant: "ghost", size: "icon" }),
           "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
         ),
-        selected: "bg-zinc-900 text-zinc-50 hover:bg-zinc-900 hover:text-zinc-50 focus:bg-zinc-900 focus:text-zinc-50",
-        today: "bg-zinc-100 text-zinc-950",
-        outside: "text-zinc-500 opacity-50 aria-selected:bg-zinc-100/50 aria-selected:text-zinc-500 aria-selected:opacity-30",
-        disabled: "text-zinc-500 opacity-50",
-        range_middle: "aria-selected:bg-zinc-100 aria-selected:text-zinc-950",
+        selected:
+          "bg-[var(--brand)] text-white hover:bg-[var(--brand)] hover:text-white focus:bg-[var(--brand)] focus:text-white",
+        today: "bg-[var(--bg-accent)] text-[var(--text)]",
+        outside:
+          "text-[var(--muted)] opacity-50 aria-selected:bg-[var(--bg-accent)] aria-selected:text-[var(--muted)] aria-selected:opacity-30",
+        disabled: "text-[var(--muted)] opacity-50",
+        range_middle: "aria-selected:bg-[var(--bg-accent)] aria-selected:text-[var(--text)]",
         hidden: "invisible",
         dropdowns: "flex items-center gap-2",
         dropdown:
-          "h-8 rounded-md border border-zinc-200 bg-white px-2 text-xs outline-none focus-visible:border-zinc-950 focus-visible:ring-1 focus-visible:ring-zinc-950",
+          "h-8 rounded-md border border-[var(--line)] bg-[var(--surface)] px-2 text-xs outline-none focus-visible:border-[var(--brand-strong)] focus-visible:ring-1 focus-visible:ring-[var(--brand-strong)]",
         ...classNames
       }}
       components={{

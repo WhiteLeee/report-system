@@ -29,6 +29,16 @@ export interface AuthSecurityPolicy {
   loginLockDurationMs: number;
 }
 
+export interface EnterpriseBrandingSettings {
+  enterpriseName: string;
+  logoUrl: string;
+  faviconUrl: string;
+  primaryColor: string;
+  primaryColorStrong: string;
+  updatedBy: string;
+  updatedAt: string;
+}
+
 export interface SystemSettingsRepository {
   getHuiYunYingApiSettings(): HuiYunYingApiSettings;
   saveHuiYunYingApiSettings(settings: HuiYunYingApiSettings): void;
@@ -36,4 +46,6 @@ export interface SystemSettingsRepository {
   saveDeliveryMode(mode: DeliveryMode): void;
   getAuthSecurityPolicy(): AuthSecurityPolicy;
   saveAuthSecurityPolicy(policy: AuthSecurityPolicy): void;
+  getEnterpriseBrandingSettings(): EnterpriseBrandingSettings;
+  saveEnterpriseBrandingSettings(settings: EnterpriseBrandingSettings): void;
 }

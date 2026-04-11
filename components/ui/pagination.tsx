@@ -78,7 +78,7 @@ export function PaginationInfo({
   ...props
 }: React.ComponentProps<"div">) {
   return (
-    <div className={cn("text-sm text-zinc-500", className)} {...props}>
+    <div className={cn("text-sm text-[var(--muted)]", className)} {...props}>
       {children}
     </div>
   );

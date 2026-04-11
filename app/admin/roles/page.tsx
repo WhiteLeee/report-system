@@ -8,6 +8,7 @@ import { permissionCodes } from "@/backend/auth/auth.types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DashboardHeader } from "@/ui/shared/dashboard-header";
 import { AccessManagementTabs } from "@/ui/shared/access-management-tabs";
 
@@ -65,15 +66,8 @@ export default async function AdminRolesPage({
           <CardHeader className={styles.workspaceHeader}>
             <div>
               <CardTitle className={styles.workspaceTitle}>权限矩阵</CardTitle>
-              <CardDescription className={styles.workspaceCopy}>
-                管理角色可访问的功能权限，系统治理权限默认仅开放给管理员。
-              </CardDescription>
             </div>
-            {canWriteRoles ? (
-              <Button asChild size="sm" variant="secondary">
-                <Link href="#save-role-permission">保存变更</Link>
-              </Button>
-            ) : null}
+          
           </CardHeader>
           <CardContent className={styles.workspaceBody}>
             {saved ? <div className={styles.saveNotice}>角色权限已保存。</div> : null}
@@ -105,11 +99,11 @@ export default async function AdminRolesPage({
                           const disabled = !canWriteRoles || isAdminRole || adminOnly;
                           return (
                             <label className={styles.permissionOption} key={`${roleItem.roleCode}-${permissionCode}`}>
-                              <input
+                              <Checkbox
+                                className={styles.permissionCheckbox}
                                 defaultChecked={checked}
                                 disabled={disabled}
                                 name={`permissions_${roleItem.roleCode}`}
-                                type="checkbox"
                                 value={permissionCode}
                               />
                               <span className={styles.permissionOptionBody}>
@@ -132,8 +126,9 @@ export default async function AdminRolesPage({
 
               {canWriteRoles ? (
                 <div className={styles.formActions} id="save-role-permission">
+                  
                   <Button size="sm" type="submit">
-                    保存权限矩阵
+                     保存权限
                   </Button>
                 </div>
               ) : null}
