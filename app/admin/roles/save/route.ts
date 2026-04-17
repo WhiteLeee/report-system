@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readAuditRequestMeta, stringifyAuditPayload, toAuditActor } from "@/backend/auth/auth-audit";
 import { createAuthService } from "@/backend/auth/auth.module";
+import { buildRequestUrl } from "@/backend/http/request-url";
 import { getSessionUserFromRequest, hasPermission } from "@/backend/auth/session";
 import { permissionCodes } from "@/backend/auth/auth.types";
 import type { PermissionCode, RoleCode } from "@/backend/auth/auth.types";
@@ -45,5 +46,5 @@ export async function POST(request: Request): Promise<Response> {
     userAgent: auditMeta.userAgent
   });
 
-  return NextResponse.redirect(new URL("/admin/roles?saved=1", request.url), 303);
+  return NextResponse.redirect(buildRequestUrl(request, "/admin/roles?saved=1"), 303);
 }

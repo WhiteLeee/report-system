@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createAuthService } from "@/backend/auth/auth.module";
+import { buildRequestUrl } from "@/backend/http/request-url";
 import { SESSION_COOKIE_NAME } from "@/backend/auth/session";
 
 const authService = createAuthService();
@@ -15,7 +16,7 @@ export async function POST(request: Request): Promise<Response> {
     authService.logout(decodeURIComponent(target.slice(`${SESSION_COOKIE_NAME}=`.length)));
   }
 
-  const response = NextResponse.redirect(new URL("/login", request.url), 303);
+  const response = NextResponse.redirect(buildRequestUrl(request, "/login"), 303);
   response.cookies.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",

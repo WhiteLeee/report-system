@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readAuditRequestMeta, stringifyAuditPayload, toAuditActor, toUserAuditSnapshot } from "@/backend/auth/auth-audit";
 import { createAuthService } from "@/backend/auth/auth.module";
+import { buildRequestUrl } from "@/backend/http/request-url";
 import { getSessionUserFromRequest, hasPermission } from "@/backend/auth/session";
 import type { RoleCode } from "@/backend/auth/auth.types";
 import { assertTargetUserManageable, filterVisibleUsers, getCurrentDeliveryMode } from "@/backend/auth/user-management-policy";
@@ -23,7 +24,7 @@ function readScopeList(formData: FormData, fieldName: string): string[] {
 }
 
 function redirectToUsers(request: Request, errorMessage?: string): Response {
-  const url = new URL("/admin/users", request.url);
+  const url = buildRequestUrl(request, "/admin/users");
   if (errorMessage) {
     url.searchParams.set("error", encodeURIComponent(errorMessage));
   }

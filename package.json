@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "pretest": "npm run check:ui-imports",
-    "test": "node --import tsx --test tests/report-review.integration.test.ts",
+    "test": "node --import tsx --test tests/report-review.integration.test.ts tests/system-settings-branding.integration.test.ts tests/auth-redirect-origin.integration.test.ts",
     "tenant:init": "tsx scripts/bootstrap-single-tenant.ts",
     "auth:seed": "tsx scripts/seed-auth.ts",
     "business:clear": "tsx scripts/clear-business-data.ts",

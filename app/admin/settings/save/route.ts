@@ -9,6 +9,7 @@ import { readAuditRequestMeta, stringifyAuditPayload, toAuditActor } from "@/bac
 import { createAuthService } from "@/backend/auth/auth.module";
 import type { ManagedNavigationMenuItem, RoleCode } from "@/backend/auth/auth.types";
 import { getSessionUserFromRequest, hasPermission } from "@/backend/auth/session";
+import { buildRequestUrl } from "@/backend/http/request-url";
 import { ensureRectificationSyncManagerStarted } from "@/backend/rectification/rectification-sync.manager";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
 
@@ -355,7 +356,7 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     const message = error instanceof Error && error.message ? error.message : "保存失败，请稍后重试。";
     return NextResponse.redirect(
-      new URL(`/admin/settings?tab=${tab}&error=${encodeURIComponent(message)}`, request.url),
+      buildRequestUrl(request, `/admin/settings?tab=${tab}&error=${encodeURIComponent(message)}`),
       303
     );
   }
@@ -363,5 +364,5 @@ export async function POST(request: Request): Promise<Response> {
   ensureRectificationSyncManagerStarted();
   ensureAnalyticsJobManagerStarted();
 
-  return NextResponse.redirect(new URL(`/admin/settings?tab=${tab}`, request.url), 303);
+  return NextResponse.redirect(buildRequestUrl(request, `/admin/settings?tab=${tab}`), 303);
 }

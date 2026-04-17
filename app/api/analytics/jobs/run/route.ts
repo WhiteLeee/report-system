@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSessionUserFromRequest, hasPermission } from "@/backend/auth/session";
 import { createAnalyticsJobService } from "@/backend/analytics/analytics.module";
+import { buildRequestUrl } from "@/backend/http/request-url";
 
 const analyticsJobService = createAnalyticsJobService();
 
@@ -17,7 +18,7 @@ export async function POST(request: Request): Promise<Response> {
 
   if (retryJobKey) {
     analyticsJobService.retryJob(retryJobKey);
-    return NextResponse.redirect(new URL("/analytics/jobs", request.url), 303);
+    return NextResponse.redirect(buildRequestUrl(request, "/analytics/jobs"), 303);
   }
 
   if (jobType === "result_fact_rebuild") {
@@ -28,5 +29,5 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ success: false, error: "Unsupported job type" }, { status: 400 });
   }
 
-  return NextResponse.redirect(new URL("/analytics/jobs", request.url), 303);
+  return NextResponse.redirect(buildRequestUrl(request, "/analytics/jobs"), 303);
 }

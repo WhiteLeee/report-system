@@ -5,6 +5,7 @@ import { createReportService, createReportReviewService } from "@/backend/report
 import { classifyReportResultSemantics, type ReportResultSemanticState } from "@/backend/report/result-semantics";
 import { RectificationSplitError } from "@/backend/rectification/rectification.service";
 import { createRectificationService } from "@/backend/rectification/rectification.module";
+import { buildRequestUrl } from "@/backend/http/request-url";
 import type { ResultReviewState, ReviewSelectedIssue } from "@/backend/report/report.types";
 
 const reviewService = createReportReviewService();
@@ -182,9 +183,9 @@ export async function POST(
   }
 
   const returnTo = String(payload.return_to || "").trim();
-  const redirectUrl = new URL(
-    returnTo && returnTo.startsWith("/") ? returnTo : `/reports/${reportId}#image-${imageId}`,
-    request.url
+  const redirectUrl = buildRequestUrl(
+    request,
+    returnTo && returnTo.startsWith("/") ? returnTo : `/reports/${reportId}#image-${imageId}`
   );
 
   if (result.recent_log?.id && createdRectificationOrders.length > 0) {
