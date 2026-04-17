@@ -25,7 +25,22 @@ rs_require_cmd() {
 
 rs_sudo() {
   if [ "$(id -u)" -eq 0 ]; then
-    "$@"
+    if [ "${1:-}" = "-u" ]; then
+      local target_user="${2:-}"
+      shift 2
+      [ -n "$target_user" ] || rs_die "rs_sudo -u requires a user"
+      [ "$#" -gt 0 ] || rs_die "rs_sudo -u requires a command"
+
+      if command -v runuser >/dev/null 2>&1; then
+        runuser -u "$target_user" -- "$@"
+      elif command -v sudo >/dev/null 2>&1; then
+        sudo -u "$target_user" "$@"
+      else
+        rs_die "Neither runuser nor sudo is available for user switching"
+      fi
+    else
+      "$@"
+    fi
   else
     sudo "$@"
   fi
