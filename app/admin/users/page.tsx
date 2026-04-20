@@ -99,6 +99,48 @@ function buildOrganizationTreeGroups(
     .filter((item) => item.nodes.length > 0);
 }
 
+function collectOrganizationLabels(nodes: MasterDataOrganization[], bucket: Map<string, string>): void {
+  nodes.forEach((node) => {
+    if (!bucket.has(node.organize_code)) {
+      bucket.set(node.organize_code, node.organize_name);
+    }
+    if (node.child.length > 0) {
+      collectOrganizationLabels(node.child, bucket);
+    }
+  });
+}
+
+function buildOrganizationLabelMap(groups: OrganizationTreeGroup[]): Map<string, string> {
+  const map = new Map<string, string>();
+  groups.forEach((group) => {
+    collectOrganizationLabels(group.nodes, map);
+  });
+  return map;
+}
+
+function formatScopeDisplay(
+  values: string[],
+  labelMap: Map<string, string>,
+  fallbackWhenEmpty: string
+): { text: string; title: string } {
+  if (values.length === 0) {
+    return { text: fallbackWhenEmpty, title: fallbackWhenEmpty };
+  }
+
+  const labels = values.map((value) => labelMap.get(value) || value);
+  const title = values
+    .map((value) => {
+      const label = labelMap.get(value);
+      return label && label !== value ? `${label}（${value}）` : value;
+    })
+    .join(", ");
+
+  return {
+    text: labels.join(", "),
+    title
+  };
+}
+
 function renderOrganizationNode(
   node: MasterDataOrganization,
   fieldName: string,
@@ -202,6 +244,10 @@ export default async function AdminUsersPage({
   const securityPolicy = systemSettingsService.getAuthSecurityPolicy();
   const enterprises = masterDataService.listEnterprises(currentUser);
   const organizationTreeGroups = buildOrganizationTreeGroups(currentUser, enterprises);
+  const enterpriseLabelMap = new Map(
+    enterpriseSummariesFromContext(currentUser, enterprises).map((enterprise) => [enterprise.value, enterprise.label])
+  );
+  const organizationLabelMap = buildOrganizationLabelMap(organizationTreeGroups);
 
   return (
     <main className="page-shell">
@@ -247,8 +293,20 @@ export default async function AdminUsersPage({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
-                      <TableRow className={styles.userRow} key={user.id}>
+                    {users.map((user) => {
+                      const enterpriseScopeDisplay = formatScopeDisplay(
+                        user.enterpriseScopeIds,
+                        enterpriseLabelMap,
+                        "全部企业"
+                      );
+                      const organizationScopeDisplay = formatScopeDisplay(
+                        user.organizationScopeIds,
+                        organizationLabelMap,
+                        "全部组织"
+                      );
+
+                      return (
+                        <TableRow className={styles.userRow} key={user.id}>
                         <TableCell>
                           <span className={styles.cellValue}>{user.username}</span>
                         </TableCell>
@@ -272,16 +330,16 @@ export default async function AdminUsersPage({
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className={styles.scopeText} title={user.enterpriseScopeIds.join(", ") || "全部企业"}>
-                            {user.enterpriseScopeIds.join(", ") || "全部企业"}
+                          <span className={styles.scopeText} title={enterpriseScopeDisplay.title}>
+                            {enterpriseScopeDisplay.text}
                           </span>
                         </TableCell>
                         <TableCell>
                           <span
                             className={styles.scopeText}
-                            title={user.organizationScopeIds.join(", ") || "全部组织"}
+                            title={organizationScopeDisplay.title}
                           >
-                            {user.organizationScopeIds.join(", ") || "全部组织"}
+                            {organizationScopeDisplay.text}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -301,8 +359,9 @@ export default async function AdminUsersPage({
                             <span className={styles.cellMeta}>-</span>
                           )}
                         </TableCell>
-                      </TableRow>
-                    ))}
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
