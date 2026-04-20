@@ -327,14 +327,24 @@ export function ReportResultDetailView({
     inspection,
     issues: getInspectionIssues(selectedIssues, inspection)
   }));
-  const resolvedPanel = activePanel === "review" ? "review" : "inspection";
   const defaultInspectionId = inspectionTabs[0]?.inspection.inspection_id || "";
   const resolvedInspectionId =
-    resolvedPanel === "review"
-      ? ""
-      : inspectionTabs.find((item) => item.inspection.inspection_id === activeInspectionId)?.inspection.inspection_id || defaultInspectionId;
+    inspectionTabs.find((item) => item.inspection.inspection_id === activeInspectionId)?.inspection.inspection_id || defaultInspectionId;
   const activeInspection =
     resolvedInspectionId ? inspectionTabs.find((item) => item.inspection.inspection_id === resolvedInspectionId) || null : null;
+  const reviewActionPath = `${currentPath}#review-action`;
+  const previousResultPath = previousResult
+    ? buildResultPath(report.id, previousResult.id, filters, {
+        inspection: activeInspectionId,
+        panel: activePanel
+      })
+    : "";
+  const nextResultPath = nextResult
+    ? buildResultPath(report.id, nextResult.id, filters, {
+        inspection: activeInspectionId,
+        panel: activePanel
+      })
+    : "";
 
   return (
     <main className="page-shell">
@@ -371,7 +381,6 @@ export function ReportResultDetailView({
                 <div>
                   <h2 className={styles.overviewTitle}>
                     {currentStoreName}
-                    {currentStoreCode ? `（${currentStoreCode}）` : ""}
                   </h2>
                 </div>
               </div>
@@ -381,7 +390,7 @@ export function ReportResultDetailView({
                   {formatCompactDate(selectedResult.captured_at)}
                 </Badge>
                 <Badge className={styles.metaPill} variant="outline">
-                  1 张图片
+                  单条图片结果
                 </Badge>
                 <Badge
                   className={styles.alertBadge}
@@ -395,58 +404,122 @@ export function ReportResultDetailView({
         </Card>
       </section>
 
-      <section className={`section ${styles.workspaceGrid}`}>
-        <Card className={styles.previewCard}>
-          <CardContent className={styles.previewCardBody}>
-            <div className={styles.previewWrap}>
-              <img alt={currentStoreName} className={styles.preview} src={currentImageUrl} />
-            </div>
-            <Button asChild className={styles.previewButton} size="sm" variant="secondary">
-              <Link href={previewPath}>
-                预览图片
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
+      <section className="section">
         <Card className={styles.analysisCard}>
           <CardContent className={styles.analysisCardBody}>
-            <div className={styles.tabBar}>
-              {inspectionTabs.map(({ inspection, issues }) => {
-                const isActive = resolvedPanel !== "review" && inspection.inspection_id === resolvedInspectionId;
-                return (
-                  <Link
-                    className={`${styles.tabLink} ${isActive ? styles.tabLinkActive : ""}`}
-                    href={buildResultPath(report.id, selectedResult.id, filters, { inspection: inspection.inspection_id })}
-                    key={inspection.id}
-                  >
-                    <span>{inspection.skill_name || inspection.skill_id}</span>
-                    <span className={styles.tabCount}>{issues.length}</span>
-                  </Link>
-                );
-              })}
-              <Link
-                className={`${styles.tabLink} ${resolvedPanel === "review" ? styles.reviewTabLinkActive : ""}`}
-                href={buildResultPath(report.id, selectedResult.id, filters, { panel: "review" })}
-              >
-                复核操作
-              </Link>
+            <div className={styles.analysisTopBar}>
+              <div>
+                <h3 className={styles.blockTitle}>巡检场景</h3>
+                <p className={styles.analysisCopy}>先看场景结果，再在右侧固定区域完成复核。</p>
+              </div>
+              <Button asChild size="sm">
+                <Link href={reviewActionPath}>进入复核{selectedIssues.length > 0 ? `（${selectedIssues.length}）` : ""}</Link>
+              </Button>
             </div>
 
-            {resolvedPanel === "review" ? (
-              <div className={styles.reviewWorkspace}>
-                <ResultReviewWorkflow
-                  actionUrl={`/api/reports/${report.id}/images/${selectedResult.id}/review-status`}
-                  canReview={canReview}
-                  currentImageUrl={currentImageUrl}
-                  currentPath={currentPath}
-                  defaultShouldCorrectedDays={defaultShouldCorrectedDays}
-                  initialReviewState={selectedResult.review_state}
-                  initialSelectedIssueIds={initialSelectedIssueIds}
-                  issues={selectedIssues.map((issue) => ({ id: issue.id, title: issue.title }))}
-                  maxDescriptionLength={maxRectificationDescriptionLength}
-                  semanticState={selectedResultSemanticState}
-                />
+            <div className={styles.sceneLayout}>
+              <aside className={styles.sceneNav}>
+                <div className={styles.scenePreviewCard}>
+                  <Link className={styles.scenePreviewThumbLink} href={previewPath}>
+                    <img alt={currentStoreName} className={styles.scenePreviewThumb} src={currentImageUrl} />
+                  </Link>
+                  <div className={styles.scenePreviewMeta}>
+                    <span className={styles.scenePreviewSubmeta}>当前结果 {selectedIndex + 1} / {navigationPool.length}</span>
+                  </div>
+                  <div className={styles.scenePreviewActions}>
+                    <Button asChild className={styles.scenePrimaryAction} size="sm">
+                      <Link href={previewPath}>放大预览</Link>
+                    </Button>
+                    {previousResult ? (
+                      <Button asChild className={styles.sceneSecondaryAction} size="sm" variant="secondary">
+                        <Link href={previousResultPath}>上一条</Link>
+                      </Button>
+                    ) : (
+                      <Button className={styles.sceneSecondaryAction} disabled size="sm" variant="secondary">
+                        上一条
+                      </Button>
+                    )}
+                    {nextResult ? (
+                      <Button asChild className={styles.sceneSecondaryAction} size="sm" variant="secondary">
+                        <Link href={nextResultPath}>下一条</Link>
+                      </Button>
+                    ) : (
+                      <Button className={styles.sceneSecondaryAction} disabled size="sm" variant="secondary">
+                        下一条
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className={styles.sceneNavHead}>
+                  <strong>场景列表</strong>
+                  <span>{inspectionTabs.length} 个场景</span>
+                </div>
+                {inspectionTabs.length > 0 ? (
+                  <div className={styles.sceneList}>
+                    {inspectionTabs.map(({ inspection, issues }) => {
+                      const isActive = inspection.inspection_id === resolvedInspectionId;
+                      return (
+                        <Link
+                          className={`${styles.sceneLink} ${isActive ? styles.sceneLinkActive : ""}`}
+                          href={buildResultPath(report.id, selectedResult.id, filters, { inspection: inspection.inspection_id })}
+                          key={inspection.id}
+                        >
+                          <span className={styles.sceneName}>{inspection.skill_name || inspection.skill_id}</span>
+                          <span className={styles.tabCount}>{issues.length}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState>当前结果没有可浏览的巡检场景。</EmptyState>
+                )}
+              </aside>
+
+              <div className={styles.sceneMain}>
+                {activeInspection ? (
+                  <div className={`${styles.analysisWorkspace} ${styles.sceneSection}`}>
+                    <div className={styles.alertPanel}>
+                      <div className={styles.alertHead}>
+                        <strong>{getReportResultSemanticSummaryLabel(selectedResultSemanticState, activeInspection.issues.length)}</strong>
+                      </div>
+                      {activeInspection.issues.length > 0 ? (
+                        <ul className={styles.issueSummaryList}>
+                          {activeInspection.issues.map((issue) => (
+                            <li key={issue.id}>{issue.title}</li>
+                          ))}
+                        </ul>
+                      ) : selectedResultSemanticState === "pass" ? (
+                        <p className={styles.analysisCopy}>当前图片已完成巡检，未发现需要复核的问题项。</p>
+                      ) : selectedResultSemanticState === "inspection_failed" ? (
+                        <p className={styles.analysisCopy}>当前图片存在巡检失败记录，本次仅支持本地复核记录异常情况，不下发整改单。</p>
+                      ) : (
+                        <p className={styles.analysisCopy}>当前图片没有形成明确问题项，可结合算法返回内容判断是否属于目标缺失、画面异常或其他无法判定场景。</p>
+                      )}
+                    </div>
+
+                    <div className={styles.analysisPanel}>
+                      {renderRawResult(activeInspection.inspection.raw_result)}
+                    </div>
+                  </div>
+                ) : (
+                  <EmptyState>当前结果还没有可展示的算法巡检明细。</EmptyState>
+                )}
+
+                <div className={`${styles.reviewWorkspace} ${styles.sceneSection}`} id="review-action">
+                  <ResultReviewWorkflow
+                    actionUrl={`/api/reports/${report.id}/images/${selectedResult.id}/review-status`}
+                    canReview={canReview}
+                    currentImageUrl={currentImageUrl}
+                    currentPath={currentPath}
+                    defaultShouldCorrectedDays={defaultShouldCorrectedDays}
+                    initialReviewState={selectedResult.review_state}
+                    initialSelectedIssueIds={initialSelectedIssueIds}
+                    issues={selectedIssues.map((issue) => ({ id: issue.id, title: issue.title }))}
+                    maxDescriptionLength={maxRectificationDescriptionLength}
+                    semanticState={selectedResultSemanticState}
+                  />
+                </div>
 
                 <div className={styles.reviewGrid}>
                   <div className={styles.reviewBlock}>
@@ -504,34 +577,7 @@ export function ReportResultDetailView({
                   </div>
                 </div>
               </div>
-            ) : activeInspection ? (
-              <div className={styles.analysisWorkspace}>
-                <div className={styles.alertPanel}>
-                  <div className={styles.alertHead}>
-                    <strong>{getReportResultSemanticSummaryLabel(selectedResultSemanticState, activeInspection.issues.length)}</strong>
-                  </div>
-                  {activeInspection.issues.length > 0 ? (
-                    <ul className={styles.issueSummaryList}>
-                      {activeInspection.issues.map((issue) => (
-                        <li key={issue.id}>{issue.title}</li>
-                      ))}
-                    </ul>
-                  ) : selectedResultSemanticState === "pass" ? (
-                    <p className={styles.analysisCopy}>当前图片已完成巡检，未发现需要复核的问题项。</p>
-                  ) : selectedResultSemanticState === "inspection_failed" ? (
-                    <p className={styles.analysisCopy}>当前图片存在巡检失败记录，本次仅支持本地复核记录异常情况，不下发整改单。</p>
-                  ) : (
-                    <p className={styles.analysisCopy}>当前图片没有形成明确问题项，可结合算法返回内容判断是否属于目标缺失、画面异常或其他无法判定场景。</p>
-                  )}
-                </div>
-
-                <div className={styles.analysisPanel}>
-                  {renderRawResult(activeInspection.inspection.raw_result)}
-                </div>
-              </div>
-            ) : (
-              <EmptyState>当前结果还没有可展示的算法巡检明细。</EmptyState>
-            )}
+            </div>
           </CardContent>
         </Card>
       </section>
