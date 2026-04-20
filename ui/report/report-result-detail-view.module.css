@@ -1,17 +1,14 @@
 .overviewCard,
-.previewCard,
 .analysisCard {
   overflow: hidden;
 }
 
 .overviewBody,
-.previewCardBody,
 .analysisCardBody {
   padding: 24px 28px;
 }
 
 .overviewBody,
-.previewCardBody,
 .analysisCardBody,
 .reviewForm,
 .timelineList,
@@ -25,7 +22,7 @@
 .overviewMain,
 .overviewIdentity,
 .overviewMetaRow,
-.tabBar,
+.analysisTopBar,
 .alertHead,
 .timelineHead,
 .reviewActions,
@@ -99,7 +96,7 @@
 
 .overviewTitle {
   margin: 0;
-  font-size: clamp(26px, 3vw, 42px);
+  font-size: clamp(20px, 2.3vw, 32px);
   line-height: 1.08;
   letter-spacing: -0.03em;
   font-weight: 600;
@@ -110,63 +107,10 @@
   justify-content: flex-end;
 }
 
-.workspaceGrid {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.34fr) minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
-}
-
-.previewCard {
-  position: sticky;
-  top: 20px;
-}
-
-.previewWrap {
-  border-radius: 0.75rem;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--surface);
-}
-
-.preview {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  background: var(--surface-code);
-}
-
-.previewButton {
-  width: 116px;
-}
-
-.tabBar {
-  gap: 0;
-  align-items: stretch;
-  border-bottom: 1px solid var(--line);
-  overflow-x: auto;
-}
-
-.tabLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 18px 18px 14px;
-  border-bottom: 3px solid transparent;
-  color: var(--muted);
-  font-size: 15px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.tabLinkActive {
-  border-bottom-color: var(--surface-inverse);
-  color: var(--surface-inverse);
-}
-
-.reviewTabLinkActive {
-  border-bottom-color: var(--danger-tab);
-  color: var(--danger-tab);
+.analysisTopBar {
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 6px;
 }
 
 .tabCount {
@@ -182,11 +126,141 @@
   font-weight: 600;
 }
 
+.sceneLayout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.sceneNav {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface-soft);
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+  align-self: start;
+  position: sticky;
+  top: 20px;
+}
+
+.scenePreviewCard {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 0.625rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.scenePreviewThumbLink {
+  display: block;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.scenePreviewThumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--surface-code);
+}
+
+.scenePreviewMeta {
+  display: grid;
+  gap: 4px;
+}
+
+.scenePreviewTitle {
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.scenePreviewSubmeta {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.scenePreviewActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.scenePrimaryAction {
+  grid-column: 1 / -1;
+}
+
+.sceneSecondaryAction {
+  width: 100%;
+}
+
+.sceneNavHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sceneList {
+  display: grid;
+  gap: 8px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.sceneLink {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 0.625rem;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.sceneLink:hover {
+  border-color: var(--line-strong);
+}
+
+.sceneLinkActive {
+  border-color: var(--surface-inverse);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--surface-inverse) 35%, transparent);
+}
+
+.sceneName {
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.sceneMain {
+  display: grid;
+  gap: 18px;
+}
+
 .analysisWorkspace,
 .reviewWorkspace {
   display: grid;
   gap: 18px;
-  padding-top: 8px;
+  padding-top: 2px;
+}
+
+.sceneSection {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
 }
 
 .reviewIssueSelector {
@@ -630,12 +704,12 @@
 }
 
 @media (max-width: 1180px) {
-  .workspaceGrid,
-  .overviewMain {
+  .overviewMain,
+  .sceneLayout {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .previewCard {
+  .sceneNav {
     position: static;
   }
 
@@ -647,6 +721,7 @@
 @media (max-width: 860px) {
   .overviewTop,
   .overviewIdentity,
+  .analysisTopBar,
   .timelineHead,
   .reviewActions,
   .imageModalHeader,
@@ -661,6 +736,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .scenePreviewActions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .reviewModalImagePanel {
     position: static;
   }
@@ -672,7 +751,6 @@
   }
 
   .overviewBody,
-  .previewCardBody,
   .analysisCardBody {
     padding: 18px;
   }
