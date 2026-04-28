@@ -7,6 +7,7 @@ import { RectificationSplitError } from "@/backend/rectification/rectification.s
 import { createRectificationService } from "@/backend/rectification/rectification.module";
 import { buildRequestUrl } from "@/backend/http/request-url";
 import type { ResultReviewState, ReviewSelectedIssue } from "@/backend/report/report.types";
+import type { RectificationIssueSelection } from "@/lib/rectification-preview";
 
 const reviewService = createReportReviewService();
 const reportService = createReportService();
@@ -51,54 +52,12 @@ function parseSelectedIssues(raw: string): ReviewSelectedIssue[] {
   }
 }
 
-function parseImageUrls(raw: string): string[] {
-  if (!raw.trim()) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return Array.from(
-      new Set(
-        parsed
-          .map((item) => (typeof item === "string" ? item.trim() : ""))
-          .filter(Boolean)
-      )
-    );
-  } catch {
-    return [];
-  }
-}
-
 function readMetadataString(metadata: unknown, key: string): string {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return "";
   }
   const value = (metadata as Record<string, unknown>)[key];
   return typeof value === "string" ? value : "";
-}
-
-function addImageUrl(target: Set<string>, value: unknown): void {
-  const normalized = typeof value === "string" ? value.trim() : "";
-  if (normalized) {
-    target.add(normalized);
-  }
-}
-
-function addIssueImageUrls(target: Set<string>, issue: { image_url: string | null; metadata: unknown }): void {
-  addImageUrl(target, issue.image_url);
-  addImageUrl(target, readMetadataString(issue.metadata, "display_image_url"));
-  addImageUrl(target, readMetadataString(issue.metadata, "evidence_image_url"));
-  addImageUrl(target, readMetadataString(issue.metadata, "linked_inspection_evidence_image_url"));
-  addImageUrl(target, readMetadataString(issue.metadata, "original_image_url"));
-}
-
-function addInspectionImageUrls(target: Set<string>, inspection: { metadata: unknown }): void {
-  addImageUrl(target, readMetadataString(inspection.metadata, "display_image_url"));
-  addImageUrl(target, readMetadataString(inspection.metadata, "evidence_image_url"));
-  addImageUrl(target, readMetadataString(inspection.metadata, "original_image_url"));
 }
 
 function issueMatchesInspection(
@@ -115,6 +74,51 @@ function issueMatchesInspection(
     return true;
   }
   return Boolean(inspection.skill_name && issueSkillName && issueSkillName === inspection.skill_name);
+}
+
+function normalizeImageUrls(values: unknown[]): string[] {
+  return Array.from(
+    new Set(values.map((value) => (typeof value === "string" ? value.trim() : "")).filter(Boolean))
+  ).slice(0, 9);
+}
+
+function issueUsesInspection(issue: { metadata: unknown }, inspectionId: string): boolean {
+  if (!inspectionId) {
+    return false;
+  }
+  return readMetadataString(issue.metadata, "inspection_id") === inspectionId ||
+    readMetadataString(issue.metadata, "linked_inspection_id") === inspectionId;
+}
+
+function buildIssueRectificationImageUrls(input: {
+  issue: { image_url: string | null; metadata: unknown };
+  linkedInspection: { metadata: unknown } | null;
+  resultDetail: { metadata: unknown; url: string };
+  failedInspectionIds: Set<string>;
+}): string[] {
+  const useOriginalFallback = Array.from(input.failedInspectionIds).some((inspectionId) =>
+    issueUsesInspection(input.issue, inspectionId)
+  );
+  const resultOriginalUrls = [
+    readMetadataString(input.resultDetail.metadata, "capture_url"),
+    readMetadataString(input.resultDetail.metadata, "preview_url"),
+    input.resultDetail.url
+  ];
+  const originalUrls = normalizeImageUrls([
+    readMetadataString(input.issue.metadata, "original_image_url"),
+    readMetadataString(input.linkedInspection?.metadata, "original_image_url"),
+    ...resultOriginalUrls
+  ]);
+  if (useOriginalFallback) {
+    return originalUrls.slice(0, 1);
+  }
+
+  const evidenceUrls = normalizeImageUrls([
+    readMetadataString(input.issue.metadata, "evidence_image_url"),
+    readMetadataString(input.issue.metadata, "linked_inspection_evidence_image_url"),
+    readMetadataString(input.linkedInspection?.metadata, "evidence_image_url")
+  ]);
+  return (evidenceUrls.length > 0 ? evidenceUrls : originalUrls).slice(0, 1);
 }
 
 export async function POST(
@@ -144,7 +148,7 @@ export async function POST(
   const note = String(payload.note || "").trim();
   const selectedIssues = parseSelectedIssues(String(payload.selected_issues_json || ""));
   const shouldCorrected = String(payload.should_corrected || "").trim();
-  const activeInspectionId = String(payload.active_inspection_id || "").trim();
+  const failedInspectionId = String(payload.failed_inspection_id || "").trim();
   const requestedSemanticState = String(payload.result_semantic_state || "").trim();
   const requestContext = buildRequestContext(currentUser);
   let resolvedSemanticState: ReportResultSemanticState | null = null;
@@ -171,9 +175,6 @@ export async function POST(
       }
       return readMetadataString(inspection.metadata, "capture_id") === readMetadataString(resultDetail.metadata, "capture_id");
     });
-    const activeInspection = activeInspectionId
-      ? resultInspections.find((inspection) => inspection.inspection_id === activeInspectionId) ?? null
-      : null;
     const semanticState: ReportResultSemanticState = classifyReportResultSemantics(resultIssues, resultInspections);
     resolvedSemanticState = semanticState;
     const shouldCreateRectification = semanticState === "issue_found" || resultIssues.length > 0;
@@ -193,6 +194,12 @@ export async function POST(
         title: issue.title
       }));
     }
+    if (shouldCreateRectification && selectedIssueIdSet.size === 0) {
+      return Response.json(
+        { success: false, error: "请至少勾选一个问题项后再创建整改单。" },
+        { status: 400 }
+      );
+    }
     const semanticMismatch = requestedSemanticState && requestedSemanticState !== semanticState;
     if (semanticMismatch) {
       return Response.json(
@@ -209,37 +216,24 @@ export async function POST(
       readMetadataString(resultDetail.metadata, "store_code") ||
       readMetadataString(store?.metadata, "store_code") ||
       "";
-    const allowedImageUrls = new Set<string>();
-
-    if (selectedResultIssues.length > 0) {
-      selectedResultIssues.forEach((issue) => {
-        addIssueImageUrls(allowedImageUrls, issue);
-        const linkedInspection = resultInspections.find((inspection) => issueMatchesInspection(issue, inspection));
-        if (linkedInspection) {
-          addInspectionImageUrls(allowedImageUrls, linkedInspection);
-        }
-      });
-    } else if (activeInspection) {
-      addInspectionImageUrls(allowedImageUrls, activeInspection);
+    const failedInspectionIds = new Set<string>();
+    if (failedInspectionId) {
+      failedInspectionIds.add(failedInspectionId);
     }
-    if (allowedImageUrls.size === 0) {
-      resultIssues.forEach((issue) => addIssueImageUrls(allowedImageUrls, issue));
-      resultInspections.forEach((inspection) => addInspectionImageUrls(allowedImageUrls, inspection));
-    }
-    addImageUrl(allowedImageUrls, readMetadataString(resultDetail.metadata, "display_url"));
-    addImageUrl(allowedImageUrls, readMetadataString(resultDetail.metadata, "capture_url"));
-    addImageUrl(allowedImageUrls, readMetadataString(resultDetail.metadata, "preview_url"));
-    addImageUrl(allowedImageUrls, resultDetail.url);
-    const requestedRectificationImageUrl = String(payload.rectification_image_url || "").trim();
-    const requestedRectificationImageUrls = parseImageUrls(String(payload.rectification_image_urls_json || ""));
-    const imageUrls = Array.from(
-      new Set(
-        [...requestedRectificationImageUrls, requestedRectificationImageUrl]
-          .map((url) => url.trim())
-          .filter((url) => url && allowedImageUrls.has(url))
-      )
-    );
-    const rectificationImageUrls = (imageUrls.length > 0 ? imageUrls : Array.from(allowedImageUrls)).slice(0, 9);
+    const selectedIssuesForRectification: RectificationIssueSelection[] = selectedResultIssues.map((issue) => {
+      const linkedInspection = resultInspections.find((inspection) => issueMatchesInspection(issue, inspection)) ?? null;
+      return {
+        id: issue.id,
+        title: issue.title,
+        imageUrls: buildIssueRectificationImageUrls({
+          issue,
+          linkedInspection,
+          resultDetail,
+          failedInspectionIds
+        })
+      };
+    });
+    const rectificationImageUrls = normalizeImageUrls(selectedIssuesForRectification.flatMap((issue) => issue.imageUrls ?? []));
 
     if (shouldCreateRectification) {
       try {
@@ -251,7 +245,7 @@ export async function POST(
             storeCode,
             storeName: resultDetail.store_name,
             imageUrls: rectificationImageUrls,
-            selectedIssues: effectiveSelectedIssues,
+            selectedIssues: selectedIssuesForRectification,
             shouldCorrected,
             note,
             createdBy: operatorName,

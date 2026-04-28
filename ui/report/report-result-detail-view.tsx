@@ -54,7 +54,13 @@ function buildResultPath(
   reportId: number,
   resultId: number,
   filters: DetailFilters,
-  options?: { imageFallback?: "load_failed" | ""; inspection?: string; imageMode?: ReportImageMode; panel?: string }
+  options?: {
+    failedInspectionId?: string;
+    imageFallback?: "load_failed" | "";
+    inspection?: string;
+    imageMode?: ReportImageMode;
+    panel?: string;
+  }
 ): string {
   const searchParams = new URLSearchParams(buildSearch(filters).replace(/^\?/, ""));
   if (options?.inspection) {
@@ -76,6 +82,11 @@ function buildResultPath(
     searchParams.set("imageFallback", "load_failed");
   } else {
     searchParams.delete("imageFallback");
+  }
+  if (options?.failedInspectionId) {
+    searchParams.set("failedInspectionId", options.failedInspectionId);
+  } else {
+    searchParams.delete("failedInspectionId");
   }
   const search = searchParams.toString();
   return search ? `/reports/${reportId}/results/${resultId}?${search}` : `/reports/${reportId}/results/${resultId}`;
@@ -286,6 +297,7 @@ export function ReportResultDetailView({
   currentUser,
   defaultShouldCorrectedDays,
   filters,
+  failedInspectionId,
   imageFallback,
   imageMode,
   maxRectificationDescriptionLength,
@@ -299,6 +311,7 @@ export function ReportResultDetailView({
   currentUser: SessionUser;
   defaultShouldCorrectedDays: number;
   filters: DetailFilters;
+  failedInspectionId: string;
   imageFallback: "load_failed" | "";
   imageMode: ReportImageMode;
   maxRectificationDescriptionLength: number;
@@ -341,7 +354,10 @@ export function ReportResultDetailView({
     inspectionTabs.find((item) => item.inspection.inspection_id === activeInspectionId)?.inspection.inspection_id || defaultInspectionId;
   const activeInspection =
     resolvedInspectionId ? inspectionTabs.find((item) => item.inspection.inspection_id === resolvedInspectionId) || null : null;
+  const effectiveFailedInspectionId = imageFallback === "load_failed" ? failedInspectionId || resolvedInspectionId : "";
+  const activeImageLoadFailed = Boolean(effectiveFailedInspectionId && effectiveFailedInspectionId === resolvedInspectionId);
   const currentPath = buildResultPath(report.id, selectedResult.id, filters, {
+    failedInspectionId: effectiveFailedInspectionId,
     imageFallback,
     inspection: resolvedInspectionId,
     imageMode,
@@ -359,6 +375,7 @@ export function ReportResultDetailView({
     panel: activePanel
   });
   const imageLoadFailedPath = buildResultPath(report.id, selectedResult.id, filters, {
+    failedInspectionId: resolvedInspectionId,
     imageFallback: "load_failed",
     inspection: resolvedInspectionId,
     imageMode: "evidence",
@@ -387,19 +404,19 @@ export function ReportResultDetailView({
   const reviewIssues = selectedIssues.map((issue) => ({
     id: issue.id,
     title: issue.title,
-    imageUrls: readIssueRectificationImageUrls(issue, { useOriginalFallback: imageFallback === "load_failed" })
+    imageUrls: readIssueRectificationImageUrls(issue, { failedInspectionId: effectiveFailedInspectionId })
   }));
   const imageState = resolveResultImageState({
     selectedResult,
     activeInspection: activeInspection?.inspection ?? null,
-    loadFailed: imageFallback === "load_failed",
+    loadFailed: activeImageLoadFailed,
     mode: imageMode
   });
   const rectificationImageState = resolveResultImageState({
     selectedResult,
     activeInspection: activeInspection?.inspection ?? null,
     activeIssue,
-    loadFailed: imageFallback === "load_failed",
+    loadFailed: activeImageLoadFailed,
     mode: "evidence"
   });
   const imageNotice = getResolvedImageNotice(imageState);
@@ -551,6 +568,7 @@ export function ReportResultDetailView({
                     currentImageUrl={imageState.url}
                     currentPath={currentPath}
                     defaultShouldCorrectedDays={defaultShouldCorrectedDays}
+                    failedInspectionId={effectiveFailedInspectionId}
                     imageNotice={imageNotice}
                     activeInspectionId={resolvedInspectionId}
                     initialReviewState={selectedResult.review_state}

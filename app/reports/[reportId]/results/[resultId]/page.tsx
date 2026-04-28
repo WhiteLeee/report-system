@@ -84,6 +84,7 @@ export default async function ReportResultDetailPage({
   const activePanel = typeof resolvedSearchParams.panel === "string" ? resolvedSearchParams.panel : "";
   const imageMode = normalizeImageMode(resolvedSearchParams.imageMode);
   const imageFallback = normalizeImageFallback(resolvedSearchParams.imageFallback);
+  const failedInspectionId = typeof resolvedSearchParams.failedInspectionId === "string" ? resolvedSearchParams.failedInspectionId : "";
   const previewImage = typeof resolvedSearchParams.preview === "string" && resolvedSearchParams.preview === "1";
   const rectificationOrders = await rectificationService.syncOrdersByResultId(resultId);
   const huiYunYingApiSettings = systemSettingsService.getHuiYunYingApiSettings();
@@ -95,6 +96,7 @@ export default async function ReportResultDetailPage({
       currentUser={currentUser}
       defaultShouldCorrectedDays={huiYunYingApiSettings.defaultShouldCorrectedDays}
       filters={filters}
+      failedInspectionId={failedInspectionId}
       imageFallback={imageFallback}
       imageMode={imageMode}
       maxRectificationDescriptionLength={huiYunYingApiSettings.rectificationDescriptionMaxLength}

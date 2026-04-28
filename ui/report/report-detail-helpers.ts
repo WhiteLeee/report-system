@@ -91,21 +91,29 @@ export function readIssueEvidenceUrl(issue: ReportIssue | null | undefined): str
 
 export function readIssueRectificationImageUrls(
   issue: ReportIssue | null | undefined,
-  options?: { useOriginalFallback?: boolean }
+  options?: { failedInspectionId?: string }
 ): string[] {
+  const failedInspectionId = String(options?.failedInspectionId || "").trim();
+  const useOriginalFallback = Boolean(
+    failedInspectionId &&
+      (
+        readMetadataString(issue?.metadata ?? null, "inspection_id") === failedInspectionId ||
+        readMetadataString(issue?.metadata ?? null, "linked_inspection_id") === failedInspectionId
+      )
+  );
   const originalUrls = Array.from(
     new Set(
       [
         readMetadataString(issue?.metadata ?? null, "original_image_url"),
-        readMetadataString(issue?.metadata ?? null, "display_image_url"),
-        issue?.image_url || ""
+        issue?.image_url || "",
+        readMetadataString(issue?.metadata ?? null, "display_image_url")
       ]
         .map((value) => value.trim())
         .filter(Boolean)
     )
   );
-  if (options?.useOriginalFallback) {
-    return originalUrls;
+  if (useOriginalFallback) {
+    return originalUrls.slice(0, 1);
   }
   const evidenceUrls = Array.from(
     new Set(
@@ -117,7 +125,7 @@ export function readIssueRectificationImageUrls(
         .filter(Boolean)
     )
   );
-  return evidenceUrls.length > 0 ? evidenceUrls : originalUrls;
+  return evidenceUrls.length > 0 ? evidenceUrls : originalUrls.slice(0, 1);
 }
 
 export function readIssueOriginalImageUrl(issue: ReportIssue | null | undefined): string {

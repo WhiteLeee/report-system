@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { ReportInspection, ReportIssue, ReportResult } from "../backend/report/report.types";
-import { resolveResultImageState } from "../ui/report/report-detail-helpers";
+import { readIssueRectificationImageUrls, resolveResultImageState } from "../ui/report/report-detail-helpers";
 
 function createResult(): ReportResult {
   return {
@@ -136,4 +136,35 @@ test("resolveResultImageState 标注图运行时加载失败时回退原图", ()
   assert.equal(state.url, "https://example.com/original.jpg");
   assert.equal(state.evidenceUrl, "https://oss.example.com/evidence.jpg");
   assert.equal(state.fallbackReason, "load_failed");
+});
+
+test("readIssueRectificationImageUrls 只让失败场景回退原图", () => {
+  const failedIssue = createIssue({
+    metadata: {
+      inspection_id: "inspection-failed",
+      evidence_image_url: "https://oss.example.com/failed-evidence.jpg",
+      linked_inspection_evidence_image_url: "",
+      original_image_url: "https://example.com/failed-original.jpg",
+      display_image_url: "https://oss.example.com/failed-evidence.jpg",
+      extra_json: {}
+    }
+  });
+  const healthyIssue = createIssue({
+    id: 2,
+    metadata: {
+      inspection_id: "inspection-healthy",
+      evidence_image_url: "https://oss.example.com/healthy-evidence.jpg",
+      linked_inspection_evidence_image_url: "",
+      original_image_url: "https://example.com/healthy-original.jpg",
+      display_image_url: "https://oss.example.com/healthy-evidence.jpg",
+      extra_json: {}
+    }
+  });
+
+  assert.deepEqual(readIssueRectificationImageUrls(failedIssue, { failedInspectionId: "inspection-failed" }), [
+    "https://example.com/failed-original.jpg"
+  ]);
+  assert.deepEqual(readIssueRectificationImageUrls(healthyIssue, { failedInspectionId: "inspection-failed" }), [
+    "https://oss.example.com/healthy-evidence.jpg"
+  ]);
 });

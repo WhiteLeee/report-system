@@ -44,3 +44,20 @@ test("未勾选问题项且备注超长时返回长度错误", () => {
     (error) => error instanceof RectificationPreviewError && error.message === "复核备注已超过 5 字，无法创建整改单。"
   );
 });
+
+test("勾选问题项时在描述中标明对应图片序号", () => {
+  const orders = buildRectificationPreviewOrders({
+    selectedIssues: [
+      { id: 1, title: "货架未摆满", imageUrls: ["https://example.com/a.jpg"] },
+      { id: 2, title: "通道堵塞", imageUrls: ["https://example.com/b.jpg"] }
+    ],
+    note: "",
+    shouldCorrected: "2026-04-08",
+    imageUrls: [],
+    maxLength: 500
+  });
+
+  assert.equal(orders.length, 1);
+  assert.deepEqual(orders[0].imageUrls, ["https://example.com/a.jpg", "https://example.com/b.jpg"]);
+  assert.equal(orders[0].description, "1. 货架未摆满（对应图片：第1张）\n2. 通道堵塞（对应图片：第2张）");
+});

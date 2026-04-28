@@ -50,6 +50,7 @@ export function ResultReviewWorkflow({
   currentPath,
   initialSelectedIssueIds,
   initialReviewState,
+  failedInspectionId,
   imageNotice,
   issues,
   maxDescriptionLength,
@@ -62,6 +63,7 @@ export function ResultReviewWorkflow({
   canReview: boolean;
   currentImageUrl: string;
   currentPath: string;
+  failedInspectionId?: string;
   initialSelectedIssueIds: number[];
   initialReviewState: ResultReviewState;
   imageNotice?: string;
@@ -124,6 +126,7 @@ export function ResultReviewWorkflow({
           review_status: reviewStatus,
           should_corrected: shouldCorrected,
           active_inspection_id: activeInspectionId || "",
+          failed_inspection_id: failedInspectionId || "",
           note,
           return_to: currentPath,
           selected_issues_json: JSON.stringify(selectedIssues),

@@ -8,7 +8,6 @@ import type {
   HuiYunYingRectificationOrderItem
 } from "@/backend/integrations/huiyunying/huiyunying.types";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
-import type { ReviewSelectedIssue } from "@/backend/report/report.types";
 import {
   buildRectificationSyncPatch,
   isRemoteRectificationSnapshotUnchanged
@@ -23,7 +22,11 @@ import type {
 } from "@/backend/rectification/rectification.types";
 import type { RectificationOrderRepository } from "@/backend/rectification/rectification.repository";
 import type { JsonValue } from "@/backend/shared/json";
-import { buildRectificationPreviewOrders, RectificationPreviewError } from "@/lib/rectification-preview";
+import {
+  buildRectificationPreviewOrders,
+  RectificationPreviewError,
+  type RectificationIssueSelection
+} from "@/lib/rectification-preview";
 
 export class RectificationSplitError extends Error {
   constructor(message: string) {
@@ -39,7 +42,7 @@ type CreateOrdersInput = {
   storeCode?: string | null;
   storeName?: string | null;
   imageUrls: string[];
-  selectedIssues: ReviewSelectedIssue[];
+  selectedIssues: RectificationIssueSelection[];
   shouldCorrected: string;
   note: string;
   createdBy: string;
@@ -313,7 +316,7 @@ export class RectificationService {
         storeCode: input.storeCode || undefined,
         description,
         shouldCorrected: input.shouldCorrected,
-        imageUrls: normalizedImageUrls
+        imageUrls: previewOrder.imageUrls
       };
 
       if (input.storeId && /^\d+$/.test(String(input.storeId))) {
@@ -342,7 +345,7 @@ export class RectificationService {
           huiyunying_order_id: remoteOrderId || null,
           request_description: description,
           selected_issues: previewOrder.selectedIssues,
-          image_urls: normalizedImageUrls,
+          image_urls: previewOrder.imageUrls,
           request_payload: remotePayload as unknown as JsonValue,
           response_payload: remoteResponse as JsonValue,
           status: "created",

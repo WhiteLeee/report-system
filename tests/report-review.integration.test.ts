@@ -426,7 +426,7 @@ test("publish rejects unsupported payload_version with 422", async () => {
 
 test("review submit sends annotation images for selected issues across scenes", async () => {
   const originalFetch = globalThis.fetch;
-  const createBodies: Array<{ imageUrls?: string[] }> = [];
+  const createBodies: Array<{ description?: string; imageUrls?: string[] }> = [];
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes("/sign")) {
@@ -436,7 +436,7 @@ test("review submit sends annotation images for selected issues across scenes", 
       });
     }
     if (url.includes("/route/ri/open/item/create")) {
-      createBodies.push(JSON.parse(String(init?.body || "{}")) as { imageUrls?: string[] });
+      createBodies.push(JSON.parse(String(init?.body || "{}")) as { description?: string; imageUrls?: string[] });
       return new Response(JSON.stringify({ status: 200, data: true, disqualifiedId: 9101 }), {
         status: 200,
         headers: { "content-type": "application/json" }
@@ -492,6 +492,7 @@ test("review submit sends annotation images for selected issues across scenes", 
                   skill_name: "技能 A",
                   raw_result: "发现问题",
                   evidence_image_url: "https://example.com/evidence-a.jpg",
+                  original_image_url: "https://example.com/original-a.jpg",
                   total_issues: 1
                 },
                 {
@@ -556,11 +557,9 @@ test("review submit sends annotation images for selected issues across scenes", 
         body: JSON.stringify({
           review_status: "completed",
           active_inspection_id: "inspection-active-a",
+          failed_inspection_id: "inspection-active-a",
           selected_issues_json: JSON.stringify(selectedIssues),
-          rectification_image_urls_json: JSON.stringify([
-            "https://example.com/evidence-a.jpg",
-            "https://example.com/evidence-b.jpg"
-          ]),
+          rectification_image_urls_json: JSON.stringify(["https://example.com/evidence-a.jpg"]),
           should_corrected: "2026-04-05",
           result_semantic_state: "issue_found",
           note: "跨场景勾选问题，下发各自标注图。"
@@ -585,9 +584,90 @@ test("review submit sends annotation images for selected issues across scenes", 
     assert.equal(reviewJson.rectification_orders[0].huiyunying_order_id, "9101");
     assert.equal(createBodies.length, 1);
     assert.deepEqual(createBodies[0].imageUrls, [
-      "https://example.com/evidence-a.jpg",
+      "https://example.com/original-a.jpg",
       "https://example.com/evidence-b.jpg"
     ]);
+    assert.match(createBodies[0].description || "", /技能 A 问题（对应图片：第1张）/);
+    assert.match(createBodies[0].description || "", /技能 B 问题（对应图片：第2张）/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("review submit rejects issue result without selected issues", async () => {
+  const originalFetch = globalThis.fetch;
+  const fetchCalls: Array<string> = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    fetchCalls.push(url);
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const loginResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "ChangeMe123!");
+          return formData;
+        })()
+      })
+    );
+    const sessionCookie = loginResp.headers.get("set-cookie") || "";
+
+    const publishResp = await publishRoute.POST(
+      new Request("http://127.0.0.1:3000/api/reports/publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...publishPayload,
+          idempotency_key: "review-test-empty-selected-issues",
+          published_at: "2026-04-04 10:00:00",
+          report: {
+            ...publishPayload.report,
+            report_meta: {
+              ...publishPayload.report.report_meta,
+              start_date: "2026-04-04",
+              end_date: "2026-04-04",
+              generated_at: "2026-04-04 10:00:00"
+            }
+          }
+        })
+      })
+    );
+    const publishJson = (await publishResp.json()) as { report_id: number };
+    const reportId = publishJson.report_id;
+
+    const detailResp = await reportRoute.GET(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
+      { params: Promise.resolve({ reportId: String(reportId) }) }
+    );
+    const detailJson = (await detailResp.json()) as { report: { images: Array<{ id: number }> } };
+    const imageId = detailJson.report.images[0].id;
+
+    const reviewResp = await reviewRoute.POST(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({
+          review_status: "completed",
+          selected_issues_json: JSON.stringify([]),
+          should_corrected: "2026-04-05",
+          result_semantic_state: "issue_found"
+        })
+      }),
+      {
+        params: Promise.resolve({ reportId: String(reportId), imageId: String(imageId) })
+      }
+    );
+
+    assert.equal(reviewResp.status, 400);
+    const reviewJson = (await reviewResp.json()) as { error: string; success: boolean };
+    assert.equal(reviewJson.success, false);
+    assert.equal(reviewJson.error, "请至少勾选一个问题项后再创建整改单。");
+    assert.equal(fetchCalls.length, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }
