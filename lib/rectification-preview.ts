@@ -12,6 +12,8 @@ export type RectificationPreviewOrder = {
   shouldCorrected: string;
 };
 
+export const MAX_RECTIFICATION_IMAGE_COUNT = 10;
+
 export class RectificationPreviewError extends Error {
   constructor(message: string) {
     super(message);
@@ -38,8 +40,8 @@ function normalizeIssues(issues: RectificationIssueSelection[]): RectificationIs
 
 function normalizeImageUrls(imageUrls: string[]): string[] {
   return Array.from(
-    new Set(imageUrls.map((url) => String(url || "").trim()).filter(Boolean))
-  ).slice(0, 9);
+    new Set(imageUrls.map((url) => String(url || "").trim()).filter((url) => url && url !== "about:blank"))
+  );
 }
 
 function buildChunkImageUrls(chunk: RectificationIssueSelection[], fallbackImageUrls: string[]): string[] {
@@ -115,11 +117,15 @@ export function buildRectificationPreviewOrders(input: {
   let currentChunk: RectificationIssueSelection[] = [];
 
   normalizedIssues.forEach((issue) => {
+    const issueImageUrls = normalizeImageUrls(issue.imageUrls ?? []);
+    if (issueImageUrls.length > MAX_RECTIFICATION_IMAGE_COUNT) {
+      throw new RectificationPreviewError(`问题“${issue.title}”关联图片超过 ${MAX_RECTIFICATION_IMAGE_COUNT} 张，无法自动拆单。`);
+    }
     const candidateChunk = [...currentChunk, issue];
     const candidateImageUrls = buildChunkImageUrls(candidateChunk, normalizedImageUrls);
     const candidateDescription = buildDescription(candidateChunk, normalizedIssues, normalizedNote, candidateImageUrls);
 
-    if (candidateDescription.length <= maxLength) {
+    if (candidateDescription.length <= maxLength && candidateImageUrls.length <= MAX_RECTIFICATION_IMAGE_COUNT) {
       currentChunk = candidateChunk;
       return;
     }
@@ -132,6 +138,9 @@ export function buildRectificationPreviewOrders(input: {
     currentChunk = [issue];
     const nextImageUrls = buildChunkImageUrls(currentChunk, normalizedImageUrls);
     const nextDescription = buildDescription(currentChunk, normalizedIssues, normalizedNote, nextImageUrls);
+    if (nextImageUrls.length > MAX_RECTIFICATION_IMAGE_COUNT) {
+      throw new RectificationPreviewError(`问题“${issue.title}”关联图片超过 ${MAX_RECTIFICATION_IMAGE_COUNT} 张，无法自动拆单。`);
+    }
     if (nextDescription.length > maxLength) {
       throw new RectificationPreviewError(`问题“${issue.title}”拼接备注后已超过 ${maxLength} 字，无法自动拆单。`);
     }

@@ -8,7 +8,12 @@ import styles from "./report-result-detail-view.module.css";
 
 import type { ReviewSelectedIssue, ResultReviewState } from "@/backend/report/report.types";
 import type { ReportResultSemanticState } from "@/ui/report/report-result-semantics";
-import { buildRectificationPreviewOrders, RectificationPreviewError } from "@/lib/rectification-preview";
+import {
+  buildRectificationPreviewOrders,
+  MAX_RECTIFICATION_IMAGE_COUNT,
+  RectificationPreviewError,
+  type RectificationIssueSelection
+} from "@/lib/rectification-preview";
 import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -39,7 +44,7 @@ function buildDefaultShouldCorrectedDate(defaultDays: number): string {
 }
 
 function uniqueNonEmptyStrings(values: string[]): string[] {
-  return Array.from(new Set(values.map((value) => String(value || "").trim()).filter(Boolean)));
+  return Array.from(new Set(values.map((value) => String(value || "").trim()).filter((url) => url && url !== "about:blank")));
 }
 
 export function ResultReviewWorkflow({
@@ -88,12 +93,17 @@ export function ResultReviewWorkflow({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
   const selectedIssueOptions = issues.filter((issue) => selectedIssueIds.includes(issue.id));
+  const selectedIssuesForPreview: RectificationIssueSelection[] = selectedIssueOptions.map((issue) => ({
+    id: issue.id,
+    title: issue.title,
+    imageUrls: issue.imageUrls ?? []
+  }));
   const selectedIssues: ReviewSelectedIssue[] = selectedIssueOptions.map((issue) => ({ id: issue.id, title: issue.title }));
   const requiresRectification = semanticState === "issue_found" || issues.length > 0;
   const effectiveRectificationImageUrls = uniqueNonEmptyStrings([
     ...selectedIssueOptions.flatMap((issue) => issue.imageUrls ?? []),
     rectificationImageUrl || currentImageUrl || ""
-  ]).slice(0, 9);
+  ]);
   const effectiveRectificationImageUrl = effectiveRectificationImageUrls[0] || "";
 
   useEffect(() => {
@@ -173,7 +183,7 @@ export function ResultReviewWorkflow({
     }
     try {
       const nextPreviewOrders = buildRectificationPreviewOrders({
-        selectedIssues,
+        selectedIssues: selectedIssuesForPreview,
         note,
         shouldCorrected,
         imageUrls: effectiveRectificationImageUrls,
@@ -367,6 +377,11 @@ export function ResultReviewWorkflow({
                 </div>
                 {effectiveRectificationImageUrls.length > 1 ? (
                   <p className={styles.previewMeta}>将随整改单下发 {effectiveRectificationImageUrls.length} 张标注图。</p>
+                ) : null}
+                {previewOrders.length > 1 ? (
+                  <p className={styles.previewMeta}>
+                    已按每单最多 {MAX_RECTIFICATION_IMAGE_COUNT} 张图片自动拆分为 {previewOrders.length} 个整改单。
+                  </p>
                 ) : null}
                 {imageNotice ? <p className={styles.imageFallbackNotice}>{imageNotice}</p> : null}
               </section>

@@ -61,3 +61,26 @@ test("勾选问题项时在描述中标明对应图片序号", () => {
   assert.deepEqual(orders[0].imageUrls, ["https://example.com/a.jpg", "https://example.com/b.jpg"]);
   assert.equal(orders[0].description, "1. 货架未摆满（对应图片：第1张）\n2. 通道堵塞（对应图片：第2张）");
 });
+
+test("勾选问题项图片超过 10 张时按图片数量自动拆单", () => {
+  const selectedIssues = Array.from({ length: 11 }, (_, index) => ({
+    id: index + 1,
+    title: `问题 ${index + 1}`,
+    imageUrls: [`https://example.com/${index + 1}.jpg`]
+  }));
+
+  const orders = buildRectificationPreviewOrders({
+    selectedIssues,
+    note: "",
+    shouldCorrected: "2026-04-08",
+    imageUrls: [],
+    maxLength: 1000
+  });
+
+  assert.equal(orders.length, 2);
+  assert.equal(orders[0].selectedIssues.length, 10);
+  assert.equal(orders[0].imageUrls.length, 10);
+  assert.equal(orders[1].selectedIssues.length, 1);
+  assert.deepEqual(orders[1].imageUrls, ["https://example.com/11.jpg"]);
+  assert.match(orders[1].description, /11\. 问题 11（对应图片：第1张）/);
+});

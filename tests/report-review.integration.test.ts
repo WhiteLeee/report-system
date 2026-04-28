@@ -594,6 +594,133 @@ test("review submit sends annotation images for selected issues across scenes", 
   }
 });
 
+test("review submit splits orders when selected issue images exceed ten", async () => {
+  const originalFetch = globalThis.fetch;
+  const createBodies: Array<{ description?: string; imageUrls?: string[] }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.includes("/sign")) {
+      return new Response("token-123", {
+        status: 200,
+        headers: { "content-type": "text/plain" }
+      });
+    }
+    if (url.includes("/route/ri/open/item/create")) {
+      createBodies.push(JSON.parse(String(init?.body || "{}")) as { description?: string; imageUrls?: string[] });
+      return new Response(JSON.stringify({ status: 200, data: true, disqualifiedId: 9200 + createBodies.length }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const loginResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "ChangeMe123!");
+          return formData;
+        })()
+      })
+    );
+    const sessionCookie = loginResp.headers.get("set-cookie") || "";
+    const inspections = Array.from({ length: 11 }, (_, index) => ({
+      ...publishPayload.report.facts.inspections[0],
+      inspection_id: `inspection-split-${index + 1}`,
+      skill_id: `skill-split-${index + 1}`,
+      skill_name: `技能 ${index + 1}`,
+      evidence_image_url: `https://example.com/split-${index + 1}.jpg`,
+      total_issues: 1
+    }));
+    const issues = Array.from({ length: 11 }, (_, index) => ({
+      ...publishPayload.report.facts.issues[0],
+      issue_id: `issue-split-${index + 1}`,
+      inspection_id: `inspection-split-${index + 1}`,
+      skill_id: `skill-split-${index + 1}`,
+      skill_name: `技能 ${index + 1}`,
+      issue_type: `问题 ${index + 1}`,
+      description: `问题 ${index + 1}`,
+      evidence_image_url: `https://example.com/split-${index + 1}.jpg`
+    }));
+
+    const publishResp = await publishRoute.POST(
+      new Request("http://127.0.0.1:3000/api/reports/publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...publishPayload,
+          idempotency_key: "review-test-split-by-image-count",
+          published_at: "2026-04-06 10:00:00",
+          report: {
+            ...publishPayload.report,
+            summary: {
+              metrics: {
+                store_count: 1,
+                image_count: 1,
+                issue_count: 11
+              }
+            },
+            report_meta: {
+              ...publishPayload.report.report_meta,
+              start_date: "2026-04-06",
+              end_date: "2026-04-06",
+              generated_at: "2026-04-06 10:00:00"
+            },
+            facts: {
+              ...publishPayload.report.facts,
+              inspections,
+              issues
+            }
+          }
+        })
+      })
+    );
+    const publishJson = (await publishResp.json()) as { report_id: number };
+    const reportId = publishJson.report_id;
+
+    const detailResp = await reportRoute.GET(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
+      { params: Promise.resolve({ reportId: String(reportId) }) }
+    );
+    const detailJson = (await detailResp.json()) as {
+      report: {
+        images: Array<{ id: number }>;
+        issues: Array<{ id: number; title: string }>;
+      };
+    };
+    const imageId = detailJson.report.images[0].id;
+    const selectedIssues = detailJson.report.issues.map((issue) => ({ id: issue.id, title: issue.title }));
+
+    const reviewResp = await reviewRoute.POST(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({
+          review_status: "completed",
+          selected_issues_json: JSON.stringify(selectedIssues),
+          should_corrected: "2026-04-08",
+          result_semantic_state: "issue_found"
+        })
+      }),
+      {
+        params: Promise.resolve({ reportId: String(reportId), imageId: String(imageId) })
+      }
+    );
+
+    assert.equal(reviewResp.status, 200);
+    assert.equal(createBodies.length, 2);
+    assert.equal(createBodies[0].imageUrls?.length, 10);
+    assert.deepEqual(createBodies[1].imageUrls, ["https://example.com/split-11.jpg"]);
+    assert.match(createBodies[1].description || "", /11\. 问题 11（对应图片：第1张）/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("review submit rejects issue result without selected issues", async () => {
   const originalFetch = globalThis.fetch;
   const fetchCalls: Array<string> = [];
@@ -667,6 +794,116 @@ test("review submit rejects issue result without selected issues", async () => {
     const reviewJson = (await reviewResp.json()) as { error: string; success: boolean };
     assert.equal(reviewJson.success, false);
     assert.equal(reviewJson.error, "请至少勾选一个问题项后再创建整改单。");
+    assert.equal(fetchCalls.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("review submit rejects selected issue without any deliverable image", async () => {
+  const originalFetch = globalThis.fetch;
+  const fetchCalls: Array<string> = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    fetchCalls.push(url);
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const loginResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "ChangeMe123!");
+          return formData;
+        })()
+      })
+    );
+    const sessionCookie = loginResp.headers.get("set-cookie") || "";
+
+    const publishResp = await publishRoute.POST(
+      new Request("http://127.0.0.1:3000/api/reports/publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...publishPayload,
+          idempotency_key: "review-test-missing-issue-image",
+          published_at: "2026-04-07 10:00:00",
+          report: {
+            ...publishPayload.report,
+            report_meta: {
+              ...publishPayload.report.report_meta,
+              start_date: "2026-04-07",
+              end_date: "2026-04-07",
+              generated_at: "2026-04-07 10:00:00"
+            },
+            facts: {
+              ...publishPayload.report.facts,
+              captures: [
+                {
+                  ...publishPayload.report.facts.captures[0],
+                  capture_url: undefined,
+                  preview_url: undefined,
+                  oss_key: undefined
+                }
+              ],
+              inspections: [
+                {
+                  ...publishPayload.report.facts.inspections[0],
+                  evidence_image_url: undefined,
+                  original_image_url: undefined
+                }
+              ],
+              issues: [
+                {
+                  ...publishPayload.report.facts.issues[0],
+                  evidence_image_url: undefined,
+                  original_image_url: undefined
+                }
+              ]
+            }
+          }
+        })
+      })
+    );
+    const publishJson = (await publishResp.json()) as { report_id: number };
+    const reportId = publishJson.report_id;
+
+    const detailResp = await reportRoute.GET(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
+      { params: Promise.resolve({ reportId: String(reportId) }) }
+    );
+    const detailJson = (await detailResp.json()) as {
+      report: {
+        images: Array<{ id: number }>;
+        issues: Array<{ id: number; title: string }>;
+      };
+    };
+    const imageId = detailJson.report.images[0].id;
+    const issue = detailJson.report.issues[0];
+
+    const reviewResp = await reviewRoute.POST(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({
+          review_status: "completed",
+          selected_issues_json: JSON.stringify([{ id: issue.id, title: issue.title }]),
+          should_corrected: "2026-04-08",
+          result_semantic_state: "issue_found"
+        })
+      }),
+      {
+        params: Promise.resolve({ reportId: String(reportId), imageId: String(imageId) })
+      }
+    );
+
+    assert.equal(reviewResp.status, 400);
+    const reviewJson = (await reviewResp.json()) as { error: string; success: boolean };
+    assert.equal(reviewJson.success, false);
+    assert.match(reviewJson.error, /缺少可下发图片/);
     assert.equal(fetchCalls.length, 0);
   } finally {
     globalThis.fetch = originalFetch;

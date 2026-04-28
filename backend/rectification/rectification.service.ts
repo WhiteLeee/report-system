@@ -292,7 +292,7 @@ export class RectificationService {
     const huiYunYingService = createHuiYunYingRectificationService();
     const normalizedImageUrls = Array.from(
       new Set(input.imageUrls.map((url) => normalizeRectificationImageUrl(String(url || ""))).filter(Boolean))
-    ).slice(0, 9);
+    );
     let previewOrders;
     try {
       previewOrders = buildRectificationPreviewOrders({

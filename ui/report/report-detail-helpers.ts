@@ -45,6 +45,10 @@ function readRecordBoolean(record: Record<string, unknown>, key: string): boolea
   return record[key] === true;
 }
 
+function normalizeIssueImageUrls(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter((url) => url && url !== "about:blank")));
+}
+
 export type ReportImageMode = "evidence" | "original";
 
 export type ResolvedReportImageState = {
@@ -101,30 +105,18 @@ export function readIssueRectificationImageUrls(
         readMetadataString(issue?.metadata ?? null, "linked_inspection_id") === failedInspectionId
       )
   );
-  const originalUrls = Array.from(
-    new Set(
-      [
-        readMetadataString(issue?.metadata ?? null, "original_image_url"),
-        issue?.image_url || "",
-        readMetadataString(issue?.metadata ?? null, "display_image_url")
-      ]
-        .map((value) => value.trim())
-        .filter(Boolean)
-    )
-  );
+  const originalUrls = normalizeIssueImageUrls([
+    readMetadataString(issue?.metadata ?? null, "original_image_url"),
+    issue?.image_url || "",
+    readMetadataString(issue?.metadata ?? null, "display_image_url")
+  ]);
   if (useOriginalFallback) {
     return originalUrls.slice(0, 1);
   }
-  const evidenceUrls = Array.from(
-    new Set(
-      [
-        readMetadataString(issue?.metadata ?? null, "evidence_image_url"),
-        readMetadataString(issue?.metadata ?? null, "linked_inspection_evidence_image_url")
-      ]
-        .map((value) => value.trim())
-        .filter(Boolean)
-    )
-  );
+  const evidenceUrls = normalizeIssueImageUrls([
+    readMetadataString(issue?.metadata ?? null, "evidence_image_url"),
+    readMetadataString(issue?.metadata ?? null, "linked_inspection_evidence_image_url")
+  ]);
   return evidenceUrls.length > 0 ? evidenceUrls : originalUrls.slice(0, 1);
 }
 

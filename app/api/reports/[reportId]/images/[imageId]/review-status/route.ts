@@ -78,8 +78,12 @@ function issueMatchesInspection(
 
 function normalizeImageUrls(values: unknown[]): string[] {
   return Array.from(
-    new Set(values.map((value) => (typeof value === "string" ? value.trim() : "")).filter(Boolean))
-  ).slice(0, 9);
+    new Set(
+      values
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter((url) => url && url !== "about:blank")
+    )
+  );
 }
 
 function issueUsesInspection(issue: { metadata: unknown }, inspectionId: string): boolean {
@@ -233,6 +237,16 @@ export async function POST(
         })
       };
     });
+    const missingImageIssues = selectedIssuesForRectification.filter((issue) => (issue.imageUrls ?? []).length === 0);
+    if (missingImageIssues.length > 0) {
+      return Response.json(
+        {
+          success: false,
+          error: `以下问题缺少可下发图片，请检查标注图或原图：${missingImageIssues.map((issue) => issue.title).join("、")}`
+        },
+        { status: 400 }
+      );
+    }
     const rectificationImageUrls = normalizeImageUrls(selectedIssuesForRectification.flatMap((issue) => issue.imageUrls ?? []));
 
     if (shouldCreateRectification) {
