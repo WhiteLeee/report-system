@@ -44,8 +44,10 @@ export function ResultReviewWorkflow({
   currentPath,
   initialSelectedIssueIds,
   initialReviewState,
+  imageNotice,
   issues,
   maxDescriptionLength,
+  rectificationImageUrl,
   semanticState,
   defaultShouldCorrectedDays
 }: {
@@ -55,8 +57,10 @@ export function ResultReviewWorkflow({
   currentPath: string;
   initialSelectedIssueIds: number[];
   initialReviewState: ResultReviewState;
+  imageNotice?: string;
   issues: ReviewIssueOption[];
   maxDescriptionLength: number;
+  rectificationImageUrl?: string;
   semanticState: ReportResultSemanticState;
   defaultShouldCorrectedDays: number;
 }) {
@@ -76,6 +80,7 @@ export function ResultReviewWorkflow({
   const [mounted, setMounted] = useState(false);
   const selectedIssues: ReviewSelectedIssue[] = issues.filter((issue) => selectedIssueIds.includes(issue.id));
   const requiresRectification = semanticState === "issue_found" || issues.length > 0;
+  const effectiveRectificationImageUrl = String(rectificationImageUrl || currentImageUrl || "").trim();
 
   useEffect(() => {
     setMounted(true);
@@ -109,6 +114,7 @@ export function ResultReviewWorkflow({
           note,
           return_to: currentPath,
           selected_issues_json: JSON.stringify(selectedIssues),
+          rectification_image_url: effectiveRectificationImageUrl,
           result_semantic_state: semanticState
         })
       });
@@ -153,7 +159,7 @@ export function ResultReviewWorkflow({
         selectedIssues,
         note,
         shouldCorrected,
-        imageUrls: currentImageUrl ? [currentImageUrl] : [],
+        imageUrls: effectiveRectificationImageUrl ? [effectiveRectificationImageUrl] : [],
         maxLength: maxDescriptionLength
       });
       setPreviewOrders(nextPreviewOrders);
@@ -279,6 +285,7 @@ export function ResultReviewWorkflow({
               />
             </div>
             {errorMessage ? <div className={styles.reviewError}>{errorMessage}</div> : null}
+            {imageNotice ? <div className={styles.imageFallbackNotice}>{imageNotice}</div> : null}
             <div className={styles.reviewActions}>
               <Button
                 disabled={initialReviewState === "pending" || isSubmitting}
@@ -335,8 +342,13 @@ export function ResultReviewWorkflow({
             <div className={styles.reviewModalLayout}>
               <section className={styles.reviewModalImagePanel}>
                 <div className={styles.reviewModalImageFrame}>
-                  <img alt="当前巡检结果图片预览" className={styles.reviewModalImage} src={currentImageUrl} />
+                  {effectiveRectificationImageUrl ? (
+                    <img alt="当前巡检结果图片预览" className={styles.reviewModalImage} src={effectiveRectificationImageUrl} />
+                  ) : (
+                    <div className={styles.imageUnavailable}>图片不可用</div>
+                  )}
                 </div>
+                {imageNotice ? <p className={styles.imageFallbackNotice}>{imageNotice}</p> : null}
               </section>
               <div className={styles.reviewModalBody}>
                 {previewOrders.map((order, index) => (

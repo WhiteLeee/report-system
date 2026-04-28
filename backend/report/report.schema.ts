@@ -86,7 +86,12 @@ const inspectionFactSchema = z.object({
   channel_code: z.string().trim().optional(),
   capture_provider: z.string().trim().optional(),
   raw_result: z.string().trim().optional(),
+  raw_result_json: jsonSchema.optional(),
   error_message: z.string().trim().optional(),
+  evidence_image_url: z.string().trim().optional(),
+  evidence_image_source: z.string().trim().optional(),
+  original_image_url: z.string().trim().optional(),
+  provider_meta: jsonSchema.optional(),
   total_issues: z.number().int().nonnegative().optional()
 });
 
@@ -105,6 +110,9 @@ const issueFactSchema = z.object({
   count: z.number().int().nonnegative().optional(),
   severity: z.string().trim().optional(),
   review_status: incomingResultReviewStateSchema.optional(),
+  evidence_image_url: z.string().trim().optional(),
+  evidence_image_source: z.string().trim().optional(),
+  original_image_url: z.string().trim().optional(),
   extra_json: jsonSchema.optional()
 });
 
@@ -125,6 +133,20 @@ export const reportPublishSchema = z.object({
       issues: z.array(issueFactSchema).default([])
     })
   })
+}).superRefine((payload, ctx) => {
+  const seenInspectionIds = new Set<string>();
+
+  payload.report.facts.inspections.forEach((inspection, index) => {
+    if (seenInspectionIds.has(inspection.inspection_id)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Duplicate inspection_id "${inspection.inspection_id}" in report.facts.inspections.`,
+        path: ["report", "facts", "inspections", index, "inspection_id"]
+      });
+      return;
+    }
+    seenInspectionIds.add(inspection.inspection_id);
+  });
 });
 
 export type ReportPublishSchema = z.infer<typeof reportPublishSchema>;

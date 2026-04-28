@@ -75,6 +75,13 @@ interface CaptureSemanticSnapshot {
   reviewState: ResultReviewState;
 }
 
+interface ResolvedEvidenceImage {
+  payloadEvidenceUrl: string;
+  evidenceImageSource: string;
+  originalImageUrl: string;
+  displayImageUrl: string;
+}
+
 export interface NormalizedPublishedReport extends ReviewProgressSummary {
   publishId: string;
   sourceSystem: string;
@@ -147,6 +154,10 @@ function normalizeDisplayImageUrl(value: unknown): string {
   return withoutQuery;
 }
 
+function normalizePayloadImageUrl(value: unknown): string {
+  return safeString(value);
+}
+
 function resolveDisplayUrl(capture: ReportCaptureFact | undefined): string {
   const previewUrl = normalizeDisplayImageUrl(capture?.preview_url);
   if (previewUrl) {
@@ -157,6 +168,36 @@ function resolveDisplayUrl(capture: ReportCaptureFact | undefined): string {
     return captureUrl;
   }
   return "about:blank";
+}
+
+function emptyAboutBlank(value: string): string {
+  return value === "about:blank" ? "" : value;
+}
+
+function resolveOriginalImageUrl(capture: ReportCaptureFact | undefined, override: unknown): string {
+  return normalizePayloadImageUrl(override) || emptyAboutBlank(resolveDisplayUrl(capture));
+}
+
+function resolveEvidenceImage(input: {
+  capture: ReportCaptureFact | undefined;
+  evidenceImageUrl: unknown;
+  evidenceImageSource: unknown;
+  originalImageUrl: unknown;
+}): ResolvedEvidenceImage {
+  const payloadEvidenceUrl = normalizePayloadImageUrl(input.evidenceImageUrl);
+  const originalImageUrl = resolveOriginalImageUrl(input.capture, input.originalImageUrl);
+  const displayImageUrl = payloadEvidenceUrl || originalImageUrl || emptyAboutBlank(resolveDisplayUrl(input.capture));
+
+  return {
+    payloadEvidenceUrl,
+    evidenceImageSource: safeString(input.evidenceImageSource),
+    originalImageUrl,
+    displayImageUrl
+  };
+}
+
+function buildCaptureSkillKey(captureId: string, skillId: string): string {
+  return `${captureId}\u0000${skillId}`;
 }
 
 function buildProgressSummary(total: number, completed: number): ReviewProgressSummary {
@@ -185,6 +226,8 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
   const summaryMetrics = (payload.report.summary.metrics ?? {}) as Record<string, JsonValue>;
   const facts = payload.report.facts;
   const capturesById = new Map<string, ReportCaptureFact>();
+  const inspectionsById = new Map<string, ReportInspectionFact>();
+  const inspectionsByCaptureAndSkill = new Map<string, ReportInspectionFact>();
   const inspectionsByCaptureId = new Map<string, ReportInspectionFact[]>();
   const issuesByCaptureId = new Map<string, ReportIssueFact[]>();
 
@@ -193,6 +236,10 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
   });
 
   facts.inspections.forEach((inspection) => {
+    inspectionsById.set(inspection.inspection_id, inspection);
+    if (inspection.skill_id) {
+      inspectionsByCaptureAndSkill.set(buildCaptureSkillKey(inspection.capture_id, inspection.skill_id), inspection);
+    }
     const list = inspectionsByCaptureId.get(inspection.capture_id) ?? [];
     list.push(inspection);
     inspectionsByCaptureId.set(inspection.capture_id, list);
@@ -362,8 +409,16 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
     };
   });
 
+  const inspectionEvidenceById = new Map<string, ResolvedEvidenceImage>();
   const inspections: NormalizedInspectionRecord[] = facts.inspections.map((inspection: ReportInspectionFact, index) => {
     const capture = capturesById.get(inspection.capture_id);
+    const evidence = resolveEvidenceImage({
+      capture,
+      evidenceImageUrl: inspection.evidence_image_url,
+      evidenceImageSource: inspection.evidence_image_source,
+      originalImageUrl: inspection.original_image_url
+    });
+    inspectionEvidenceById.set(inspection.inspection_id, evidence);
     return {
       store_id: inspection.store_id || null,
       store_name: inspection.store_name || null,
@@ -383,7 +438,13 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
         capture_url: safeString(capture?.capture_url),
         preview_url: safeString(capture?.preview_url),
         oss_key: safeString(capture?.oss_key),
-        display_url: resolveDisplayUrl(capture)
+        display_url: evidence.displayImageUrl || resolveDisplayUrl(capture),
+        evidence_image_url: evidence.payloadEvidenceUrl,
+        evidence_image_source: evidence.evidenceImageSource,
+        original_image_url: evidence.originalImageUrl,
+        display_image_url: evidence.displayImageUrl,
+        provider_meta: inspection.provider_meta ?? {},
+        raw_result_json: inspection.raw_result_json ?? null
       },
       display_order: index
     };
@@ -391,7 +452,22 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
 
   const issues: NormalizedIssueRecord[] = facts.issues.map((issue: ReportIssueFact, index) => {
     const capture = capturesById.get(issue.capture_id);
-    const imageUrl = resolveDisplayUrl(capture);
+    const linkedInspection =
+      inspectionsById.get(issue.inspection_id) ||
+      (issue.skill_id ? inspectionsByCaptureAndSkill.get(buildCaptureSkillKey(issue.capture_id, issue.skill_id)) : undefined);
+    const linkedEvidence = linkedInspection ? inspectionEvidenceById.get(linkedInspection.inspection_id) : undefined;
+    const issueEvidence = resolveEvidenceImage({
+      capture,
+      evidenceImageUrl: issue.evidence_image_url,
+      evidenceImageSource: issue.evidence_image_source || linkedEvidence?.evidenceImageSource,
+      originalImageUrl: issue.original_image_url || linkedEvidence?.originalImageUrl
+    });
+    const imageUrl =
+      issueEvidence.payloadEvidenceUrl ||
+      linkedEvidence?.payloadEvidenceUrl ||
+      issueEvidence.originalImageUrl ||
+      linkedEvidence?.originalImageUrl ||
+      emptyAboutBlank(resolveDisplayUrl(capture));
     const title = safeString(issue.description) || safeString(issue.issue_type) || safeString(issue.skill_name) || issue.issue_id;
     return {
       store_id: issue.store_id || null,
@@ -401,7 +477,7 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
       severity: safeString(issue.severity) || null,
       description: safeString(issue.description) || null,
       suggestion: null,
-      image_url: imageUrl !== "about:blank" ? imageUrl : null,
+      image_url: imageUrl ? imageUrl : null,
       image_object_key: safeString(capture?.oss_key) || safeString(capture?.capture_url) || null,
       review_state: normalizeIncomingReviewState(issue.review_status),
       metadata: {
@@ -417,7 +493,14 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
         capture_url: safeString(capture?.capture_url),
         preview_url: safeString(capture?.preview_url),
         oss_key: safeString(capture?.oss_key),
-        display_url: imageUrl
+        display_url: imageUrl,
+        evidence_image_url: issueEvidence.payloadEvidenceUrl,
+        linked_inspection_id: linkedInspection?.inspection_id ?? "",
+        linked_inspection_evidence_image_url: linkedEvidence?.payloadEvidenceUrl ?? "",
+        evidence_image_source: safeString(issue.evidence_image_source) || linkedEvidence?.evidenceImageSource || "",
+        original_image_url: issueEvidence.originalImageUrl || linkedEvidence?.originalImageUrl || "",
+        display_image_url: imageUrl,
+        missing_inspection: Boolean(issue.inspection_id && !inspectionsById.has(issue.inspection_id))
       },
       display_order: index
     };

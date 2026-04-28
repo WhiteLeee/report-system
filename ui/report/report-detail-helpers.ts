@@ -21,6 +21,220 @@ export function readMetadataString(metadata: JsonValue, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+export function readMetadataRecord(metadata: JsonValue, key: string): Record<string, unknown> {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return {};
+  }
+  const value = metadata[key as keyof typeof metadata];
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+export function readMetadataBoolean(metadata: JsonValue, key: string): boolean {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return false;
+  }
+  return metadata[key as keyof typeof metadata] === true;
+}
+
+function readRecordString(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readRecordBoolean(record: Record<string, unknown>, key: string): boolean {
+  return record[key] === true;
+}
+
+export type ReportImageMode = "evidence" | "original";
+
+export type ResolvedReportImageState = {
+  mode: ReportImageMode;
+  url: string;
+  evidenceUrl: string;
+  originalUrl: string;
+  displayUrl: string;
+  isFallback: boolean;
+  fallbackReason: "none" | "missing_evidence" | "load_failed" | "original_mode" | "unavailable";
+  unstable: boolean;
+  unstableReason: string;
+  evidenceSource: string;
+};
+
+export function readInspectionEvidenceUrl(inspection: ReportInspection | null | undefined): string {
+  return readMetadataString(inspection?.metadata ?? null, "evidence_image_url");
+}
+
+export function readInspectionOriginalImageUrl(inspection: ReportInspection | null | undefined): string {
+  return readMetadataString(inspection?.metadata ?? null, "original_image_url");
+}
+
+export function readInspectionDisplayImageUrl(inspection: ReportInspection | null | undefined): string {
+  return readMetadataString(inspection?.metadata ?? null, "display_image_url") || readMetadataString(inspection?.metadata ?? null, "display_url");
+}
+
+export function readInspectionEvidenceSource(inspection: ReportInspection | null | undefined): string {
+  return readMetadataString(inspection?.metadata ?? null, "evidence_image_source");
+}
+
+export function readInspectionProviderMeta(inspection: ReportInspection | null | undefined): Record<string, unknown> {
+  return readMetadataRecord(inspection?.metadata ?? null, "provider_meta");
+}
+
+export function readIssueExtraJson(issue: ReportIssue | null | undefined): Record<string, unknown> {
+  return readMetadataRecord(issue?.metadata ?? null, "extra_json");
+}
+
+export function readIssueEvidenceUrl(issue: ReportIssue | null | undefined): string {
+  return readMetadataString(issue?.metadata ?? null, "evidence_image_url") ||
+    readMetadataString(issue?.metadata ?? null, "linked_inspection_evidence_image_url");
+}
+
+export function readIssueOriginalImageUrl(issue: ReportIssue | null | undefined): string {
+  return readMetadataString(issue?.metadata ?? null, "original_image_url");
+}
+
+export function readIssueEvidenceSource(issue: ReportIssue | null | undefined): string {
+  return readMetadataString(issue?.metadata ?? null, "evidence_image_source");
+}
+
+export function readIssueUnstableEvidence(issue: ReportIssue | null | undefined): boolean {
+  const extraJson = readIssueExtraJson(issue);
+  return readRecordBoolean(extraJson, "unstable_evidence") || readMetadataBoolean(issue?.metadata ?? null, "unstable_evidence");
+}
+
+export function readIssueUnstableEvidenceReason(issue: ReportIssue | null | undefined): string {
+  const extraJson = readIssueExtraJson(issue);
+  return readRecordString(extraJson, "evidence_asset_override_reason");
+}
+
+export function readInspectionUnstableEvidence(inspection: ReportInspection | null | undefined): boolean {
+  const providerMeta = readInspectionProviderMeta(inspection);
+  return readRecordBoolean(providerMeta, "unstable_evidence");
+}
+
+export function readInspectionUnstableEvidenceReason(inspection: ReportInspection | null | undefined): string {
+  const providerMeta = readInspectionProviderMeta(inspection);
+  return readRecordString(providerMeta, "evidence_asset_override_reason");
+}
+
+export function resolveResultImageState(input: {
+  selectedResult: ReportResult;
+  activeInspection?: ReportInspection | null;
+  activeIssue?: ReportIssue | null;
+  mode?: ReportImageMode;
+  loadFailed?: boolean;
+}): ResolvedReportImageState {
+  const resultDisplayUrl = readMetadataString(input.selectedResult.metadata, "display_url") || input.selectedResult.url;
+  const resultOriginalUrl =
+    readMetadataString(input.selectedResult.metadata, "capture_url") ||
+    readMetadataString(input.selectedResult.metadata, "preview_url") ||
+    resultDisplayUrl;
+  const issueEvidenceUrl = input.activeIssue ? readIssueEvidenceUrl(input.activeIssue) : "";
+  const issueOriginalUrl = input.activeIssue ? readIssueOriginalImageUrl(input.activeIssue) : "";
+  const inspectionEvidenceUrl = readInspectionEvidenceUrl(input.activeInspection);
+  const inspectionOriginalUrl = readInspectionOriginalImageUrl(input.activeInspection);
+  const inspectionDisplayUrl = readInspectionDisplayImageUrl(input.activeInspection);
+  const evidenceUrl = issueEvidenceUrl || inspectionEvidenceUrl;
+  const originalUrl = issueOriginalUrl || inspectionOriginalUrl || resultOriginalUrl;
+  const displayUrl = evidenceUrl || inspectionDisplayUrl || originalUrl || resultDisplayUrl;
+  const mode = input.mode === "original" ? "original" : "evidence";
+  const unstable =
+    readIssueUnstableEvidence(input.activeIssue) || readInspectionUnstableEvidence(input.activeInspection);
+  const unstableReason =
+    readIssueUnstableEvidenceReason(input.activeIssue) || readInspectionUnstableEvidenceReason(input.activeInspection);
+  const evidenceSource =
+    readIssueEvidenceSource(input.activeIssue) || readInspectionEvidenceSource(input.activeInspection);
+
+  if (mode === "original") {
+    return {
+      mode,
+      url: originalUrl || displayUrl,
+      evidenceUrl,
+      originalUrl,
+      displayUrl,
+      isFallback: true,
+      fallbackReason: "original_mode",
+      unstable,
+      unstableReason,
+      evidenceSource
+    };
+  }
+
+  if (input.loadFailed && originalUrl) {
+    return {
+      mode,
+      url: originalUrl,
+      evidenceUrl,
+      originalUrl,
+      displayUrl,
+      isFallback: true,
+      fallbackReason: "load_failed",
+      unstable,
+      unstableReason,
+      evidenceSource
+    };
+  }
+
+  if (!evidenceUrl && originalUrl) {
+    return {
+      mode,
+      url: originalUrl,
+      evidenceUrl,
+      originalUrl,
+      displayUrl,
+      isFallback: true,
+      fallbackReason: "missing_evidence",
+      unstable,
+      unstableReason,
+      evidenceSource
+    };
+  }
+
+  if (!displayUrl) {
+    return {
+      mode,
+      url: "",
+      evidenceUrl,
+      originalUrl,
+      displayUrl,
+      isFallback: true,
+      fallbackReason: "unavailable",
+      unstable,
+      unstableReason,
+      evidenceSource
+    };
+  }
+
+  return {
+    mode,
+    url: displayUrl,
+    evidenceUrl,
+    originalUrl,
+    displayUrl,
+    isFallback: false,
+    fallbackReason: "none",
+    unstable,
+    unstableReason,
+    evidenceSource
+  };
+}
+
+export function getResolvedImageNotice(imageState: ResolvedReportImageState): string {
+  if (imageState.fallbackReason === "load_failed") {
+    return "标注图加载失败，当前为原图。";
+  }
+  if (imageState.fallbackReason === "missing_evidence") {
+    return "标注图不可用，当前为原图。";
+  }
+  if (imageState.fallbackReason === "original_mode") {
+    return "当前正在查看原图。";
+  }
+  if (imageState.fallbackReason === "unavailable") {
+    return "图片不可用。";
+  }
+  return "";
+}
+
 export function buildScopeStoreIds(stores: ReportStore[], filters: DetailFilters): Set<string> {
   return new Set(
     stores

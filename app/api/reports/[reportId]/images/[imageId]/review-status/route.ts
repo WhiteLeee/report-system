@@ -59,6 +59,13 @@ function readMetadataString(metadata: unknown, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+function addImageUrl(target: Set<string>, value: unknown): void {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (normalized) {
+    target.add(normalized);
+  }
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ reportId: string; imageId: string }> }
@@ -130,7 +137,28 @@ export async function POST(
       readMetadataString(resultDetail.metadata, "store_code") ||
       readMetadataString(store?.metadata, "store_code") ||
       "";
-    const imageUrl = readMetadataString(resultDetail.metadata, "display_url") || resultDetail.url;
+    const allowedImageUrls = new Set<string>();
+    resultIssues.forEach((issue) => {
+      addImageUrl(allowedImageUrls, issue.image_url);
+      addImageUrl(allowedImageUrls, readMetadataString(issue.metadata, "display_image_url"));
+      addImageUrl(allowedImageUrls, readMetadataString(issue.metadata, "evidence_image_url"));
+      addImageUrl(allowedImageUrls, readMetadataString(issue.metadata, "linked_inspection_evidence_image_url"));
+      addImageUrl(allowedImageUrls, readMetadataString(issue.metadata, "original_image_url"));
+    });
+    resultInspections.forEach((inspection) => {
+      addImageUrl(allowedImageUrls, readMetadataString(inspection.metadata, "display_image_url"));
+      addImageUrl(allowedImageUrls, readMetadataString(inspection.metadata, "evidence_image_url"));
+      addImageUrl(allowedImageUrls, readMetadataString(inspection.metadata, "original_image_url"));
+    });
+    addImageUrl(allowedImageUrls, readMetadataString(resultDetail.metadata, "display_url"));
+    addImageUrl(allowedImageUrls, readMetadataString(resultDetail.metadata, "capture_url"));
+    addImageUrl(allowedImageUrls, readMetadataString(resultDetail.metadata, "preview_url"));
+    addImageUrl(allowedImageUrls, resultDetail.url);
+    const requestedRectificationImageUrl = String(payload.rectification_image_url || "").trim();
+    const imageUrl =
+      requestedRectificationImageUrl && allowedImageUrls.has(requestedRectificationImageUrl)
+        ? requestedRectificationImageUrl
+        : Array.from(allowedImageUrls)[0] || "";
 
     if (shouldCreateRectification) {
       try {

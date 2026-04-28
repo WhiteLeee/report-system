@@ -89,7 +89,12 @@ export interface ReportInspectionFact {
   channel_code?: string;
   capture_provider?: string;
   raw_result?: string;
+  raw_result_json?: JsonValue;
   error_message?: string;
+  evidence_image_url?: string;
+  evidence_image_source?: string;
+  original_image_url?: string;
+  provider_meta?: JsonValue;
   total_issues?: number;
 }
 
@@ -108,6 +113,9 @@ export interface ReportIssueFact {
   count?: number;
   severity?: string;
   review_status?: IncomingResultReviewState;
+  evidence_image_url?: string;
+  evidence_image_source?: string;
+  original_image_url?: string;
   extra_json?: JsonValue;
 }
 

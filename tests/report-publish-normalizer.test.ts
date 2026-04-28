@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { normalizePublishedReport } from "../backend/report/report-publish-normalizer";
+import { reportPublishSchema } from "../backend/report/report.schema";
 import type { ReportPublishPayload } from "../backend/report/report.types";
 
 function createPayload(): ReportPublishPayload {
@@ -119,4 +120,124 @@ test("未发现问题的图片在入库标准化时自动标记为已复核", ()
   assert.equal(normalized.progress_state, "in_progress");
   assert.equal(normalized.stores[0].completed_result_count, 1);
   assert.equal(normalized.stores[0].progress_state, "in_progress");
+});
+
+test("发布 schema 保留 V5 evidence 扩展字段并拒绝重复 inspection_id", () => {
+  const payload = createPayload();
+  payload.report.facts.inspections[0].evidence_image_url = "https://oss.example.com/evidence-a.jpg?token=keep";
+  payload.report.facts.inspections[0].evidence_image_source = "oss_rendered";
+  payload.report.facts.inspections[0].original_image_url = "https://hyy.example.com/original-a.jpg";
+  payload.report.facts.inspections[0].provider_meta = {
+    unstable_evidence: true,
+    evidence_asset_override_reason: "人工覆盖发布"
+  };
+  payload.report.facts.inspections[0].raw_result_json = { labels: [{ x: 1, y: 2 }] };
+  payload.report.facts.issues[0].evidence_image_url = "https://oss.example.com/issue-a.jpg";
+  payload.report.facts.issues[0].evidence_image_source = "oss_rendered";
+  payload.report.facts.issues[0].original_image_url = "https://hyy.example.com/issue-original.jpg";
+
+  const parsed = reportPublishSchema.safeParse(payload);
+
+  assert.equal(parsed.success, true);
+  if (!parsed.success) {
+    return;
+  }
+  assert.equal(parsed.data.report.facts.inspections[0].evidence_image_url, "https://oss.example.com/evidence-a.jpg?token=keep");
+  assert.deepEqual(parsed.data.report.facts.inspections[0].provider_meta, {
+    unstable_evidence: true,
+    evidence_asset_override_reason: "人工覆盖发布"
+  });
+  assert.deepEqual(parsed.data.report.facts.inspections[0].raw_result_json, { labels: [{ x: 1, y: 2 }] });
+  assert.equal(parsed.data.report.facts.issues[0].evidence_image_url, "https://oss.example.com/issue-a.jpg");
+
+  const duplicatePayload = createPayload();
+  duplicatePayload.report.facts.inspections[1].inspection_id = duplicatePayload.report.facts.inspections[0].inspection_id;
+
+  const duplicateParsed = reportPublishSchema.safeParse(duplicatePayload);
+
+  assert.equal(duplicateParsed.success, false);
+});
+
+test("同一抓拍下多技能各自保留标注图，issue 优先使用关联 inspection evidence", () => {
+  const payload = createPayload();
+  payload.report.facts.captures = [
+    {
+      capture_id: "capture-shared",
+      image_id: "image-shared",
+      store_id: "store-1",
+      store_name: "测试门店",
+      preview_url: "https://example.com/original-shared.jpg",
+      captured_at: "2026-04-01 10:00:00",
+      issue_count: 1
+    }
+  ];
+  payload.report.facts.inspections = [
+    {
+      inspection_id: "inspection-a",
+      capture_id: "capture-shared",
+      image_id: "image-shared",
+      store_id: "store-1",
+      skill_id: "skill-a",
+      skill_name: "技能 A",
+      status: "success",
+      raw_result: "A",
+      evidence_image_url: "https://oss.example.com/a.jpg?token=a",
+      evidence_image_source: "oss_rendered",
+      original_image_url: "https://example.com/original-shared.jpg",
+      provider_meta: {
+        unstable_evidence: false
+      },
+      total_issues: 0
+    },
+    {
+      inspection_id: "inspection-b",
+      capture_id: "capture-shared",
+      image_id: "image-shared",
+      store_id: "store-1",
+      skill_id: "skill-b",
+      skill_name: "技能 B",
+      status: "success",
+      raw_result: "B",
+      evidence_image_url: "https://oss.example.com/b.jpg?token=b",
+      evidence_image_source: "oss_rendered",
+      original_image_url: "https://example.com/original-shared.jpg",
+      provider_meta: {
+        unstable_evidence: true,
+        evidence_asset_override_reason: "人工覆盖发布"
+      },
+      total_issues: 1
+    }
+  ];
+  payload.report.facts.issues = [
+    {
+      issue_id: "issue-b",
+      inspection_id: "inspection-b",
+      capture_id: "capture-shared",
+      image_id: "image-shared",
+      store_id: "store-1",
+      skill_id: "skill-b",
+      skill_name: "技能 B",
+      issue_type: "陈列",
+      description: "技能 B 识别问题",
+      count: 1,
+      severity: "P2",
+      review_status: "pending_review",
+      extra_json: {
+        unstable_evidence: true,
+        evidence_asset_override_reason: "人工覆盖发布"
+      }
+    }
+  ];
+
+  const normalized = normalizePublishedReport(payload);
+  const inspectionA = normalized.inspections.find((inspection) => inspection.inspection_id === "inspection-a");
+  const inspectionB = normalized.inspections.find((inspection) => inspection.inspection_id === "inspection-b");
+  const issueB = normalized.issues[0];
+
+  assert.equal((inspectionA?.metadata as Record<string, unknown>).evidence_image_url, "https://oss.example.com/a.jpg?token=a");
+  assert.equal((inspectionB?.metadata as Record<string, unknown>).evidence_image_url, "https://oss.example.com/b.jpg?token=b");
+  assert.equal(issueB.image_url, "https://oss.example.com/b.jpg?token=b");
+  assert.equal((issueB.metadata as Record<string, unknown>).linked_inspection_evidence_image_url, "https://oss.example.com/b.jpg?token=b");
+  assert.equal((issueB.metadata as Record<string, unknown>).evidence_image_url, "");
+  assert.equal((issueB.metadata as Record<string, unknown>).display_image_url, "https://oss.example.com/b.jpg?token=b");
 });

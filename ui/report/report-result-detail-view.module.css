@@ -191,6 +191,59 @@
   gap: 8px;
 }
 
+.imageModeActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.imageModeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.imageStatusPill {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: 3px 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.imageRiskText {
+  color: var(--danger-text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.imageFallbackNotice {
+  margin: 0;
+  border-radius: 0.625rem;
+  border: 1px solid var(--warning-border, var(--line));
+  padding: 8px 10px;
+  background: var(--warning-bg, var(--surface-soft));
+  color: var(--warning-text, var(--muted));
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.imageUnavailable {
+  display: grid;
+  width: 100%;
+  min-height: 180px;
+  place-items: center;
+  background: var(--surface-code);
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .scenePrimaryAction {
   grid-column: 1 / -1;
 }
