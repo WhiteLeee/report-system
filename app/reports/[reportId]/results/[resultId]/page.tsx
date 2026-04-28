@@ -40,6 +40,10 @@ function normalizeImageMode(value: string | string[] | undefined): ReportImageMo
   return value === "original" ? "original" : "evidence";
 }
 
+function normalizeImageFallback(value: string | string[] | undefined): "load_failed" | "" {
+  return value === "load_failed" ? "load_failed" : "";
+}
+
 export default async function ReportResultDetailPage({
   params,
   searchParams
@@ -79,6 +83,7 @@ export default async function ReportResultDetailPage({
     typeof resolvedSearchParams.inspection === "string" ? resolvedSearchParams.inspection : "";
   const activePanel = typeof resolvedSearchParams.panel === "string" ? resolvedSearchParams.panel : "";
   const imageMode = normalizeImageMode(resolvedSearchParams.imageMode);
+  const imageFallback = normalizeImageFallback(resolvedSearchParams.imageFallback);
   const previewImage = typeof resolvedSearchParams.preview === "string" && resolvedSearchParams.preview === "1";
   const rectificationOrders = await rectificationService.syncOrdersByResultId(resultId);
   const huiYunYingApiSettings = systemSettingsService.getHuiYunYingApiSettings();
@@ -90,6 +95,7 @@ export default async function ReportResultDetailPage({
       currentUser={currentUser}
       defaultShouldCorrectedDays={huiYunYingApiSettings.defaultShouldCorrectedDays}
       filters={filters}
+      imageFallback={imageFallback}
       imageMode={imageMode}
       maxRectificationDescriptionLength={huiYunYingApiSettings.rectificationDescriptionMaxLength}
       previewImage={previewImage}

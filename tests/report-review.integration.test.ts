@@ -424,6 +424,130 @@ test("publish rejects unsupported payload_version with 422", async () => {
   assert.deepEqual(publishJson.supported_payload_versions, [2]);
 });
 
+test("review submit uses active inspection semantics instead of whole capture semantics", async () => {
+  const originalFetch = globalThis.fetch;
+  const fetchCalls: Array<string> = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    fetchCalls.push(url);
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const loginResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "ChangeMe123!");
+          return formData;
+        })()
+      })
+    );
+    const sessionCookie = loginResp.headers.get("set-cookie") || "";
+
+    const publishResp = await publishRoute.POST(
+      new Request("http://127.0.0.1:3000/api/reports/publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...publishPayload,
+          idempotency_key: "review-test-active-inspection-semantics",
+          published_at: "2026-04-03 10:00:00",
+          report: {
+            ...publishPayload.report,
+            summary: {
+              metrics: {
+                store_count: 1,
+                image_count: 1,
+                issue_count: 1
+              }
+            },
+            report_meta: {
+              ...publishPayload.report.report_meta,
+              start_date: "2026-04-03",
+              end_date: "2026-04-03",
+              generated_at: "2026-04-03 10:00:00"
+            },
+            facts: {
+              ...publishPayload.report.facts,
+              inspections: [
+                {
+                  ...publishPayload.report.facts.inspections[0],
+                  inspection_id: "inspection-active-a",
+                  skill_id: "skill-a",
+                  skill_name: "技能 A",
+                  raw_result: "发现问题",
+                  total_issues: 1
+                },
+                {
+                  ...publishPayload.report.facts.inspections[0],
+                  inspection_id: "inspection-active-b",
+                  skill_id: "skill-b",
+                  skill_name: "技能 B",
+                  raw_result: "识别完成，未发现异常。",
+                  total_issues: 0
+                }
+              ],
+              issues: [
+                {
+                  ...publishPayload.report.facts.issues[0],
+                  issue_id: "issue-active-a",
+                  inspection_id: "inspection-active-a",
+                  skill_id: "skill-a",
+                  skill_name: "技能 A"
+                }
+              ]
+            }
+          }
+        })
+      })
+    );
+    const publishJson = (await publishResp.json()) as { report_id: number };
+    const reportId = publishJson.report_id;
+
+    const detailResp = await reportRoute.GET(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
+      { params: Promise.resolve({ reportId: String(reportId) }) }
+    );
+    const detailJson = (await detailResp.json()) as { report: { images: Array<{ id: number; review_state: string }> } };
+    const imageId = detailJson.report.images[0].id;
+    assert.equal(detailJson.report.images[0].review_state, "pending");
+
+    const reviewResp = await reviewRoute.POST(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({
+          review_status: "completed",
+          active_inspection_id: "inspection-active-b",
+          result_semantic_state: "pass",
+          note: "当前技能无问题，本地完成复核。"
+        })
+      }),
+      {
+        params: Promise.resolve({ reportId: String(reportId), imageId: String(imageId) })
+      }
+    );
+
+    assert.equal(reviewResp.status, 200);
+    const reviewJson = (await reviewResp.json()) as {
+      result_semantic_state: string | null;
+      rectification_orders: Array<unknown>;
+      selected_issues: Array<unknown>;
+      to_status: string;
+    };
+    assert.equal(reviewJson.result_semantic_state, "pass");
+    assert.equal(reviewJson.to_status, "completed");
+    assert.equal(reviewJson.selected_issues.length, 0);
+    assert.equal(reviewJson.rectification_orders.length, 0);
+    assert.equal(fetchCalls.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("review submit treats huiyunying business failure as 502", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (input: string | URL | Request) => {
@@ -484,8 +608,14 @@ test("review submit treats huiyunying business failure as 502", async () => {
       new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
       { params: Promise.resolve({ reportId: String(reportId) }) }
     );
-    const detailJson = (await detailResp.json()) as { report: { images: Array<{ id: number }> } };
+    const detailJson = (await detailResp.json()) as {
+      report: {
+        images: Array<{ id: number }>;
+        issues: Array<{ id: number; title: string }>;
+      };
+    };
     const imageId = detailJson.report.images[0].id;
+    const issue = detailJson.report.issues[0];
 
     const reviewResp = await reviewRoute.POST(
       new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
@@ -493,7 +623,7 @@ test("review submit treats huiyunying business failure as 502", async () => {
         headers: { "content-type": "application/json", cookie: sessionCookie },
         body: JSON.stringify({
           review_status: "completed",
-          selected_issues_json: JSON.stringify([{ id: 1, title: "货架未摆满" }]),
+          selected_issues_json: JSON.stringify([{ id: issue.id, title: issue.title }]),
           should_corrected: "2026-04-05"
         })
       }),

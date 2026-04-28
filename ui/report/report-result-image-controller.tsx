@@ -22,6 +22,7 @@ export function ReportResultImagePreviewCard({
   currentStoreName,
   evidencePath,
   imageState,
+  imageLoadFailedPath,
   nextResultPath,
   originalPath,
   previousResultPath,
@@ -31,6 +32,7 @@ export function ReportResultImagePreviewCard({
   currentStoreName: string;
   evidencePath: string;
   imageState: ResolvedReportImageState;
+  imageLoadFailedPath: string;
   nextResultPath: string;
   originalPath: string;
   previousResultPath: string;
@@ -42,7 +44,7 @@ export function ReportResultImagePreviewCard({
 
   function handleImageError() {
     if (imageState.mode === "evidence" && imageState.evidenceUrl && imageState.originalUrl) {
-      router.replace(originalPath);
+      router.replace(imageLoadFailedPath);
     }
   }
 

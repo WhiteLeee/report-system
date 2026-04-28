@@ -452,8 +452,9 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
 
   const issues: NormalizedIssueRecord[] = facts.issues.map((issue: ReportIssueFact, index) => {
     const capture = capturesById.get(issue.capture_id);
+    const issueInspectionId = safeString(issue.inspection_id);
     const linkedInspection =
-      inspectionsById.get(issue.inspection_id) ||
+      (issueInspectionId ? inspectionsById.get(issueInspectionId) : undefined) ||
       (issue.skill_id ? inspectionsByCaptureAndSkill.get(buildCaptureSkillKey(issue.capture_id, issue.skill_id)) : undefined);
     const linkedEvidence = linkedInspection ? inspectionEvidenceById.get(linkedInspection.inspection_id) : undefined;
     const issueEvidence = resolveEvidenceImage({
@@ -482,7 +483,7 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
       review_state: normalizeIncomingReviewState(issue.review_status),
       metadata: {
         issue_id: issue.issue_id,
-        inspection_id: issue.inspection_id,
+        inspection_id: issueInspectionId,
         capture_id: issue.capture_id,
         image_id: issue.image_id,
         store_code: safeString(issue.store_code),
@@ -500,7 +501,7 @@ export function normalizePublishedReport(payload: ReportPublishPayload): Normali
         evidence_image_source: safeString(issue.evidence_image_source) || linkedEvidence?.evidenceImageSource || "",
         original_image_url: issueEvidence.originalImageUrl || linkedEvidence?.originalImageUrl || "",
         display_image_url: imageUrl,
-        missing_inspection: Boolean(issue.inspection_id && !inspectionsById.has(issue.inspection_id))
+        missing_inspection: !linkedInspection
       },
       display_order: index
     };

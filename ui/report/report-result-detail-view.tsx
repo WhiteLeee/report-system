@@ -53,7 +53,7 @@ function buildResultPath(
   reportId: number,
   resultId: number,
   filters: DetailFilters,
-  options?: { inspection?: string; imageMode?: ReportImageMode; panel?: string }
+  options?: { imageFallback?: "load_failed" | ""; inspection?: string; imageMode?: ReportImageMode; panel?: string }
 ): string {
   const searchParams = new URLSearchParams(buildSearch(filters).replace(/^\?/, ""));
   if (options?.inspection) {
@@ -70,6 +70,11 @@ function buildResultPath(
     searchParams.set("imageMode", "original");
   } else {
     searchParams.delete("imageMode");
+  }
+  if (options?.imageFallback === "load_failed") {
+    searchParams.set("imageFallback", "load_failed");
+  } else {
+    searchParams.delete("imageFallback");
   }
   const search = searchParams.toString();
   return search ? `/reports/${reportId}/results/${resultId}?${search}` : `/reports/${reportId}/results/${resultId}`;
@@ -280,6 +285,7 @@ export function ReportResultDetailView({
   currentUser,
   defaultShouldCorrectedDays,
   filters,
+  imageFallback,
   imageMode,
   maxRectificationDescriptionLength,
   previewImage,
@@ -292,6 +298,7 @@ export function ReportResultDetailView({
   currentUser: SessionUser;
   defaultShouldCorrectedDays: number;
   filters: DetailFilters;
+  imageFallback: "load_failed" | "";
   imageMode: ReportImageMode;
   maxRectificationDescriptionLength: number;
   previewImage: boolean;
@@ -334,6 +341,7 @@ export function ReportResultDetailView({
   const activeInspection =
     resolvedInspectionId ? inspectionTabs.find((item) => item.inspection.inspection_id === resolvedInspectionId) || null : null;
   const currentPath = buildResultPath(report.id, selectedResult.id, filters, {
+    imageFallback,
     inspection: resolvedInspectionId,
     imageMode,
     panel: activePanel
@@ -347,6 +355,12 @@ export function ReportResultDetailView({
   const originalPath = buildResultPath(report.id, selectedResult.id, filters, {
     inspection: resolvedInspectionId,
     imageMode: "original",
+    panel: activePanel
+  });
+  const imageLoadFailedPath = buildResultPath(report.id, selectedResult.id, filters, {
+    imageFallback: "load_failed",
+    inspection: resolvedInspectionId,
+    imageMode: "evidence",
     panel: activePanel
   });
   const reviewActionPath = `${currentPath}#review-action`;
@@ -366,15 +380,20 @@ export function ReportResultDetailView({
     : "";
   const activeIssues = activeInspection?.issues ?? selectedIssues;
   const activeIssue = activeIssues[0] ?? null;
+  const activeSemanticState = activeInspection
+    ? classifyReportResultSemantics(activeInspection.issues, [activeInspection.inspection])
+    : selectedResultSemanticState;
   const imageState = resolveResultImageState({
     selectedResult,
     activeInspection: activeInspection?.inspection ?? null,
+    loadFailed: imageFallback === "load_failed",
     mode: imageMode
   });
   const rectificationImageState = resolveResultImageState({
     selectedResult,
     activeInspection: activeInspection?.inspection ?? null,
     activeIssue,
+    loadFailed: imageFallback === "load_failed",
     mode: "evidence"
   });
   const imageNotice = getResolvedImageNotice(imageState);
@@ -456,6 +475,7 @@ export function ReportResultDetailView({
                   currentStoreName={currentStoreName}
                   evidencePath={evidencePath}
                   imageState={imageState}
+                  imageLoadFailedPath={imageLoadFailedPath}
                   nextResultPath={nextResultPath}
                   originalPath={originalPath}
                   previousResultPath={previousResultPath}
@@ -493,7 +513,7 @@ export function ReportResultDetailView({
                   <div className={`${styles.analysisWorkspace} ${styles.sceneSection}`}>
                     <div className={styles.alertPanel}>
                       <div className={styles.alertHead}>
-                        <strong>{getReportResultSemanticSummaryLabel(selectedResultSemanticState, activeInspection.issues.length)}</strong>
+                        <strong>{getReportResultSemanticSummaryLabel(activeSemanticState, activeInspection.issues.length)}</strong>
                       </div>
                       {activeInspection.issues.length > 0 ? (
                         <ul className={styles.issueSummaryList}>
@@ -501,9 +521,9 @@ export function ReportResultDetailView({
                             <li key={issue.id}>{issue.title}</li>
                           ))}
                         </ul>
-                      ) : selectedResultSemanticState === "pass" ? (
+                      ) : activeSemanticState === "pass" ? (
                         <p className={styles.analysisCopy}>当前图片已完成巡检，未发现需要复核的问题项。</p>
-                      ) : selectedResultSemanticState === "inspection_failed" ? (
+                      ) : activeSemanticState === "inspection_failed" ? (
                         <p className={styles.analysisCopy}>当前图片存在巡检失败记录，本次仅支持本地复核记录异常情况，不下发整改单。</p>
                       ) : (
                         <p className={styles.analysisCopy}>当前图片没有形成明确问题项，可结合算法返回内容判断是否属于目标缺失、画面异常或其他无法判定场景。</p>
@@ -526,12 +546,13 @@ export function ReportResultDetailView({
                     currentPath={currentPath}
                     defaultShouldCorrectedDays={defaultShouldCorrectedDays}
                     imageNotice={imageNotice}
+                    activeInspectionId={resolvedInspectionId}
                     initialReviewState={selectedResult.review_state}
                     initialSelectedIssueIds={initialSelectedIssueIds}
                     issues={activeIssues.map((issue) => ({ id: issue.id, title: issue.title }))}
                     maxDescriptionLength={maxRectificationDescriptionLength}
                     rectificationImageUrl={rectificationImageState.url}
-                    semanticState={selectedResultSemanticState}
+                    semanticState={activeSemanticState}
                   />
                 </div>
 

@@ -122,7 +122,7 @@ test("未发现问题的图片在入库标准化时自动标记为已复核", ()
   assert.equal(normalized.stores[0].progress_state, "in_progress");
 });
 
-test("发布 schema 保留 V5 evidence 扩展字段并拒绝重复 inspection_id", () => {
+test("发布 schema 保留 V5 evidence 扩展字段并拒绝重复业务 ID", () => {
   const payload = createPayload();
   payload.report.facts.inspections[0].evidence_image_url = "https://oss.example.com/evidence-a.jpg?token=keep";
   payload.report.facts.inspections[0].evidence_image_source = "oss_rendered";
@@ -156,6 +156,23 @@ test("发布 schema 保留 V5 evidence 扩展字段并拒绝重复 inspection_id
   const duplicateParsed = reportPublishSchema.safeParse(duplicatePayload);
 
   assert.equal(duplicateParsed.success, false);
+
+  const duplicateCapturePayload = createPayload();
+  duplicateCapturePayload.report.facts.captures[1].capture_id = duplicateCapturePayload.report.facts.captures[0].capture_id;
+
+  const duplicateCaptureParsed = reportPublishSchema.safeParse(duplicateCapturePayload);
+
+  assert.equal(duplicateCaptureParsed.success, false);
+
+  const duplicateIssuePayload = createPayload();
+  duplicateIssuePayload.report.facts.issues.push({
+    ...duplicateIssuePayload.report.facts.issues[0],
+    inspection_id: "inspection-1"
+  });
+
+  const duplicateIssueParsed = reportPublishSchema.safeParse(duplicateIssuePayload);
+
+  assert.equal(duplicateIssueParsed.success, false);
 });
 
 test("同一抓拍下多技能各自保留标注图，issue 优先使用关联 inspection evidence", () => {
@@ -240,4 +257,56 @@ test("同一抓拍下多技能各自保留标注图，issue 优先使用关联 i
   assert.equal((issueB.metadata as Record<string, unknown>).linked_inspection_evidence_image_url, "https://oss.example.com/b.jpg?token=b");
   assert.equal((issueB.metadata as Record<string, unknown>).evidence_image_url, "");
   assert.equal((issueB.metadata as Record<string, unknown>).display_image_url, "https://oss.example.com/b.jpg?token=b");
+});
+
+test("issue 缺失 inspection_id 时按 capture_id 和 skill_id 降级匹配 inspection", () => {
+  const payload = createPayload();
+  payload.report.facts.captures = [
+    {
+      capture_id: "capture-shared-fallback",
+      image_id: "image-shared-fallback",
+      store_id: "store-1",
+      store_name: "测试门店",
+      preview_url: "https://example.com/original-fallback.jpg",
+      captured_at: "2026-04-01 10:00:00",
+      issue_count: 1
+    }
+  ];
+  payload.report.facts.inspections = [
+    {
+      inspection_id: "inspection-fallback-a",
+      capture_id: "capture-shared-fallback",
+      image_id: "image-shared-fallback",
+      store_id: "store-1",
+      skill_id: "skill-a",
+      skill_name: "技能 A",
+      status: "success",
+      evidence_image_url: "https://oss.example.com/fallback-a.jpg",
+      total_issues: 1
+    }
+  ];
+  payload.report.facts.issues = [
+    {
+      issue_id: "issue-without-inspection",
+      capture_id: "capture-shared-fallback",
+      image_id: "image-shared-fallback",
+      store_id: "store-1",
+      skill_id: "skill-a",
+      skill_name: "技能 A",
+      issue_type: "陈列",
+      description: "未绑定 inspection_id 的问题",
+      count: 1,
+      severity: "P2"
+    }
+  ];
+
+  const parsed = reportPublishSchema.safeParse(payload);
+  assert.equal(parsed.success, true);
+
+  const normalized = normalizePublishedReport(payload);
+  const issue = normalized.issues[0];
+
+  assert.equal(issue.image_url, "https://oss.example.com/fallback-a.jpg");
+  assert.equal((issue.metadata as Record<string, unknown>).linked_inspection_id, "inspection-fallback-a");
+  assert.equal((issue.metadata as Record<string, unknown>).missing_inspection, false);
 });

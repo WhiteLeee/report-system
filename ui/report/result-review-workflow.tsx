@@ -39,6 +39,7 @@ function buildDefaultShouldCorrectedDate(defaultDays: number): string {
 
 export function ResultReviewWorkflow({
   actionUrl,
+  activeInspectionId,
   canReview,
   currentImageUrl,
   currentPath,
@@ -52,6 +53,7 @@ export function ResultReviewWorkflow({
   defaultShouldCorrectedDays
 }: {
   actionUrl: string;
+  activeInspectionId?: string;
   canReview: boolean;
   currentImageUrl: string;
   currentPath: string;
@@ -111,6 +113,7 @@ export function ResultReviewWorkflow({
         body: JSON.stringify({
           review_status: reviewStatus,
           should_corrected: shouldCorrected,
+          active_inspection_id: activeInspectionId || "",
           note,
           return_to: currentPath,
           selected_issues_json: JSON.stringify(selectedIssues),

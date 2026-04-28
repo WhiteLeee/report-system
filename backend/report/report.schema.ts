@@ -97,7 +97,7 @@ const inspectionFactSchema = z.object({
 
 const issueFactSchema = z.object({
   issue_id: z.string().trim().min(1),
-  inspection_id: z.string().trim().min(1),
+  inspection_id: z.string().trim().optional().default(""),
   capture_id: z.string().trim().min(1),
   image_id: z.string().trim().min(1),
   store_id: z.string().trim().min(1),
@@ -134,7 +134,21 @@ export const reportPublishSchema = z.object({
     })
   })
 }).superRefine((payload, ctx) => {
+  const seenCaptureIds = new Set<string>();
   const seenInspectionIds = new Set<string>();
+  const seenIssueIds = new Set<string>();
+
+  payload.report.facts.captures.forEach((capture, index) => {
+    if (seenCaptureIds.has(capture.capture_id)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Duplicate capture_id "${capture.capture_id}" in report.facts.captures.`,
+        path: ["report", "facts", "captures", index, "capture_id"]
+      });
+      return;
+    }
+    seenCaptureIds.add(capture.capture_id);
+  });
 
   payload.report.facts.inspections.forEach((inspection, index) => {
     if (seenInspectionIds.has(inspection.inspection_id)) {
@@ -146,6 +160,18 @@ export const reportPublishSchema = z.object({
       return;
     }
     seenInspectionIds.add(inspection.inspection_id);
+  });
+
+  payload.report.facts.issues.forEach((issue, index) => {
+    if (seenIssueIds.has(issue.issue_id)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Duplicate issue_id "${issue.issue_id}" in report.facts.issues.`,
+        path: ["report", "facts", "issues", index, "issue_id"]
+      });
+      return;
+    }
+    seenIssueIds.add(issue.issue_id);
   });
 });
 

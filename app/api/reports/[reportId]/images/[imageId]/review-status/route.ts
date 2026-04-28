@@ -66,6 +66,36 @@ function addImageUrl(target: Set<string>, value: unknown): void {
   }
 }
 
+function addIssueImageUrls(target: Set<string>, issue: { image_url: string | null; metadata: unknown }): void {
+  addImageUrl(target, issue.image_url);
+  addImageUrl(target, readMetadataString(issue.metadata, "display_image_url"));
+  addImageUrl(target, readMetadataString(issue.metadata, "evidence_image_url"));
+  addImageUrl(target, readMetadataString(issue.metadata, "linked_inspection_evidence_image_url"));
+  addImageUrl(target, readMetadataString(issue.metadata, "original_image_url"));
+}
+
+function addInspectionImageUrls(target: Set<string>, inspection: { metadata: unknown }): void {
+  addImageUrl(target, readMetadataString(inspection.metadata, "display_image_url"));
+  addImageUrl(target, readMetadataString(inspection.metadata, "evidence_image_url"));
+  addImageUrl(target, readMetadataString(inspection.metadata, "original_image_url"));
+}
+
+function issueMatchesInspection(
+  issue: { metadata: unknown },
+  inspection: { inspection_id: string; skill_id: string; skill_name: string | null }
+): boolean {
+  const issueInspectionId = readMetadataString(issue.metadata, "inspection_id");
+  const issueSkillId = readMetadataString(issue.metadata, "skill_id");
+  const issueSkillName = readMetadataString(issue.metadata, "skill_name");
+  if (issueInspectionId && issueInspectionId === inspection.inspection_id) {
+    return true;
+  }
+  if (issueSkillId && issueSkillId === inspection.skill_id) {
+    return true;
+  }
+  return Boolean(inspection.skill_name && issueSkillName && issueSkillName === inspection.skill_name);
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ reportId: string; imageId: string }> }
@@ -93,9 +123,11 @@ export async function POST(
   const note = String(payload.note || "").trim();
   const selectedIssues = parseSelectedIssues(String(payload.selected_issues_json || ""));
   const shouldCorrected = String(payload.should_corrected || "").trim();
+  const activeInspectionId = String(payload.active_inspection_id || "").trim();
   const requestedSemanticState = String(payload.result_semantic_state || "").trim();
   const requestContext = buildRequestContext(currentUser);
   let resolvedSemanticState: ReportResultSemanticState | null = null;
+  let effectiveSelectedIssues = selectedIssues;
 
   let createdRectificationOrders: Array<{ id: number; huiyunying_order_id: string | null; status: string }> = [];
 
@@ -118,9 +150,30 @@ export async function POST(
       }
       return readMetadataString(inspection.metadata, "capture_id") === readMetadataString(resultDetail.metadata, "capture_id");
     });
-    const semanticState: ReportResultSemanticState = classifyReportResultSemantics(resultIssues, resultInspections);
+    const activeInspection = activeInspectionId
+      ? resultInspections.find((inspection) => inspection.inspection_id === activeInspectionId) ?? null
+      : null;
+    const activeIssues = activeInspection
+      ? resultIssues.filter((issue) => issueMatchesInspection(issue, activeInspection))
+      : resultIssues;
+    const activeInspections = activeInspection ? [activeInspection] : resultInspections;
+    const semanticState: ReportResultSemanticState = classifyReportResultSemantics(activeIssues, activeInspections);
     resolvedSemanticState = semanticState;
-    const shouldCreateRectification = semanticState === "issue_found" || resultIssues.length > 0;
+    const shouldCreateRectification = semanticState === "issue_found" || activeIssues.length > 0;
+    const selectedIssueIdSet = new Set(selectedIssues.map((issue) => issue.id));
+    if (selectedIssueIdSet.size > 0) {
+      const activeSelectedIssues = activeIssues.filter((issue) => selectedIssueIdSet.has(issue.id));
+      if (activeSelectedIssues.length !== selectedIssueIdSet.size) {
+        return Response.json(
+          { success: false, error: "所选问题项不属于当前巡检技能，请刷新页面后重试。" },
+          { status: 400 }
+        );
+      }
+      effectiveSelectedIssues = activeSelectedIssues.map((issue) => ({
+        id: issue.id,
+        title: issue.title
+      }));
+    }
     const semanticMismatch = requestedSemanticState && requestedSemanticState !== semanticState;
     if (semanticMismatch) {
       return Response.json(
@@ -138,18 +191,19 @@ export async function POST(
       readMetadataString(store?.metadata, "store_code") ||
       "";
     const allowedImageUrls = new Set<string>();
-    resultIssues.forEach((issue) => {
-      addImageUrl(allowedImageUrls, issue.image_url);
-      addImageUrl(allowedImageUrls, readMetadataString(issue.metadata, "display_image_url"));
-      addImageUrl(allowedImageUrls, readMetadataString(issue.metadata, "evidence_image_url"));
-      addImageUrl(allowedImageUrls, readMetadataString(issue.metadata, "linked_inspection_evidence_image_url"));
-      addImageUrl(allowedImageUrls, readMetadataString(issue.metadata, "original_image_url"));
-    });
-    resultInspections.forEach((inspection) => {
-      addImageUrl(allowedImageUrls, readMetadataString(inspection.metadata, "display_image_url"));
-      addImageUrl(allowedImageUrls, readMetadataString(inspection.metadata, "evidence_image_url"));
-      addImageUrl(allowedImageUrls, readMetadataString(inspection.metadata, "original_image_url"));
-    });
+    const scopedIssues = selectedIssueIdSet.size > 0
+      ? activeIssues.filter((issue) => selectedIssueIdSet.has(issue.id))
+      : [];
+    const scopedInspection = activeInspection;
+
+    scopedIssues.forEach((issue) => addIssueImageUrls(allowedImageUrls, issue));
+    if (scopedInspection) {
+      addInspectionImageUrls(allowedImageUrls, scopedInspection);
+    }
+    if (allowedImageUrls.size === 0) {
+      resultIssues.forEach((issue) => addIssueImageUrls(allowedImageUrls, issue));
+      resultInspections.forEach((inspection) => addInspectionImageUrls(allowedImageUrls, inspection));
+    }
     addImageUrl(allowedImageUrls, readMetadataString(resultDetail.metadata, "display_url"));
     addImageUrl(allowedImageUrls, readMetadataString(resultDetail.metadata, "capture_url"));
     addImageUrl(allowedImageUrls, readMetadataString(resultDetail.metadata, "preview_url"));
@@ -170,7 +224,7 @@ export async function POST(
             storeCode,
             storeName: resultDetail.store_name,
             imageUrls: imageUrl ? [imageUrl] : [],
-            selectedIssues,
+            selectedIssues: effectiveSelectedIssues,
             shouldCorrected,
             note,
             createdBy: operatorName,
@@ -204,7 +258,7 @@ export async function POST(
     operatorName,
     note,
     requestContext,
-    selectedIssues
+    effectiveSelectedIssues
   );
   if (!result) {
     return Response.json({ success: false, error: "Review target not found." }, { status: 404 });
@@ -240,7 +294,7 @@ export async function POST(
     total_result_count: result.total_result_count,
     should_corrected: shouldCorrected || null,
     result_semantic_state: resolvedSemanticState,
-    selected_issues: selectedIssues,
+    selected_issues: effectiveSelectedIssues,
     rectification_orders: createdRectificationOrders,
     recent_log: result.recent_log,
     updated_at: result.updated_at

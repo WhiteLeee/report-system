@@ -124,3 +124,16 @@ test("resolveResultImageState 不把 issue.image_url 误判为 payload evidence"
   assert.equal(state.url, "https://example.com/original.jpg");
   assert.equal(state.fallbackReason, "missing_evidence");
 });
+
+test("resolveResultImageState 标注图运行时加载失败时回退原图", () => {
+  const state = resolveResultImageState({
+    selectedResult: createResult(),
+    activeInspection: createInspection(),
+    loadFailed: true,
+    mode: "evidence"
+  });
+
+  assert.equal(state.url, "https://example.com/original.jpg");
+  assert.equal(state.evidenceUrl, "https://oss.example.com/evidence.jpg");
+  assert.equal(state.fallbackReason, "load_failed");
+});

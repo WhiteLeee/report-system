@@ -100,7 +100,7 @@ export interface ReportInspectionFact {
 
 export interface ReportIssueFact {
   issue_id: string;
-  inspection_id: string;
+  inspection_id?: string;
   capture_id: string;
   image_id: string;
   store_id: string;
