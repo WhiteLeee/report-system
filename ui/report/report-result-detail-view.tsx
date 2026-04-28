@@ -21,6 +21,7 @@ import {
   matchesIssueToImage,
   getResolvedImageNotice,
   readMetadataString,
+  readIssueRectificationImageUrls,
   resolveResultImageState,
   type DetailFilters,
   type ReportImageMode
@@ -378,11 +379,16 @@ export function ReportResultDetailView({
         panel: activePanel
       })
     : "";
-  const activeIssues = activeInspection?.issues ?? selectedIssues;
+  const activeIssues = activeInspection?.issues ?? [];
   const activeIssue = activeIssues[0] ?? null;
   const activeSemanticState = activeInspection
     ? classifyReportResultSemantics(activeInspection.issues, [activeInspection.inspection])
     : selectedResultSemanticState;
+  const reviewIssues = selectedIssues.map((issue) => ({
+    id: issue.id,
+    title: issue.title,
+    imageUrls: readIssueRectificationImageUrls(issue, { useOriginalFallback: imageFallback === "load_failed" })
+  }));
   const imageState = resolveResultImageState({
     selectedResult,
     activeInspection: activeInspection?.inspection ?? null,
@@ -549,10 +555,10 @@ export function ReportResultDetailView({
                     activeInspectionId={resolvedInspectionId}
                     initialReviewState={selectedResult.review_state}
                     initialSelectedIssueIds={initialSelectedIssueIds}
-                    issues={activeIssues.map((issue) => ({ id: issue.id, title: issue.title }))}
+                    issues={reviewIssues}
                     maxDescriptionLength={maxRectificationDescriptionLength}
                     rectificationImageUrl={rectificationImageState.url}
-                    semanticState={activeSemanticState}
+                    semanticState={selectedResultSemanticState}
                   />
                 </div>
 

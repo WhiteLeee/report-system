@@ -424,12 +424,24 @@ test("publish rejects unsupported payload_version with 422", async () => {
   assert.deepEqual(publishJson.supported_payload_versions, [2]);
 });
 
-test("review submit uses active inspection semantics instead of whole capture semantics", async () => {
+test("review submit sends annotation images for selected issues across scenes", async () => {
   const originalFetch = globalThis.fetch;
-  const fetchCalls: Array<string> = [];
-  globalThis.fetch = (async (input: string | URL | Request) => {
+  const createBodies: Array<{ imageUrls?: string[] }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-    fetchCalls.push(url);
+    if (url.includes("/sign")) {
+      return new Response("token-123", {
+        status: 200,
+        headers: { "content-type": "text/plain" }
+      });
+    }
+    if (url.includes("/route/ri/open/item/create")) {
+      createBodies.push(JSON.parse(String(init?.body || "{}")) as { imageUrls?: string[] });
+      return new Response(JSON.stringify({ status: 200, data: true, disqualifiedId: 9101 }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
     throw new Error(`Unexpected fetch url: ${url}`);
   }) as typeof fetch;
 
@@ -453,7 +465,7 @@ test("review submit uses active inspection semantics instead of whole capture se
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           ...publishPayload,
-          idempotency_key: "review-test-active-inspection-semantics",
+          idempotency_key: "review-test-multi-scene-images",
           published_at: "2026-04-03 10:00:00",
           report: {
             ...publishPayload.report,
@@ -479,6 +491,7 @@ test("review submit uses active inspection semantics instead of whole capture se
                   skill_id: "skill-a",
                   skill_name: "技能 A",
                   raw_result: "发现问题",
+                  evidence_image_url: "https://example.com/evidence-a.jpg",
                   total_issues: 1
                 },
                 {
@@ -486,8 +499,9 @@ test("review submit uses active inspection semantics instead of whole capture se
                   inspection_id: "inspection-active-b",
                   skill_id: "skill-b",
                   skill_name: "技能 B",
-                  raw_result: "识别完成，未发现异常。",
-                  total_issues: 0
+                  raw_result: "发现问题",
+                  evidence_image_url: "https://example.com/evidence-b.jpg",
+                  total_issues: 1
                 }
               ],
               issues: [
@@ -496,7 +510,20 @@ test("review submit uses active inspection semantics instead of whole capture se
                   issue_id: "issue-active-a",
                   inspection_id: "inspection-active-a",
                   skill_id: "skill-a",
-                  skill_name: "技能 A"
+                  skill_name: "技能 A",
+                  issue_type: "技能 A 问题",
+                  description: "技能 A 问题",
+                  evidence_image_url: "https://example.com/evidence-a.jpg"
+                },
+                {
+                  ...publishPayload.report.facts.issues[0],
+                  issue_id: "issue-active-b",
+                  inspection_id: "inspection-active-b",
+                  skill_id: "skill-b",
+                  skill_name: "技能 B",
+                  issue_type: "技能 B 问题",
+                  description: "技能 B 问题",
+                  evidence_image_url: "https://example.com/evidence-b.jpg"
                 }
               ]
             }
@@ -511,9 +538,16 @@ test("review submit uses active inspection semantics instead of whole capture se
       new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
       { params: Promise.resolve({ reportId: String(reportId) }) }
     );
-    const detailJson = (await detailResp.json()) as { report: { images: Array<{ id: number; review_state: string }> } };
+    const detailJson = (await detailResp.json()) as {
+      report: {
+        images: Array<{ id: number; review_state: string }>;
+        issues: Array<{ id: number; title: string }>;
+      };
+    };
     const imageId = detailJson.report.images[0].id;
     assert.equal(detailJson.report.images[0].review_state, "pending");
+    const selectedIssues = detailJson.report.issues.map((issue) => ({ id: issue.id, title: issue.title }));
+    assert.equal(selectedIssues.length, 2);
 
     const reviewResp = await reviewRoute.POST(
       new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
@@ -521,9 +555,15 @@ test("review submit uses active inspection semantics instead of whole capture se
         headers: { "content-type": "application/json", cookie: sessionCookie },
         body: JSON.stringify({
           review_status: "completed",
-          active_inspection_id: "inspection-active-b",
-          result_semantic_state: "pass",
-          note: "当前技能无问题，本地完成复核。"
+          active_inspection_id: "inspection-active-a",
+          selected_issues_json: JSON.stringify(selectedIssues),
+          rectification_image_urls_json: JSON.stringify([
+            "https://example.com/evidence-a.jpg",
+            "https://example.com/evidence-b.jpg"
+          ]),
+          should_corrected: "2026-04-05",
+          result_semantic_state: "issue_found",
+          note: "跨场景勾选问题，下发各自标注图。"
         })
       }),
       {
@@ -534,15 +574,20 @@ test("review submit uses active inspection semantics instead of whole capture se
     assert.equal(reviewResp.status, 200);
     const reviewJson = (await reviewResp.json()) as {
       result_semantic_state: string | null;
-      rectification_orders: Array<unknown>;
+      rectification_orders: Array<{ huiyunying_order_id: string | null }>;
       selected_issues: Array<unknown>;
       to_status: string;
     };
-    assert.equal(reviewJson.result_semantic_state, "pass");
+    assert.equal(reviewJson.result_semantic_state, "issue_found");
     assert.equal(reviewJson.to_status, "completed");
-    assert.equal(reviewJson.selected_issues.length, 0);
-    assert.equal(reviewJson.rectification_orders.length, 0);
-    assert.equal(fetchCalls.length, 0);
+    assert.equal(reviewJson.selected_issues.length, 2);
+    assert.equal(reviewJson.rectification_orders.length, 1);
+    assert.equal(reviewJson.rectification_orders[0].huiyunying_order_id, "9101");
+    assert.equal(createBodies.length, 1);
+    assert.deepEqual(createBodies[0].imageUrls, [
+      "https://example.com/evidence-a.jpg",
+      "https://example.com/evidence-b.jpg"
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }

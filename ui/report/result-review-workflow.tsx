@@ -21,6 +21,7 @@ import {
 type ReviewIssueOption = {
   id: number;
   title: string;
+  imageUrls?: string[];
 };
 
 function formatDateInputValue(date: Date): string {
@@ -35,6 +36,10 @@ function buildDefaultShouldCorrectedDate(defaultDays: number): string {
   nextDate.setHours(0, 0, 0, 0);
   nextDate.setDate(nextDate.getDate() + Math.max(0, Math.floor(defaultDays)));
   return formatDateInputValue(nextDate);
+}
+
+function uniqueNonEmptyStrings(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => String(value || "").trim()).filter(Boolean)));
 }
 
 export function ResultReviewWorkflow({
@@ -80,9 +85,14 @@ export function ResultReviewWorkflow({
   const [previewOrders, setPreviewOrders] = useState<ReturnType<typeof buildRectificationPreviewOrders>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const selectedIssues: ReviewSelectedIssue[] = issues.filter((issue) => selectedIssueIds.includes(issue.id));
+  const selectedIssueOptions = issues.filter((issue) => selectedIssueIds.includes(issue.id));
+  const selectedIssues: ReviewSelectedIssue[] = selectedIssueOptions.map((issue) => ({ id: issue.id, title: issue.title }));
   const requiresRectification = semanticState === "issue_found" || issues.length > 0;
-  const effectiveRectificationImageUrl = String(rectificationImageUrl || currentImageUrl || "").trim();
+  const effectiveRectificationImageUrls = uniqueNonEmptyStrings([
+    ...selectedIssueOptions.flatMap((issue) => issue.imageUrls ?? []),
+    rectificationImageUrl || currentImageUrl || ""
+  ]).slice(0, 9);
+  const effectiveRectificationImageUrl = effectiveRectificationImageUrls[0] || "";
 
   useEffect(() => {
     setMounted(true);
@@ -118,6 +128,7 @@ export function ResultReviewWorkflow({
           return_to: currentPath,
           selected_issues_json: JSON.stringify(selectedIssues),
           rectification_image_url: effectiveRectificationImageUrl,
+          rectification_image_urls_json: JSON.stringify(effectiveRectificationImageUrls),
           result_semantic_state: semanticState
         })
       });
@@ -162,7 +173,7 @@ export function ResultReviewWorkflow({
         selectedIssues,
         note,
         shouldCorrected,
-        imageUrls: effectiveRectificationImageUrl ? [effectiveRectificationImageUrl] : [],
+        imageUrls: effectiveRectificationImageUrls,
         maxLength: maxDescriptionLength
       });
       setPreviewOrders(nextPreviewOrders);
@@ -351,6 +362,9 @@ export function ResultReviewWorkflow({
                     <div className={styles.imageUnavailable}>图片不可用</div>
                   )}
                 </div>
+                {effectiveRectificationImageUrls.length > 1 ? (
+                  <p className={styles.previewMeta}>将随整改单下发 {effectiveRectificationImageUrls.length} 张标注图。</p>
+                ) : null}
                 {imageNotice ? <p className={styles.imageFallbackNotice}>{imageNotice}</p> : null}
               </section>
               <div className={styles.reviewModalBody}>

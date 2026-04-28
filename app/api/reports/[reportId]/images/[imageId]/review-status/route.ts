@@ -51,6 +51,27 @@ function parseSelectedIssues(raw: string): ReviewSelectedIssue[] {
   }
 }
 
+function parseImageUrls(raw: string): string[] {
+  if (!raw.trim()) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return Array.from(
+      new Set(
+        parsed
+          .map((item) => (typeof item === "string" ? item.trim() : ""))
+          .filter(Boolean)
+      )
+    );
+  } catch {
+    return [];
+  }
+}
+
 function readMetadataString(metadata: unknown, key: string): string {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return "";
@@ -153,23 +174,21 @@ export async function POST(
     const activeInspection = activeInspectionId
       ? resultInspections.find((inspection) => inspection.inspection_id === activeInspectionId) ?? null
       : null;
-    const activeIssues = activeInspection
-      ? resultIssues.filter((issue) => issueMatchesInspection(issue, activeInspection))
-      : resultIssues;
-    const activeInspections = activeInspection ? [activeInspection] : resultInspections;
-    const semanticState: ReportResultSemanticState = classifyReportResultSemantics(activeIssues, activeInspections);
+    const semanticState: ReportResultSemanticState = classifyReportResultSemantics(resultIssues, resultInspections);
     resolvedSemanticState = semanticState;
-    const shouldCreateRectification = semanticState === "issue_found" || activeIssues.length > 0;
+    const shouldCreateRectification = semanticState === "issue_found" || resultIssues.length > 0;
     const selectedIssueIdSet = new Set(selectedIssues.map((issue) => issue.id));
+    const selectedResultIssues = selectedIssueIdSet.size > 0
+      ? resultIssues.filter((issue) => selectedIssueIdSet.has(issue.id))
+      : [];
     if (selectedIssueIdSet.size > 0) {
-      const activeSelectedIssues = activeIssues.filter((issue) => selectedIssueIdSet.has(issue.id));
-      if (activeSelectedIssues.length !== selectedIssueIdSet.size) {
+      if (selectedResultIssues.length !== selectedIssueIdSet.size) {
         return Response.json(
-          { success: false, error: "所选问题项不属于当前巡检技能，请刷新页面后重试。" },
+          { success: false, error: "所选问题项不属于当前巡检结果，请刷新页面后重试。" },
           { status: 400 }
         );
       }
-      effectiveSelectedIssues = activeSelectedIssues.map((issue) => ({
+      effectiveSelectedIssues = selectedResultIssues.map((issue) => ({
         id: issue.id,
         title: issue.title
       }));
@@ -191,14 +210,17 @@ export async function POST(
       readMetadataString(store?.metadata, "store_code") ||
       "";
     const allowedImageUrls = new Set<string>();
-    const scopedIssues = selectedIssueIdSet.size > 0
-      ? activeIssues.filter((issue) => selectedIssueIdSet.has(issue.id))
-      : [];
-    const scopedInspection = activeInspection;
 
-    scopedIssues.forEach((issue) => addIssueImageUrls(allowedImageUrls, issue));
-    if (scopedInspection) {
-      addInspectionImageUrls(allowedImageUrls, scopedInspection);
+    if (selectedResultIssues.length > 0) {
+      selectedResultIssues.forEach((issue) => {
+        addIssueImageUrls(allowedImageUrls, issue);
+        const linkedInspection = resultInspections.find((inspection) => issueMatchesInspection(issue, inspection));
+        if (linkedInspection) {
+          addInspectionImageUrls(allowedImageUrls, linkedInspection);
+        }
+      });
+    } else if (activeInspection) {
+      addInspectionImageUrls(allowedImageUrls, activeInspection);
     }
     if (allowedImageUrls.size === 0) {
       resultIssues.forEach((issue) => addIssueImageUrls(allowedImageUrls, issue));
@@ -209,10 +231,15 @@ export async function POST(
     addImageUrl(allowedImageUrls, readMetadataString(resultDetail.metadata, "preview_url"));
     addImageUrl(allowedImageUrls, resultDetail.url);
     const requestedRectificationImageUrl = String(payload.rectification_image_url || "").trim();
-    const imageUrl =
-      requestedRectificationImageUrl && allowedImageUrls.has(requestedRectificationImageUrl)
-        ? requestedRectificationImageUrl
-        : Array.from(allowedImageUrls)[0] || "";
+    const requestedRectificationImageUrls = parseImageUrls(String(payload.rectification_image_urls_json || ""));
+    const imageUrls = Array.from(
+      new Set(
+        [...requestedRectificationImageUrls, requestedRectificationImageUrl]
+          .map((url) => url.trim())
+          .filter((url) => url && allowedImageUrls.has(url))
+      )
+    );
+    const rectificationImageUrls = (imageUrls.length > 0 ? imageUrls : Array.from(allowedImageUrls)).slice(0, 9);
 
     if (shouldCreateRectification) {
       try {
@@ -223,7 +250,7 @@ export async function POST(
             storeId: resultDetail.store_id,
             storeCode,
             storeName: resultDetail.store_name,
-            imageUrls: imageUrl ? [imageUrl] : [],
+            imageUrls: rectificationImageUrls,
             selectedIssues: effectiveSelectedIssues,
             shouldCorrected,
             note,

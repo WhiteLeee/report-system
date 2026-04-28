@@ -89,6 +89,37 @@ export function readIssueEvidenceUrl(issue: ReportIssue | null | undefined): str
     readMetadataString(issue?.metadata ?? null, "linked_inspection_evidence_image_url");
 }
 
+export function readIssueRectificationImageUrls(
+  issue: ReportIssue | null | undefined,
+  options?: { useOriginalFallback?: boolean }
+): string[] {
+  const originalUrls = Array.from(
+    new Set(
+      [
+        readMetadataString(issue?.metadata ?? null, "original_image_url"),
+        readMetadataString(issue?.metadata ?? null, "display_image_url"),
+        issue?.image_url || ""
+      ]
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )
+  );
+  if (options?.useOriginalFallback) {
+    return originalUrls;
+  }
+  const evidenceUrls = Array.from(
+    new Set(
+      [
+        readMetadataString(issue?.metadata ?? null, "evidence_image_url"),
+        readMetadataString(issue?.metadata ?? null, "linked_inspection_evidence_image_url")
+      ]
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )
+  );
+  return evidenceUrls.length > 0 ? evidenceUrls : originalUrls;
+}
+
 export function readIssueOriginalImageUrl(issue: ReportIssue | null | undefined): string {
   return readMetadataString(issue?.metadata ?? null, "original_image_url");
 }
