@@ -7,6 +7,7 @@ import { RectificationSplitError } from "@/backend/rectification/rectification.s
 import { createRectificationService } from "@/backend/rectification/rectification.module";
 import { buildRequestUrl } from "@/backend/http/request-url";
 import type { ResultReviewState, ReviewSelectedIssue } from "@/backend/report/report.types";
+import type { RectificationIssueSelection } from "@/lib/rectification-preview";
 
 const reviewService = createReportReviewService();
 const reportService = createReportService();
@@ -59,6 +60,97 @@ function readMetadataString(metadata: unknown, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+function readMetadataBoolean(metadata: unknown, key: string): boolean {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return false;
+  }
+  return (metadata as Record<string, unknown>)[key] === true;
+}
+
+function issueMatchesInspection(
+  issue: { metadata: unknown },
+  inspection: { inspection_id: string; skill_id: string; skill_name: string | null }
+): boolean {
+  const issueInspectionId = readMetadataString(issue.metadata, "inspection_id");
+  const issueSkillId = readMetadataString(issue.metadata, "skill_id");
+  const issueSkillName = readMetadataString(issue.metadata, "skill_name");
+  if (issueInspectionId && issueInspectionId === inspection.inspection_id) {
+    return true;
+  }
+  if (issueSkillId && issueSkillId === inspection.skill_id) {
+    return true;
+  }
+  return Boolean(inspection.skill_name && issueSkillName && issueSkillName === inspection.skill_name);
+}
+
+function normalizeImageUrls(values: unknown[]): string[] {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter((url) => url && url !== "about:blank")
+    )
+  );
+}
+
+function isDeprecatedManualUploadUrl(url: string): boolean {
+  return url.trim().startsWith("/uploads/report-issues/");
+}
+
+function issueUsesInspection(issue: { metadata: unknown }, inspectionId: string): boolean {
+  if (!inspectionId) {
+    return false;
+  }
+  return readMetadataString(issue.metadata, "inspection_id") === inspectionId ||
+    readMetadataString(issue.metadata, "linked_inspection_id") === inspectionId;
+}
+
+function buildIssueRectificationImageUrls(input: {
+  issue: { image_url: string | null; metadata: unknown };
+  linkedInspection: { metadata: unknown } | null;
+  resultDetail: { metadata: unknown; url: string };
+  failedInspectionIds: Set<string>;
+}): string[] {
+  const isManualIssue = readMetadataBoolean(input.issue.metadata, "manual_issue") ||
+    readMetadataString(input.issue.metadata, "source") === "manual_review";
+  const useOriginalFallback = Array.from(input.failedInspectionIds).some((inspectionId) =>
+    issueUsesInspection(input.issue, inspectionId)
+  );
+  const resultOriginalUrls = [
+    readMetadataString(input.resultDetail.metadata, "capture_url"),
+    readMetadataString(input.resultDetail.metadata, "preview_url"),
+    input.resultDetail.url
+  ];
+  const originalUrls = normalizeImageUrls([
+    readMetadataString(input.issue.metadata, "original_image_url"),
+    readMetadataString(input.linkedInspection?.metadata, "original_image_url"),
+    ...resultOriginalUrls
+  ]);
+  if (useOriginalFallback) {
+    return originalUrls.slice(0, 1);
+  }
+  if (isManualIssue) {
+    return normalizeImageUrls([
+      readMetadataString(input.resultDetail.metadata, "preview_url"),
+      readMetadataString(input.resultDetail.metadata, "display_url"),
+      input.resultDetail.url,
+      readMetadataString(input.issue.metadata, "preview_url"),
+      readMetadataString(input.issue.metadata, "original_image_url"),
+      input.issue.image_url || "",
+      readMetadataString(input.issue.metadata, "display_image_url"),
+      readMetadataString(input.issue.metadata, "capture_url"),
+      ...resultOriginalUrls
+    ].filter((url) => typeof url !== "string" || !isDeprecatedManualUploadUrl(url))).slice(0, 1);
+  }
+
+  const evidenceUrls = normalizeImageUrls([
+    readMetadataString(input.issue.metadata, "evidence_image_url"),
+    readMetadataString(input.issue.metadata, "linked_inspection_evidence_image_url"),
+    readMetadataString(input.linkedInspection?.metadata, "evidence_image_url")
+  ]);
+  return (evidenceUrls.length > 0 ? evidenceUrls : originalUrls).slice(0, 1);
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ reportId: string; imageId: string }> }
@@ -86,9 +178,12 @@ export async function POST(
   const note = String(payload.note || "").trim();
   const selectedIssues = parseSelectedIssues(String(payload.selected_issues_json || ""));
   const shouldCorrected = String(payload.should_corrected || "").trim();
+  const failedInspectionId = String(payload.failed_inspection_id || "").trim();
   const requestedSemanticState = String(payload.result_semantic_state || "").trim();
   const requestContext = buildRequestContext(currentUser);
   let resolvedSemanticState: ReportResultSemanticState | null = null;
+  let effectiveSelectedIssues = selectedIssues;
+  let rectificationPartialFailed = false;
 
   let createdRectificationOrders: Array<{ id: number; huiyunying_order_id: string | null; status: string }> = [];
 
@@ -114,6 +209,28 @@ export async function POST(
     const semanticState: ReportResultSemanticState = classifyReportResultSemantics(resultIssues, resultInspections);
     resolvedSemanticState = semanticState;
     const shouldCreateRectification = semanticState === "issue_found" || resultIssues.length > 0;
+    const selectedIssueIdSet = new Set(selectedIssues.map((issue) => issue.id));
+    const selectedResultIssues = selectedIssueIdSet.size > 0
+      ? resultIssues.filter((issue) => selectedIssueIdSet.has(issue.id))
+      : [];
+    if (selectedIssueIdSet.size > 0) {
+      if (selectedResultIssues.length !== selectedIssueIdSet.size) {
+        return Response.json(
+          { success: false, error: "所选问题项不属于当前巡检结果，请刷新页面后重试。" },
+          { status: 400 }
+        );
+      }
+      effectiveSelectedIssues = selectedResultIssues.map((issue) => ({
+        id: issue.id,
+        title: issue.title
+      }));
+    }
+    if (shouldCreateRectification && selectedIssueIdSet.size === 0) {
+      return Response.json(
+        { success: false, error: "请至少勾选一个问题项后再创建整改单。" },
+        { status: 400 }
+      );
+    }
     const semanticMismatch = requestedSemanticState && requestedSemanticState !== semanticState;
     if (semanticMismatch) {
       return Response.json(
@@ -130,7 +247,34 @@ export async function POST(
       readMetadataString(resultDetail.metadata, "store_code") ||
       readMetadataString(store?.metadata, "store_code") ||
       "";
-    const imageUrl = readMetadataString(resultDetail.metadata, "display_url") || resultDetail.url;
+    const failedInspectionIds = new Set<string>();
+    if (failedInspectionId) {
+      failedInspectionIds.add(failedInspectionId);
+    }
+    const selectedIssuesForRectification: RectificationIssueSelection[] = selectedResultIssues.map((issue) => {
+      const linkedInspection = resultInspections.find((inspection) => issueMatchesInspection(issue, inspection)) ?? null;
+      return {
+        id: issue.id,
+        title: issue.title,
+        imageUrls: buildIssueRectificationImageUrls({
+          issue,
+          linkedInspection,
+          resultDetail,
+          failedInspectionIds
+        })
+      };
+    });
+    const missingImageIssues = selectedIssuesForRectification.filter((issue) => (issue.imageUrls ?? []).length === 0);
+    if (missingImageIssues.length > 0) {
+      return Response.json(
+        {
+          success: false,
+          error: `以下问题缺少可下发图片，请检查标注图或原图：${missingImageIssues.map((issue) => issue.title).join("、")}`
+        },
+        { status: 400 }
+      );
+    }
+    const rectificationImageUrls = normalizeImageUrls(selectedIssuesForRectification.flatMap((issue) => issue.imageUrls ?? []));
 
     if (shouldCreateRectification) {
       try {
@@ -141,8 +285,8 @@ export async function POST(
             storeId: resultDetail.store_id,
             storeCode,
             storeName: resultDetail.store_name,
-            imageUrls: imageUrl ? [imageUrl] : [],
-            selectedIssues,
+            imageUrls: rectificationImageUrls,
+            selectedIssues: selectedIssuesForRectification,
             shouldCorrected,
             note,
             createdBy: operatorName,
@@ -153,6 +297,7 @@ export async function POST(
           huiyunying_order_id: order.huiyunying_order_id,
           status: order.status
         }));
+        rectificationPartialFailed = createdRectificationOrders.some((order) => order.status === "sync_failed");
       } catch (error) {
         if (error instanceof RectificationSplitError) {
           return Response.json({ success: false, error: error.message }, { status: 400 });
@@ -176,7 +321,7 @@ export async function POST(
     operatorName,
     note,
     requestContext,
-    selectedIssues
+    effectiveSelectedIssues
   );
   if (!result) {
     return Response.json({ success: false, error: "Review target not found." }, { status: 404 });
@@ -212,8 +357,12 @@ export async function POST(
     total_result_count: result.total_result_count,
     should_corrected: shouldCorrected || null,
     result_semantic_state: resolvedSemanticState,
-    selected_issues: selectedIssues,
+    selected_issues: effectiveSelectedIssues,
     rectification_orders: createdRectificationOrders,
+    rectification_partial_failed: rectificationPartialFailed,
+    warning: rectificationPartialFailed
+      ? "部分整改单创建失败，已保留成功和失败记录；请在整改单列表中核查失败项。"
+      : null,
     recent_log: result.recent_log,
     updated_at: result.updated_at
   });

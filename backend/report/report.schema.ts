@@ -86,13 +86,18 @@ const inspectionFactSchema = z.object({
   channel_code: z.string().trim().optional(),
   capture_provider: z.string().trim().optional(),
   raw_result: z.string().trim().optional(),
+  raw_result_json: jsonSchema.optional(),
   error_message: z.string().trim().optional(),
+  evidence_image_url: z.string().trim().optional(),
+  evidence_image_source: z.string().trim().optional(),
+  original_image_url: z.string().trim().optional(),
+  provider_meta: jsonSchema.optional(),
   total_issues: z.number().int().nonnegative().optional()
 });
 
 const issueFactSchema = z.object({
   issue_id: z.string().trim().min(1),
-  inspection_id: z.string().trim().min(1),
+  inspection_id: z.string().trim().optional().default(""),
   capture_id: z.string().trim().min(1),
   image_id: z.string().trim().min(1),
   store_id: z.string().trim().min(1),
@@ -105,6 +110,9 @@ const issueFactSchema = z.object({
   count: z.number().int().nonnegative().optional(),
   severity: z.string().trim().optional(),
   review_status: incomingResultReviewStateSchema.optional(),
+  evidence_image_url: z.string().trim().optional(),
+  evidence_image_source: z.string().trim().optional(),
+  original_image_url: z.string().trim().optional(),
   extra_json: jsonSchema.optional()
 });
 
@@ -125,6 +133,46 @@ export const reportPublishSchema = z.object({
       issues: z.array(issueFactSchema).default([])
     })
   })
+}).superRefine((payload, ctx) => {
+  const seenCaptureIds = new Set<string>();
+  const seenInspectionIds = new Set<string>();
+  const seenIssueIds = new Set<string>();
+
+  payload.report.facts.captures.forEach((capture, index) => {
+    if (seenCaptureIds.has(capture.capture_id)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Duplicate capture_id "${capture.capture_id}" in report.facts.captures.`,
+        path: ["report", "facts", "captures", index, "capture_id"]
+      });
+      return;
+    }
+    seenCaptureIds.add(capture.capture_id);
+  });
+
+  payload.report.facts.inspections.forEach((inspection, index) => {
+    if (seenInspectionIds.has(inspection.inspection_id)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Duplicate inspection_id "${inspection.inspection_id}" in report.facts.inspections.`,
+        path: ["report", "facts", "inspections", index, "inspection_id"]
+      });
+      return;
+    }
+    seenInspectionIds.add(inspection.inspection_id);
+  });
+
+  payload.report.facts.issues.forEach((issue, index) => {
+    if (seenIssueIds.has(issue.issue_id)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Duplicate issue_id "${issue.issue_id}" in report.facts.issues.`,
+        path: ["report", "facts", "issues", index, "issue_id"]
+      });
+      return;
+    }
+    seenIssueIds.add(issue.issue_id);
+  });
 });
 
 export type ReportPublishSchema = z.infer<typeof reportPublishSchema>;

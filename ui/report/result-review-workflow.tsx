@@ -8,10 +8,24 @@ import styles from "./report-result-detail-view.module.css";
 
 import type { ReviewSelectedIssue, ResultReviewState } from "@/backend/report/report.types";
 import type { ReportResultSemanticState } from "@/ui/report/report-result-semantics";
-import { buildRectificationPreviewOrders, RectificationPreviewError } from "@/lib/rectification-preview";
+import {
+  buildRectificationPreviewOrders,
+  MAX_RECTIFICATION_IMAGE_COUNT,
+  RectificationPreviewError,
+  type RectificationIssueSelection
+} from "@/lib/rectification-preview";
 import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ISSUE_SELECTION_MODAL_MESSAGE,
@@ -21,6 +35,7 @@ import {
 type ReviewIssueOption = {
   id: number;
   title: string;
+  imageUrls?: string[];
 };
 
 function formatDateInputValue(date: Date): string {
@@ -37,26 +52,40 @@ function buildDefaultShouldCorrectedDate(defaultDays: number): string {
   return formatDateInputValue(nextDate);
 }
 
+function uniqueNonEmptyStrings(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => String(value || "").trim()).filter((url) => url && url !== "about:blank")));
+}
+
 export function ResultReviewWorkflow({
   actionUrl,
+  addIssueUrl,
+  activeInspectionId,
   canReview,
   currentImageUrl,
   currentPath,
   initialSelectedIssueIds,
   initialReviewState,
+  failedInspectionId,
+  imageNotice,
   issues,
   maxDescriptionLength,
+  rectificationImageUrl,
   semanticState,
   defaultShouldCorrectedDays
 }: {
   actionUrl: string;
+  addIssueUrl: string;
+  activeInspectionId?: string;
   canReview: boolean;
   currentImageUrl: string;
   currentPath: string;
+  failedInspectionId?: string;
   initialSelectedIssueIds: number[];
   initialReviewState: ResultReviewState;
+  imageNotice?: string;
   issues: ReviewIssueOption[];
   maxDescriptionLength: number;
+  rectificationImageUrl?: string;
   semanticState: ReportResultSemanticState;
   defaultShouldCorrectedDays: number;
 }) {
@@ -73,13 +102,36 @@ export function ResultReviewWorkflow({
   const [processingOpen, setProcessingOpen] = useState(false);
   const [previewOrders, setPreviewOrders] = useState<ReturnType<typeof buildRectificationPreviewOrders>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAddingIssue, setIsAddingIssue] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const selectedIssues: ReviewSelectedIssue[] = issues.filter((issue) => selectedIssueIds.includes(issue.id));
-  const requiresRectification = semanticState === "issue_found" || issues.length > 0;
+  const [manualIssueOpen, setManualIssueOpen] = useState(false);
+  const [issueOptions, setIssueOptions] = useState<ReviewIssueOption[]>(issues);
+  const [manualIssueTitle, setManualIssueTitle] = useState("");
+  const [manualIssueDescription, setManualIssueDescription] = useState("");
+  const selectedIssueOptions = issueOptions.filter((issue) => selectedIssueIds.includes(issue.id));
+  const selectedIssuesForPreview: RectificationIssueSelection[] = selectedIssueOptions.map((issue) => ({
+    id: issue.id,
+    title: issue.title,
+    imageUrls: issue.imageUrls ?? []
+  }));
+  const selectedIssues: ReviewSelectedIssue[] = selectedIssueOptions.map((issue) => ({ id: issue.id, title: issue.title }));
+  const requiresRectification = semanticState === "issue_found" || issueOptions.length > 0;
+  const selectedIssueImageUrls = uniqueNonEmptyStrings(selectedIssueOptions.flatMap((issue) => issue.imageUrls ?? []));
+  const effectiveRectificationImageUrls = requiresRectification
+    ? selectedIssueImageUrls
+    : uniqueNonEmptyStrings([rectificationImageUrl || currentImageUrl || ""]);
+  const effectiveRectificationImageUrl = effectiveRectificationImageUrls[0] || "";
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    setIssueOptions(issues);
+    setSelectedIssueIds((current) =>
+      Array.from(new Set(current.filter((issueId) => issues.some((issue) => issue.id === issueId))))
+    );
+  }, [issues]);
 
   function toggleIssue(issueId: number) {
     setSelectedIssueIds((current) =>
@@ -88,11 +140,29 @@ export function ResultReviewWorkflow({
   }
 
   function selectAll() {
-    setSelectedIssueIds(issues.map((issue) => issue.id));
+    setSelectedIssueIds(issueOptions.map((issue) => issue.id));
   }
 
   function clearAll() {
     setSelectedIssueIds([]);
+  }
+
+  function resetManualIssueForm() {
+    setManualIssueTitle("");
+    setManualIssueDescription("");
+  }
+
+  function handleManualIssueOpenChange(open: boolean) {
+    if (isAddingIssue) {
+      return;
+    }
+    if (open) {
+      setErrorMessage("");
+    }
+    setManualIssueOpen(open);
+    if (!open) {
+      resetManualIssueForm();
+    }
   }
 
   async function submitReview(reviewStatus: "pending" | "completed") {
@@ -106,18 +176,30 @@ export function ResultReviewWorkflow({
         body: JSON.stringify({
           review_status: reviewStatus,
           should_corrected: shouldCorrected,
+          active_inspection_id: activeInspectionId || "",
+          failed_inspection_id: failedInspectionId || "",
           note,
           return_to: currentPath,
           selected_issues_json: JSON.stringify(selectedIssues),
-          result_semantic_state: semanticState
+          rectification_image_url: effectiveRectificationImageUrl,
+          rectification_image_urls_json: JSON.stringify(effectiveRectificationImageUrls),
+          result_semantic_state: requiresRectification ? "issue_found" : semanticState
         })
       });
 
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        detail?: string;
+        rectification_partial_failed?: boolean;
+        warning?: string | null;
+      };
       if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as { error?: string; detail?: string };
         throw new Error(payload.detail || payload.error || "提交复核失败。");
       }
 
+      if (payload.rectification_partial_failed) {
+        setErrorMessage(payload.warning || "部分整改单创建失败，请在整改单列表中核查失败项。");
+      }
       router.refresh();
     } finally {
       setIsSubmitting(false);
@@ -148,12 +230,17 @@ export function ResultReviewWorkflow({
       });
       return;
     }
+    const missingImageIssues = selectedIssueOptions.filter((issue) => uniqueNonEmptyStrings(issue.imageUrls ?? []).length === 0);
+    if (missingImageIssues.length > 0) {
+      setErrorMessage(`以下问题缺少可下发图片，请检查标注图或原图：${missingImageIssues.map((issue) => issue.title).join("、")}`);
+      return;
+    }
     try {
       const nextPreviewOrders = buildRectificationPreviewOrders({
-        selectedIssues,
+        selectedIssues: selectedIssuesForPreview,
         note,
         shouldCorrected,
-        imageUrls: currentImageUrl ? [currentImageUrl] : [],
+        imageUrls: effectiveRectificationImageUrls,
         maxLength: maxDescriptionLength
       });
       setPreviewOrders(nextPreviewOrders);
@@ -174,18 +261,59 @@ export function ResultReviewWorkflow({
     });
   }
 
+  async function handleAddManualIssue() {
+    setErrorMessage("");
+    const title = manualIssueTitle.trim();
+    const description = manualIssueDescription.trim();
+    if (!title) {
+      setErrorMessage("请填写问题项名称。");
+      return;
+    }
+    setIsAddingIssue(true);
+    try {
+      const response = await fetch(addIssueUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          inspection_id: activeInspectionId || ""
+        })
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        issue?: { id: number; title: string; image_urls?: string[] };
+      };
+      if (!response.ok || !payload.issue) {
+        throw new Error(payload.error || "添加问题项失败。");
+      }
+      const nextIssue = {
+        id: payload.issue.id,
+        title: payload.issue.title,
+        imageUrls: payload.issue.image_urls ?? []
+      };
+      setIssueOptions((current) => {
+        if (current.some((issue) => issue.id === nextIssue.id)) {
+          return current;
+        }
+        return [...current, nextIssue];
+      });
+      setSelectedIssueIds((current) => Array.from(new Set([...current, nextIssue.id])));
+      resetManualIssueForm();
+      setManualIssueOpen(false);
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "添加问题项失败。");
+    } finally {
+      setIsAddingIssue(false);
+    }
+  }
+
   function handleConfirmSubmit() {
     setIsSubmitting(true);
     setConfirmOpen(false);
-    setProcessingOpen(true);
-    void submitReview("completed").catch((error) => {
-      setErrorMessage(error instanceof Error ? error.message : "创建整改单失败。");
-    });
-  }
-
-  function handleIssueSelectionConfirm() {
-    setIsSubmitting(true);
-    setIssueSelectionModalOpen(false);
     setProcessingOpen(true);
     void submitReview("completed").catch((error) => {
       setErrorMessage(error instanceof Error ? error.message : "创建整改单失败。");
@@ -196,12 +324,26 @@ export function ResultReviewWorkflow({
     <>
       <div className={styles.reviewIssueSelector}>
         <div className={styles.alertHead}>
-          <strong>当前结果概况</strong>
-          <span className={styles.selectionSummary}>
-            已选择 {selectedIssueIds.length} / {issues.length}
-          </span>
+          <div className={styles.resultSummaryTitle}>
+            <strong>当前结果概况</strong>
+            <span className={styles.selectionSummary}>
+              已选择 {selectedIssueIds.length} / {issueOptions.length}
+            </span>
+          </div>
+          {canReview ? (
+            <Button
+              className={styles.manualIssueTrigger}
+              disabled={isSubmitting}
+              onClick={() => handleManualIssueOpenChange(true)}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              添加问题
+            </Button>
+          ) : null}
         </div>
-        {issues.length > 0 ? (
+        {issueOptions.length > 0 ? (
           <>
             <div className={styles.selectionToolbar}>
               <Button className={styles.selectionAction} disabled={!canReview || isSubmitting} onClick={selectAll} size="sm" type="button" variant="ghost">
@@ -212,7 +354,7 @@ export function ResultReviewWorkflow({
               </Button>
             </div>
             <ul className={styles.issueChecklist}>
-              {issues.map((issue) => {
+              {issueOptions.map((issue) => {
                 const checked = selectedIssueIds.includes(issue.id);
                 return (
                   <li className={styles.issueChecklistItem} key={issue.id}>
@@ -239,6 +381,55 @@ export function ResultReviewWorkflow({
           </p>
         )}
       </div>
+
+      <Dialog open={manualIssueOpen} onOpenChange={handleManualIssueOpenChange}>
+        <DialogContent className={styles.manualIssueDialog}>
+          <DialogHeader>
+            <DialogTitle>添加问题</DialogTitle>
+            <DialogDescription>
+              人工添加的问题会自动勾选，并使用当前结果图片下发整改单。
+            </DialogDescription>
+          </DialogHeader>
+          <div className={styles.manualIssueForm}>
+            <div className="field">
+              <label htmlFor="manualIssueTitle">问题内容</label>
+              <Input
+                disabled={isAddingIssue || isSubmitting}
+                id="manualIssueTitle"
+                maxLength={120}
+                onChange={(event) => setManualIssueTitle(event.target.value)}
+                placeholder="例如：冷柜货架陈列不完整"
+                value={manualIssueTitle}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="manualIssueDescription">补充说明</label>
+              <Textarea
+                disabled={isAddingIssue || isSubmitting}
+                id="manualIssueDescription"
+                maxLength={500}
+                onChange={(event) => setManualIssueDescription(event.target.value)}
+                placeholder="可选：补充门店需要调整的细节。"
+                value={manualIssueDescription}
+              />
+            </div>
+            {errorMessage ? <div className={styles.reviewError}>{errorMessage}</div> : null}
+          </div>
+          <DialogFooter>
+            <Button
+              disabled={isAddingIssue}
+              onClick={() => handleManualIssueOpenChange(false)}
+              type="button"
+              variant="secondary"
+            >
+              取消
+            </Button>
+            <Button disabled={isAddingIssue || isSubmitting} onClick={handleAddManualIssue} type="button">
+              {isAddingIssue ? "添加中" : "添加并勾选"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className={styles.reviewBlock}>
         <h3 className={styles.blockTitle}>复核备注</h3>
@@ -279,6 +470,7 @@ export function ResultReviewWorkflow({
               />
             </div>
             {errorMessage ? <div className={styles.reviewError}>{errorMessage}</div> : null}
+            {imageNotice ? <div className={styles.imageFallbackNotice}>{imageNotice}</div> : null}
             <div className={styles.reviewActions}>
               <Button
                 disabled={initialReviewState === "pending" || isSubmitting}
@@ -335,8 +527,35 @@ export function ResultReviewWorkflow({
             <div className={styles.reviewModalLayout}>
               <section className={styles.reviewModalImagePanel}>
                 <div className={styles.reviewModalImageFrame}>
-                  <img alt="当前巡检结果图片预览" className={styles.reviewModalImage} src={currentImageUrl} />
+                  {effectiveRectificationImageUrl ? (
+                    <img alt="当前巡检结果图片预览" className={styles.reviewModalImage} src={effectiveRectificationImageUrl} />
+                  ) : (
+                    <div className={styles.imageUnavailable}>图片不可用</div>
+                  )}
                 </div>
+                {effectiveRectificationImageUrls.length > 1 ? (
+                  <p className={styles.previewMeta}>将随整改单下发 {effectiveRectificationImageUrls.length} 张标注图。</p>
+                ) : null}
+                {effectiveRectificationImageUrls.length > 0 ? (
+                  <div className={styles.reviewModalImageGrid} aria-label="将随整改单下发的图片列表">
+                    {effectiveRectificationImageUrls.map((imageUrl, index) => (
+                      <figure className={styles.reviewModalThumbCard} key={`${imageUrl}-${index}`}>
+                        <img
+                          alt={`将下发图片第 ${index + 1} 张`}
+                          className={styles.reviewModalThumb}
+                          src={imageUrl}
+                        />
+                        <figcaption>第 {index + 1} 张</figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                ) : null}
+                {previewOrders.length > 1 ? (
+                  <p className={styles.previewMeta}>
+                    已按每单最多 {MAX_RECTIFICATION_IMAGE_COUNT} 张图片自动拆分为 {previewOrders.length} 个整改单。
+                  </p>
+                ) : null}
+                {imageNotice ? <p className={styles.imageFallbackNotice}>{imageNotice}</p> : null}
               </section>
               <div className={styles.reviewModalBody}>
                 {previewOrders.map((order, index) => (
@@ -398,15 +617,7 @@ export function ResultReviewWorkflow({
                     type="button"
                     variant="secondary"
                   >
-                    取消
-                  </Button>
-                  <Button
-                    disabled={isSubmitting}
-                    onClick={handleIssueSelectionConfirm}
-                    size="sm"
-                    type="button"
-                  >
-                    确认
+                    返回勾选
                   </Button>
                 </div>
               </div>

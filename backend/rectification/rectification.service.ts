@@ -8,7 +8,6 @@ import type {
   HuiYunYingRectificationOrderItem
 } from "@/backend/integrations/huiyunying/huiyunying.types";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
-import type { ReviewSelectedIssue } from "@/backend/report/report.types";
 import {
   buildRectificationSyncPatch,
   isRemoteRectificationSnapshotUnchanged
@@ -23,7 +22,11 @@ import type {
 } from "@/backend/rectification/rectification.types";
 import type { RectificationOrderRepository } from "@/backend/rectification/rectification.repository";
 import type { JsonValue } from "@/backend/shared/json";
-import { buildRectificationPreviewOrders, RectificationPreviewError } from "@/lib/rectification-preview";
+import {
+  buildRectificationPreviewOrders,
+  RectificationPreviewError,
+  type RectificationIssueSelection
+} from "@/lib/rectification-preview";
 
 export class RectificationSplitError extends Error {
   constructor(message: string) {
@@ -39,7 +42,7 @@ type CreateOrdersInput = {
   storeCode?: string | null;
   storeName?: string | null;
   imageUrls: string[];
-  selectedIssues: ReviewSelectedIssue[];
+  selectedIssues: RectificationIssueSelection[];
   shouldCorrected: string;
   note: string;
   createdBy: string;
@@ -92,6 +95,29 @@ function formatDateOnly(value: string | Date): string {
     return "";
   }
   return date.toISOString().slice(0, 10);
+}
+
+function extractRemoteOrderId(remoteResponse: unknown): string {
+  if (!remoteResponse || typeof remoteResponse !== "object" || Array.isArray(remoteResponse)) {
+    return "";
+  }
+  const response = remoteResponse as Record<string, unknown>;
+  const data = response.data && typeof response.data === "object" && !Array.isArray(response.data)
+    ? response.data as Record<string, unknown>
+    : {};
+  const candidate = response.disqualifiedId ?? response.itemId ?? response.id ?? data.disqualifiedId;
+  return String(candidate || "").trim();
+}
+
+function buildDispatchErrorPayload(error: unknown): JsonValue {
+  const errorMessage = error instanceof Error ? error.message : "未知下发异常";
+  const errorType =
+    error instanceof Error && error.name ? error.name : typeof error === "string" ? "Error" : "UnknownError";
+  return {
+    dispatch_status: "failed",
+    error_type: errorType,
+    error_message: errorMessage
+  };
 }
 
 export class RectificationService {
@@ -289,7 +315,7 @@ export class RectificationService {
     const huiYunYingService = createHuiYunYingRectificationService();
     const normalizedImageUrls = Array.from(
       new Set(input.imageUrls.map((url) => normalizeRectificationImageUrl(String(url || ""))).filter(Boolean))
-    ).slice(0, 9);
+    );
     let previewOrders;
     try {
       previewOrders = buildRectificationPreviewOrders({
@@ -305,53 +331,88 @@ export class RectificationService {
       }
       throw error;
     }
+    const dispatchBatchId = `rectification-dispatch-${Date.now()}-${randomUUID().slice(0, 8)}`;
     const createdOrders: RectificationOrderRecord[] = [];
 
-    for (const previewOrder of previewOrders) {
+    for (const [index, previewOrder] of previewOrders.entries()) {
       const description = previewOrder.description;
       const remotePayload: HuiYunYingCreateRectificationInput = {
         storeCode: input.storeCode || undefined,
         description,
         shouldCorrected: input.shouldCorrected,
-        imageUrls: normalizedImageUrls
+        imageUrls: previewOrder.imageUrls
       };
 
       if (input.storeId && /^\d+$/.test(String(input.storeId))) {
         remotePayload.storeId = Number(input.storeId);
       }
 
-      const remoteResponse = await huiYunYingService.createRectificationOrder(remotePayload);
-      const remoteOrderId = (() => {
-        if (!remoteResponse || typeof remoteResponse !== "object" || Array.isArray(remoteResponse)) {
-          return "";
-        }
-        const candidate = (remoteResponse as Record<string, unknown>).disqualifiedId
-          ?? (remoteResponse as Record<string, unknown>).itemId
-          ?? (remoteResponse as Record<string, unknown>).id
-          ?? ((remoteResponse as Record<string, unknown>).data as Record<string, unknown> | undefined)?.disqualifiedId;
-        return String(candidate || "").trim();
-      })();
+      const plannedOrder = this.repository.create({
+        report_id: input.reportId,
+        result_id: input.resultId,
+        store_id: input.storeId ?? null,
+        store_code: input.storeCode ?? null,
+        store_name: input.storeName ?? null,
+        huiyunying_order_id: null,
+        request_description: description,
+        selected_issues: previewOrder.selectedIssues,
+        image_urls: previewOrder.imageUrls,
+        request_payload: {
+          ...(remotePayload as unknown as Record<string, unknown>),
+          dispatch_batch_id: dispatchBatchId,
+          dispatch_order_index: index + 1,
+          dispatch_order_count: previewOrders.length
+        } as JsonValue,
+        response_payload: {
+          dispatch_status: "pending"
+        },
+        status: "sync_failed",
+        should_corrected: input.shouldCorrected,
+        rectification_reply_content: null,
+        last_synced_at: null,
+        created_by: input.createdBy
+      });
 
-      createdOrders.push(
-        this.repository.create({
-          report_id: input.reportId,
-          result_id: input.resultId,
-          store_id: input.storeId ?? null,
-          store_code: input.storeCode ?? null,
-          store_name: input.storeName ?? null,
+      try {
+        const remoteResponse = await huiYunYingService.createRectificationOrder(remotePayload);
+        const remoteOrderId = extractRemoteOrderId(remoteResponse);
+        const lastSyncedAt = new Date().toISOString();
+        this.repository.updateSyncState(plannedOrder.id, {
           huiyunying_order_id: remoteOrderId || null,
-          request_description: description,
-          selected_issues: previewOrder.selectedIssues,
-          image_urls: normalizedImageUrls,
-          request_payload: remotePayload as unknown as JsonValue,
-          response_payload: remoteResponse as JsonValue,
           status: "created",
-          should_corrected: input.shouldCorrected,
-          rectification_reply_content: null,
-          last_synced_at: new Date().toISOString(),
-          created_by: input.createdBy
-        })
-      );
+          response_payload: {
+            dispatch_status: "succeeded",
+            remote_response: remoteResponse as JsonValue
+          },
+          last_synced_at: lastSyncedAt
+        });
+        createdOrders.push({
+          ...plannedOrder,
+          huiyunying_order_id: remoteOrderId || null,
+          response_payload: {
+            dispatch_status: "succeeded",
+            remote_response: remoteResponse as JsonValue
+          },
+          status: "created",
+          last_synced_at: lastSyncedAt,
+          updated_at: lastSyncedAt
+        });
+      } catch (error) {
+        const lastSyncedAt = new Date().toISOString();
+        const responsePayload = buildDispatchErrorPayload(error);
+        this.repository.updateSyncState(plannedOrder.id, {
+          status: "sync_failed",
+          response_payload: responsePayload,
+          last_synced_at: lastSyncedAt
+        });
+        createdOrders.push({
+          ...plannedOrder,
+          response_payload: responsePayload,
+          status: "sync_failed",
+          last_synced_at: lastSyncedAt,
+          updated_at: lastSyncedAt
+        });
+      }
     }
 
     return createdOrders;

@@ -19,8 +19,12 @@ import {
   filterImages,
   matchesInspectionToImage,
   matchesIssueToImage,
+  getResolvedImageNotice,
   readMetadataString,
-  type DetailFilters
+  readIssueRectificationImageUrls,
+  resolveResultImageState,
+  type DetailFilters,
+  type ReportImageMode
 } from "@/ui/report/report-detail-helpers";
 import { DashboardHeader } from "@/ui/shared/dashboard-header";
 import { ReviewStatusBadge } from "@/ui/report/review-status-badge";
@@ -31,6 +35,7 @@ import {
   getReportResultSemanticSummaryLabel,
   getReportResultSemanticTone
 } from "@/ui/report/report-result-semantics";
+import { ReportResultImagePreviewCard } from "@/ui/report/report-result-image-controller";
 import { ResultReviewWorkflow } from "@/ui/report/result-review-workflow";
 
 function formatCompactDate(value: string | null | undefined): string {
@@ -49,7 +54,13 @@ function buildResultPath(
   reportId: number,
   resultId: number,
   filters: DetailFilters,
-  options?: { inspection?: string; panel?: string }
+  options?: {
+    failedInspectionId?: string;
+    imageFallback?: "load_failed" | "";
+    inspection?: string;
+    imageMode?: ReportImageMode;
+    panel?: string;
+  }
 ): string {
   const searchParams = new URLSearchParams(buildSearch(filters).replace(/^\?/, ""));
   if (options?.inspection) {
@@ -61,6 +72,21 @@ function buildResultPath(
     searchParams.set("panel", options.panel);
   } else {
     searchParams.delete("panel");
+  }
+  if (options?.imageMode === "original") {
+    searchParams.set("imageMode", "original");
+  } else {
+    searchParams.delete("imageMode");
+  }
+  if (options?.imageFallback === "load_failed") {
+    searchParams.set("imageFallback", "load_failed");
+  } else {
+    searchParams.delete("imageFallback");
+  }
+  if (options?.failedInspectionId) {
+    searchParams.set("failedInspectionId", options.failedInspectionId);
+  } else {
+    searchParams.delete("failedInspectionId");
   }
   const search = searchParams.toString();
   return search ? `/reports/${reportId}/results/${resultId}?${search}` : `/reports/${reportId}/results/${resultId}`;
@@ -271,6 +297,9 @@ export function ReportResultDetailView({
   currentUser,
   defaultShouldCorrectedDays,
   filters,
+  failedInspectionId,
+  imageFallback,
+  imageMode,
   maxRectificationDescriptionLength,
   previewImage,
   rectificationOrders,
@@ -282,6 +311,9 @@ export function ReportResultDetailView({
   currentUser: SessionUser;
   defaultShouldCorrectedDays: number;
   filters: DetailFilters;
+  failedInspectionId: string;
+  imageFallback: "load_failed" | "";
+  imageMode: ReportImageMode;
   maxRectificationDescriptionLength: number;
   previewImage: boolean;
   rectificationOrders: RectificationOrderRecord[];
@@ -304,8 +336,6 @@ export function ReportResultDetailView({
   const previousResult = selectedIndex > 0 ? navigationPool[selectedIndex - 1] : null;
   const nextResult =
     selectedIndex >= 0 && selectedIndex < navigationPool.length - 1 ? navigationPool[selectedIndex + 1] : null;
-  const storeById = new Map(report.stores.map((store) => [store.store_id, store]));
-  const selectedStore = selectedResult.store_id ? storeById.get(selectedResult.store_id) ?? null : null;
   const selectedIssues = report.issues.filter((issue) => matchesIssueToImage(issue, selectedResult));
   const selectedInspections = report.inspections
     .filter((inspection) => matchesInspectionToImage(inspection, selectedResult))
@@ -313,38 +343,92 @@ export function ReportResultDetailView({
   const selectedResultSemanticState = classifyReportResultSemantics(selectedIssues, selectedInspections);
   const selectedLogs = report.review_logs.filter((log) => log.result_id === selectedResult.id);
   const backPath = `/reports/${report.id}${buildSearch(filters)}`;
-  const currentPath = buildResultPath(report.id, selectedResult.id, filters, {
-    inspection: activeInspectionId,
-    panel: activePanel
-  });
-  const previewPath = `${currentPath}${currentPath.includes("?") ? "&" : "?"}preview=1`;
-  const currentImageUrl = readMetadataString(selectedResult.metadata, "display_url") || selectedResult.url;
-  const currentCameraAlias = readMetadataString(selectedResult.metadata, "camera_alias") || "未标注摄像头";
   const currentStoreName = selectedResult.store_name || "未绑定门店";
-  const currentStoreCode = selectedStore?.store_id || selectedResult.store_id || "";
   const initialSelectedIssueIds = readSelectedIssueIds(selectedResult.review_payload);
-  const inspectionTabs = selectedInspections.map((inspection) => ({
-    inspection,
-    issues: getInspectionIssues(selectedIssues, inspection)
-  }));
+  const inspectionTabs = selectedInspections
+    .map((inspection) => ({
+      inspection,
+      issues: getInspectionIssues(selectedIssues, inspection)
+    }))
+    .sort((left, right) => {
+      const leftHasIssues = left.issues.length > 0;
+      const rightHasIssues = right.issues.length > 0;
+      if (leftHasIssues !== rightHasIssues) {
+        return leftHasIssues ? -1 : 1;
+      }
+      return left.inspection.display_order - right.inspection.display_order;
+    });
   const defaultInspectionId = inspectionTabs[0]?.inspection.inspection_id || "";
   const resolvedInspectionId =
     inspectionTabs.find((item) => item.inspection.inspection_id === activeInspectionId)?.inspection.inspection_id || defaultInspectionId;
   const activeInspection =
     resolvedInspectionId ? inspectionTabs.find((item) => item.inspection.inspection_id === resolvedInspectionId) || null : null;
+  const effectiveFailedInspectionId = imageFallback === "load_failed" ? failedInspectionId || resolvedInspectionId : "";
+  const activeImageLoadFailed = Boolean(effectiveFailedInspectionId && effectiveFailedInspectionId === resolvedInspectionId);
+  const currentPath = buildResultPath(report.id, selectedResult.id, filters, {
+    failedInspectionId: effectiveFailedInspectionId,
+    imageFallback,
+    inspection: resolvedInspectionId,
+    imageMode,
+    panel: activePanel
+  });
+  const previewPath = `${currentPath}${currentPath.includes("?") ? "&" : "?"}preview=1`;
+  const evidencePath = buildResultPath(report.id, selectedResult.id, filters, {
+    inspection: resolvedInspectionId,
+    imageMode: "evidence",
+    panel: activePanel
+  });
+  const originalPath = buildResultPath(report.id, selectedResult.id, filters, {
+    inspection: resolvedInspectionId,
+    imageMode: "original",
+    panel: activePanel
+  });
+  const imageLoadFailedPath = buildResultPath(report.id, selectedResult.id, filters, {
+    failedInspectionId: resolvedInspectionId,
+    imageFallback: "load_failed",
+    inspection: resolvedInspectionId,
+    imageMode: "evidence",
+    panel: activePanel
+  });
   const reviewActionPath = `${currentPath}#review-action`;
   const previousResultPath = previousResult
     ? buildResultPath(report.id, previousResult.id, filters, {
-        inspection: activeInspectionId,
+        inspection: resolvedInspectionId,
+        imageMode,
         panel: activePanel
       })
     : "";
   const nextResultPath = nextResult
     ? buildResultPath(report.id, nextResult.id, filters, {
-        inspection: activeInspectionId,
+        inspection: resolvedInspectionId,
+        imageMode,
         panel: activePanel
       })
     : "";
+  const activeIssues = activeInspection?.issues ?? [];
+  const activeIssue = activeIssues[0] ?? null;
+  const activeSemanticState = activeInspection
+    ? classifyReportResultSemantics(activeInspection.issues, [activeInspection.inspection])
+    : selectedResultSemanticState;
+  const reviewIssues = selectedIssues.map((issue) => ({
+    id: issue.id,
+    title: issue.title,
+    imageUrls: readIssueRectificationImageUrls(issue, { failedInspectionId: effectiveFailedInspectionId })
+  }));
+  const imageState = resolveResultImageState({
+    selectedResult,
+    activeInspection: activeInspection?.inspection ?? null,
+    loadFailed: activeImageLoadFailed,
+    mode: imageMode
+  });
+  const rectificationImageState = resolveResultImageState({
+    selectedResult,
+    activeInspection: activeInspection?.inspection ?? null,
+    activeIssue,
+    loadFailed: activeImageLoadFailed,
+    mode: "evidence"
+  });
+  const imageNotice = getResolvedImageNotice(imageState);
 
   return (
     <main className="page-shell">
@@ -419,37 +503,17 @@ export function ReportResultDetailView({
 
             <div className={styles.sceneLayout}>
               <aside className={styles.sceneNav}>
-                <div className={styles.scenePreviewCard}>
-                  <Link className={styles.scenePreviewThumbLink} href={previewPath}>
-                    <img alt={currentStoreName} className={styles.scenePreviewThumb} src={currentImageUrl} />
-                  </Link>
-                  <div className={styles.scenePreviewMeta}>
-                    <span className={styles.scenePreviewSubmeta}>当前结果 {selectedIndex + 1} / {navigationPool.length}</span>
-                  </div>
-                  <div className={styles.scenePreviewActions}>
-                    <Button asChild className={styles.scenePrimaryAction} size="sm">
-                      <Link href={previewPath}>放大预览</Link>
-                    </Button>
-                    {previousResult ? (
-                      <Button asChild className={styles.sceneSecondaryAction} size="sm" variant="secondary">
-                        <Link href={previousResultPath}>上一条</Link>
-                      </Button>
-                    ) : (
-                      <Button className={styles.sceneSecondaryAction} disabled size="sm" variant="secondary">
-                        上一条
-                      </Button>
-                    )}
-                    {nextResult ? (
-                      <Button asChild className={styles.sceneSecondaryAction} size="sm" variant="secondary">
-                        <Link href={nextResultPath}>下一条</Link>
-                      </Button>
-                    ) : (
-                      <Button className={styles.sceneSecondaryAction} disabled size="sm" variant="secondary">
-                        下一条
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                <ReportResultImagePreviewCard
+                  currentStoreName={currentStoreName}
+                  evidencePath={evidencePath}
+                  imageState={imageState}
+                  imageLoadFailedPath={imageLoadFailedPath}
+                  nextResultPath={nextResultPath}
+                  originalPath={originalPath}
+                  previousResultPath={previousResultPath}
+                  previewPath={previewPath}
+                  resultCounterText={`当前结果 ${selectedIndex + 1} / ${navigationPool.length}`}
+                />
 
                 <div className={styles.sceneNavHead}>
                   <strong>场景列表</strong>
@@ -466,7 +530,7 @@ export function ReportResultDetailView({
                           key={inspection.id}
                         >
                           <span className={styles.sceneName}>{inspection.skill_name || inspection.skill_id}</span>
-                          <span className={styles.tabCount}>{issues.length}</span>
+                          {issues.length > 0 ? <span className={styles.tabCount}>{issues.length}</span> : null}
                         </Link>
                       );
                     })}
@@ -481,7 +545,7 @@ export function ReportResultDetailView({
                   <div className={`${styles.analysisWorkspace} ${styles.sceneSection}`}>
                     <div className={styles.alertPanel}>
                       <div className={styles.alertHead}>
-                        <strong>{getReportResultSemanticSummaryLabel(selectedResultSemanticState, activeInspection.issues.length)}</strong>
+                        <strong>{getReportResultSemanticSummaryLabel(activeSemanticState, activeInspection.issues.length)}</strong>
                       </div>
                       {activeInspection.issues.length > 0 ? (
                         <ul className={styles.issueSummaryList}>
@@ -489,9 +553,9 @@ export function ReportResultDetailView({
                             <li key={issue.id}>{issue.title}</li>
                           ))}
                         </ul>
-                      ) : selectedResultSemanticState === "pass" ? (
+                      ) : activeSemanticState === "pass" ? (
                         <p className={styles.analysisCopy}>当前图片已完成巡检，未发现需要复核的问题项。</p>
-                      ) : selectedResultSemanticState === "inspection_failed" ? (
+                      ) : activeSemanticState === "inspection_failed" ? (
                         <p className={styles.analysisCopy}>当前图片存在巡检失败记录，本次仅支持本地复核记录异常情况，不下发整改单。</p>
                       ) : (
                         <p className={styles.analysisCopy}>当前图片没有形成明确问题项，可结合算法返回内容判断是否属于目标缺失、画面异常或其他无法判定场景。</p>
@@ -509,14 +573,19 @@ export function ReportResultDetailView({
                 <div className={`${styles.reviewWorkspace} ${styles.sceneSection}`} id="review-action">
                   <ResultReviewWorkflow
                     actionUrl={`/api/reports/${report.id}/images/${selectedResult.id}/review-status`}
+                    addIssueUrl={`/api/reports/${report.id}/images/${selectedResult.id}/issues`}
                     canReview={canReview}
-                    currentImageUrl={currentImageUrl}
+                    currentImageUrl={imageState.url}
                     currentPath={currentPath}
                     defaultShouldCorrectedDays={defaultShouldCorrectedDays}
+                    failedInspectionId={effectiveFailedInspectionId}
+                    imageNotice={imageNotice}
+                    activeInspectionId={resolvedInspectionId}
                     initialReviewState={selectedResult.review_state}
                     initialSelectedIssueIds={initialSelectedIssueIds}
-                    issues={selectedIssues.map((issue) => ({ id: issue.id, title: issue.title }))}
+                    issues={reviewIssues}
                     maxDescriptionLength={maxRectificationDescriptionLength}
+                    rectificationImageUrl={rectificationImageState.url}
                     semanticState={selectedResultSemanticState}
                   />
                 </div>
@@ -595,8 +664,13 @@ export function ReportResultDetailView({
                 </Button>
               </div>
               <div className={styles.imageModalFrame}>
-                <img alt={currentStoreName} className={styles.imageModalPreview} src={currentImageUrl} />
+                {imageState.url ? (
+                  <img alt={currentStoreName} className={styles.imageModalPreview} src={imageState.url} />
+                ) : (
+                  <div className={styles.imageUnavailable}>图片不可用</div>
+                )}
               </div>
+              {imageNotice ? <p className={styles.imageFallbackNotice}>{imageNotice}</p> : null}
             </CardContent>
           </Card>
         </div>

@@ -1,6 +1,7 @@
 export type RectificationIssueSelection = {
   id: number;
   title: string;
+  imageUrls?: string[];
 };
 
 export type RectificationPreviewOrder = {
@@ -10,6 +11,8 @@ export type RectificationPreviewOrder = {
   imageUrls: string[];
   shouldCorrected: string;
 };
+
+export const MAX_RECTIFICATION_IMAGE_COUNT = 10;
 
 export class RectificationPreviewError extends Error {
   constructor(message: string) {
@@ -26,7 +29,8 @@ function normalizeIssues(issues: RectificationIssueSelection[]): RectificationIs
       issues
         .map((issue) => ({
           id: Number(issue.id),
-          title: String(issue.title || "").trim()
+          title: String(issue.title || "").trim(),
+          imageUrls: normalizeImageUrls(issue.imageUrls ?? [])
         }))
         .filter((issue) => Number.isInteger(issue.id) && issue.id > 0 && issue.title)
         .map((issue) => [issue.id, issue] as const)
@@ -34,12 +38,41 @@ function normalizeIssues(issues: RectificationIssueSelection[]): RectificationIs
   );
 }
 
-function buildIssueLine(issue: RectificationIssueSelection, allIssues: RectificationIssueSelection[]): string {
-  return `${allIssues.findIndex((candidate) => candidate.id === issue.id) + 1}. ${issue.title}`;
+function normalizeImageUrls(imageUrls: string[]): string[] {
+  return Array.from(
+    new Set(imageUrls.map((url) => String(url || "").trim()).filter((url) => url && url !== "about:blank"))
+  );
 }
 
-function buildDescription(chunk: RectificationIssueSelection[], allIssues: RectificationIssueSelection[], note: string): string {
-  const issueSection = chunk.map((issue) => buildIssueLine(issue, allIssues)).join("\n");
+function buildChunkImageUrls(chunk: RectificationIssueSelection[], fallbackImageUrls: string[]): string[] {
+  const issueImageUrls = normalizeImageUrls(chunk.flatMap((issue) => issue.imageUrls ?? []));
+  return issueImageUrls.length > 0 ? issueImageUrls : fallbackImageUrls;
+}
+
+function formatImageIndexes(indexes: number[]): string {
+  return indexes.map((index) => `第${index}张`).join("、");
+}
+
+function buildIssueLine(
+  issue: RectificationIssueSelection,
+  allIssues: RectificationIssueSelection[],
+  chunkImageUrls: string[]
+): string {
+  const issueNumber = allIssues.findIndex((candidate) => candidate.id === issue.id) + 1;
+  const imageIndexes = normalizeImageUrls(issue.imageUrls ?? [])
+    .map((url) => chunkImageUrls.indexOf(url) + 1)
+    .filter((index) => index > 0);
+  const imageSuffix = imageIndexes.length > 0 ? `（对应图片：${formatImageIndexes(imageIndexes)}）` : "";
+  return `${issueNumber}. ${issue.title}${imageSuffix}`;
+}
+
+function buildDescription(
+  chunk: RectificationIssueSelection[],
+  allIssues: RectificationIssueSelection[],
+  note: string,
+  chunkImageUrls: string[]
+): string {
+  const issueSection = chunk.map((issue) => buildIssueLine(issue, allIssues, chunkImageUrls)).join("\n");
   const normalizedNote = note.trim();
   if (!issueSection) {
     if (!normalizedNote) {
@@ -62,12 +95,10 @@ export function buildRectificationPreviewOrders(input: {
 }): RectificationPreviewOrder[] {
   const normalizedIssues = normalizeIssues(input.selectedIssues);
   const normalizedNote = String(input.note || "").trim();
-  const normalizedImageUrls = Array.from(
-    new Set(input.imageUrls.map((url) => String(url || "").trim()).filter(Boolean))
-  ).slice(0, 9);
+  const normalizedImageUrls = normalizeImageUrls(input.imageUrls);
   const maxLength = Math.max(1, Math.floor(Number(input.maxLength) || 0));
   if (normalizedIssues.length === 0) {
-    const description = buildDescription([], [], normalizedNote);
+    const description = buildDescription([], [], normalizedNote, normalizedImageUrls);
     if (description.length > maxLength) {
       throw new RectificationPreviewError(`复核备注已超过 ${maxLength} 字，无法创建整改单。`);
     }
@@ -86,10 +117,18 @@ export function buildRectificationPreviewOrders(input: {
   let currentChunk: RectificationIssueSelection[] = [];
 
   normalizedIssues.forEach((issue) => {
+    const issueImageUrls = normalizeImageUrls(issue.imageUrls ?? []);
+    if (issueImageUrls.length === 0) {
+      throw new RectificationPreviewError(`问题“${issue.title}”缺少可下发图片，请检查标注图或原图。`);
+    }
+    if (issueImageUrls.length > MAX_RECTIFICATION_IMAGE_COUNT) {
+      throw new RectificationPreviewError(`问题“${issue.title}”关联图片超过 ${MAX_RECTIFICATION_IMAGE_COUNT} 张，无法自动拆单。`);
+    }
     const candidateChunk = [...currentChunk, issue];
-    const candidateDescription = buildDescription(candidateChunk, normalizedIssues, normalizedNote);
+    const candidateImageUrls = buildChunkImageUrls(candidateChunk, normalizedImageUrls);
+    const candidateDescription = buildDescription(candidateChunk, normalizedIssues, normalizedNote, candidateImageUrls);
 
-    if (candidateDescription.length <= maxLength) {
+    if (candidateDescription.length <= maxLength && candidateImageUrls.length <= MAX_RECTIFICATION_IMAGE_COUNT) {
       currentChunk = candidateChunk;
       return;
     }
@@ -100,7 +139,11 @@ export function buildRectificationPreviewOrders(input: {
 
     chunks.push(currentChunk);
     currentChunk = [issue];
-    const nextDescription = buildDescription(currentChunk, normalizedIssues, normalizedNote);
+    const nextImageUrls = buildChunkImageUrls(currentChunk, normalizedImageUrls);
+    const nextDescription = buildDescription(currentChunk, normalizedIssues, normalizedNote, nextImageUrls);
+    if (nextImageUrls.length > MAX_RECTIFICATION_IMAGE_COUNT) {
+      throw new RectificationPreviewError(`问题“${issue.title}”关联图片超过 ${MAX_RECTIFICATION_IMAGE_COUNT} 张，无法自动拆单。`);
+    }
     if (nextDescription.length > maxLength) {
       throw new RectificationPreviewError(`问题“${issue.title}”拼接备注后已超过 ${maxLength} 字，无法自动拆单。`);
     }
@@ -110,11 +153,14 @@ export function buildRectificationPreviewOrders(input: {
     chunks.push(currentChunk);
   }
 
-  return chunks.map((chunk) => ({
-    description: buildDescription(chunk, normalizedIssues, normalizedNote),
-    issueCount: chunk.length,
-    selectedIssues: chunk,
-    imageUrls: normalizedImageUrls,
-    shouldCorrected: input.shouldCorrected
-  }));
+  return chunks.map((chunk) => {
+    const chunkImageUrls = buildChunkImageUrls(chunk, normalizedImageUrls);
+    return {
+      description: buildDescription(chunk, normalizedIssues, normalizedNote, chunkImageUrls),
+      issueCount: chunk.length,
+      selectedIssues: chunk,
+      imageUrls: chunkImageUrls,
+      shouldCorrected: input.shouldCorrected
+    };
+  });
 }

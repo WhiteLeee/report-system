@@ -89,13 +89,18 @@ export interface ReportInspectionFact {
   channel_code?: string;
   capture_provider?: string;
   raw_result?: string;
+  raw_result_json?: JsonValue;
   error_message?: string;
+  evidence_image_url?: string;
+  evidence_image_source?: string;
+  original_image_url?: string;
+  provider_meta?: JsonValue;
   total_issues?: number;
 }
 
 export interface ReportIssueFact {
   issue_id: string;
-  inspection_id: string;
+  inspection_id?: string;
   capture_id: string;
   image_id: string;
   store_id: string;
@@ -108,6 +113,9 @@ export interface ReportIssueFact {
   count?: number;
   severity?: string;
   review_status?: IncomingResultReviewState;
+  evidence_image_url?: string;
+  evidence_image_source?: string;
+  original_image_url?: string;
   extra_json?: JsonValue;
 }
 
@@ -128,6 +136,15 @@ export interface ReportReviewLog {
 export interface ReviewSelectedIssue {
   id: number;
   title: string;
+}
+
+export interface CreateManualReportIssueInput {
+  report_id: number;
+  result_id: number;
+  title: string;
+  description?: string;
+  inspection_id?: string;
+  operator_name: string;
 }
 
 export interface ReviewResultUpdateResult {

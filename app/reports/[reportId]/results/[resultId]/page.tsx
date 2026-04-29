@@ -6,6 +6,7 @@ import { createReportService } from "@/backend/report/report.module";
 import type { ReviewFilterState } from "@/backend/report/report.types";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
 import { DETAIL_PAGE_SIZE_OPTIONS, type DetailFilters } from "@/ui/report/report-detail-helpers";
+import type { ReportImageMode } from "@/ui/report/report-detail-helpers";
 import type { ReportResultSemanticState } from "@/ui/report/report-result-semantics";
 import { ReportResultDetailView } from "@/ui/report/report-result-detail-view";
 
@@ -33,6 +34,14 @@ function normalizeSemanticState(value: string): ReportResultSemanticState | "" {
 function normalizePageSize(value: string | string[] | undefined): DetailFilters["pageSize"] {
   const pageSize = typeof value === "string" ? Number(value) : NaN;
   return DETAIL_PAGE_SIZE_OPTIONS.includes(pageSize as DetailFilters["pageSize"]) ? (pageSize as DetailFilters["pageSize"]) : 30;
+}
+
+function normalizeImageMode(value: string | string[] | undefined): ReportImageMode {
+  return value === "original" ? "original" : "evidence";
+}
+
+function normalizeImageFallback(value: string | string[] | undefined): "load_failed" | "" {
+  return value === "load_failed" ? "load_failed" : "";
 }
 
 export default async function ReportResultDetailPage({
@@ -73,6 +82,9 @@ export default async function ReportResultDetailPage({
   const activeInspectionId =
     typeof resolvedSearchParams.inspection === "string" ? resolvedSearchParams.inspection : "";
   const activePanel = typeof resolvedSearchParams.panel === "string" ? resolvedSearchParams.panel : "";
+  const imageMode = normalizeImageMode(resolvedSearchParams.imageMode);
+  const imageFallback = normalizeImageFallback(resolvedSearchParams.imageFallback);
+  const failedInspectionId = typeof resolvedSearchParams.failedInspectionId === "string" ? resolvedSearchParams.failedInspectionId : "";
   const previewImage = typeof resolvedSearchParams.preview === "string" && resolvedSearchParams.preview === "1";
   const rectificationOrders = await rectificationService.syncOrdersByResultId(resultId);
   const huiYunYingApiSettings = systemSettingsService.getHuiYunYingApiSettings();
@@ -84,6 +96,9 @@ export default async function ReportResultDetailPage({
       currentUser={currentUser}
       defaultShouldCorrectedDays={huiYunYingApiSettings.defaultShouldCorrectedDays}
       filters={filters}
+      failedInspectionId={failedInspectionId}
+      imageFallback={imageFallback}
+      imageMode={imageMode}
       maxRectificationDescriptionLength={huiYunYingApiSettings.rectificationDescriptionMaxLength}
       previewImage={previewImage}
       rectificationOrders={rectificationOrders}
