@@ -284,7 +284,6 @@ export default async function AdminUsersPage({
                       <TableHead>账号</TableHead>
                       <TableHead>显示名</TableHead>
                       <TableHead>角色</TableHead>
-                      <TableHead>权限</TableHead>
                       <TableHead>企业范围</TableHead>
                       <TableHead>组织范围</TableHead>
                       <TableHead>状态</TableHead>
@@ -323,11 +322,6 @@ export default async function AdminUsersPage({
                           ) : (
                             <span className={styles.cellMeta}>-</span>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <span className={styles.permissionText} title={user.permissions.join(", ") || "-"}>
-                            {user.permissions.join(", ") || "-"}
-                          </span>
                         </TableCell>
                         <TableCell>
                           <span className={styles.scopeText} title={enterpriseScopeDisplay.title}>
