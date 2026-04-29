@@ -1,5 +1,7 @@
 import type { RequestContext } from "@/backend/auth/request-context";
 import type {
+  CreateManualReportIssueInput,
+  ReportIssue,
   ReviewResultUpdateResult,
   ResultReviewState,
   ReportReviewLog,
@@ -9,6 +11,34 @@ import type { ReportRepository } from "@/backend/report/report.repository";
 
 export class ReportReviewService {
   constructor(private readonly repository: ReportRepository) {}
+
+  createManualIssue(
+    input: CreateManualReportIssueInput,
+    context: RequestContext = {}
+  ): ReportIssue | null {
+    const title = input.title.trim();
+    const operatorName = input.operator_name.trim();
+    if (
+      !Number.isInteger(input.report_id) ||
+      input.report_id <= 0 ||
+      !Number.isInteger(input.result_id) ||
+      input.result_id <= 0 ||
+      !title ||
+      !operatorName
+    ) {
+      return null;
+    }
+    return this.repository.createManualIssue(
+      {
+        ...input,
+        title,
+        description: input.description?.trim() ?? "",
+        inspection_id: input.inspection_id?.trim() ?? "",
+        operator_name: operatorName
+      },
+      context
+    );
+  }
 
   updateImageReviewStatus(
     reportId: number,

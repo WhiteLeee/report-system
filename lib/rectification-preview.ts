@@ -118,6 +118,9 @@ export function buildRectificationPreviewOrders(input: {
 
   normalizedIssues.forEach((issue) => {
     const issueImageUrls = normalizeImageUrls(issue.imageUrls ?? []);
+    if (issueImageUrls.length === 0) {
+      throw new RectificationPreviewError(`问题“${issue.title}”缺少可下发图片，请检查标注图或原图。`);
+    }
     if (issueImageUrls.length > MAX_RECTIFICATION_IMAGE_COUNT) {
       throw new RectificationPreviewError(`问题“${issue.title}”关联图片超过 ${MAX_RECTIFICATION_IMAGE_COUNT} 张，无法自动拆单。`);
     }

@@ -2,8 +2,10 @@ import type { RequestContext } from "@/backend/auth/request-context";
 import type {
   PublishReceipt,
   PublishStatusReceipt,
+  CreateManualReportIssueInput,
   ReportDetail,
   ReportFilters,
+  ReportIssue,
   ReportPublishPayload,
   ReportReviewLog,
   ReportSummary,
@@ -26,6 +28,7 @@ export interface ReportRepository {
     selectedIssues?: ReviewSelectedIssue[],
     context?: RequestContext
   ): ReviewResultUpdateResult | null;
+  createManualIssue(input: CreateManualReportIssueInput, context?: RequestContext): ReportIssue | null;
   listReviewLogs(
     reportId: number,
     limit?: number,

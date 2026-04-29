@@ -345,10 +345,19 @@ export function ReportResultDetailView({
   const backPath = `/reports/${report.id}${buildSearch(filters)}`;
   const currentStoreName = selectedResult.store_name || "未绑定门店";
   const initialSelectedIssueIds = readSelectedIssueIds(selectedResult.review_payload);
-  const inspectionTabs = selectedInspections.map((inspection) => ({
-    inspection,
-    issues: getInspectionIssues(selectedIssues, inspection)
-  }));
+  const inspectionTabs = selectedInspections
+    .map((inspection) => ({
+      inspection,
+      issues: getInspectionIssues(selectedIssues, inspection)
+    }))
+    .sort((left, right) => {
+      const leftHasIssues = left.issues.length > 0;
+      const rightHasIssues = right.issues.length > 0;
+      if (leftHasIssues !== rightHasIssues) {
+        return leftHasIssues ? -1 : 1;
+      }
+      return left.inspection.display_order - right.inspection.display_order;
+    });
   const defaultInspectionId = inspectionTabs[0]?.inspection.inspection_id || "";
   const resolvedInspectionId =
     inspectionTabs.find((item) => item.inspection.inspection_id === activeInspectionId)?.inspection.inspection_id || defaultInspectionId;
@@ -521,7 +530,7 @@ export function ReportResultDetailView({
                           key={inspection.id}
                         >
                           <span className={styles.sceneName}>{inspection.skill_name || inspection.skill_id}</span>
-                          <span className={styles.tabCount}>{issues.length}</span>
+                          {issues.length > 0 ? <span className={styles.tabCount}>{issues.length}</span> : null}
                         </Link>
                       );
                     })}
@@ -564,6 +573,7 @@ export function ReportResultDetailView({
                 <div className={`${styles.reviewWorkspace} ${styles.sceneSection}`} id="review-action">
                   <ResultReviewWorkflow
                     actionUrl={`/api/reports/${report.id}/images/${selectedResult.id}/review-status`}
+                    addIssueUrl={`/api/reports/${report.id}/images/${selectedResult.id}/issues`}
                     canReview={canReview}
                     currentImageUrl={imageState.url}
                     currentPath={currentPath}

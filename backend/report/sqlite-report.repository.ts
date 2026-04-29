@@ -1,4 +1,6 @@
-import { and, desc, eq, gte, inArray, like, lte, or } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+
+import { and, desc, eq, gte, inArray, like, lte, or, sql } from "drizzle-orm";
 
 import type { RequestContext } from "@/backend/auth/request-context";
 import { db } from "@/backend/database/client";
@@ -15,6 +17,7 @@ import { normalizePublishedReport } from "@/backend/report/report-publish-normal
 import type { ReportRepository } from "@/backend/report/report.repository";
 import type {
   ProgressState,
+  CreateManualReportIssueInput,
   PublishReceipt,
   PublishStatusReceipt,
   ReportDetail,
@@ -226,6 +229,15 @@ function normalizeSelectedIssues(values: ReviewSelectedIssue[] | undefined): Rev
         .map((item) => [item.id, item] as const)
     ).values()
   );
+}
+
+function resolveResultOriginalImageUrl(result: typeof reportImageTable.$inferSelect): string {
+  const metadata = safeParse(result.metadataJson, {});
+  return readMetadataString(metadata, "preview_url") ||
+    readMetadataString(metadata, "display_url") ||
+    result.url ||
+    readMetadataString(metadata, "capture_url") ||
+    "";
 }
 
 function filterStoresByScope(stores: ReportStore[], scopedStoreIds: string[] | null): ReportStore[] {
@@ -689,6 +701,140 @@ export class SqliteReportRepository implements ReportRepository {
       review_logs: visibleLogs,
       raw_payload: safeParse(snapshotRow?.payloadJson || "{}", {}) as unknown as ReportPublishPayload
     };
+  }
+
+  createManualIssue(input: CreateManualReportIssueInput, context: RequestContext = {}): ReportIssue | null {
+    const title = input.title.trim();
+    const description = String(input.description || "").trim();
+    const operatorName = input.operator_name.trim();
+    const inspectionId = String(input.inspection_id || "").trim();
+    if (!title || !operatorName) {
+      return null;
+    }
+
+    return db.transaction((tx) => {
+      const reportRow = tx
+        .select({
+          id: reportTable.id,
+          sourceEnterpriseId: reportTable.sourceEnterpriseId
+        })
+        .from(reportTable)
+        .where(eq(reportTable.id, input.report_id))
+        .get();
+      if (!reportRow || !canAccessEnterprise(context, reportRow.sourceEnterpriseId)) {
+        return null;
+      }
+
+      const resultRow = tx
+        .select()
+        .from(reportImageTable)
+        .where(and(eq(reportImageTable.reportId, input.report_id), eq(reportImageTable.id, input.result_id)))
+        .get();
+      if (!resultRow) {
+        return null;
+      }
+
+      const scopedStoreIds = resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
+      if (scopedStoreIds) {
+        const resultStoreId = String(resultRow.storeId || "").trim();
+        if (!resultStoreId || !scopedStoreIds.includes(resultStoreId)) {
+          return null;
+        }
+      }
+
+      const linkedInspection = inspectionId
+        ? tx
+            .select()
+            .from(reportInspectionTable)
+            .where(
+              and(
+                eq(reportInspectionTable.reportId, input.report_id),
+                eq(reportInspectionTable.resultId, input.result_id),
+                eq(reportInspectionTable.inspectionId, inspectionId)
+              )
+            )
+            .get()
+        : tx
+            .select()
+            .from(reportInspectionTable)
+            .where(and(eq(reportInspectionTable.reportId, input.report_id), eq(reportInspectionTable.resultId, input.result_id)))
+            .orderBy(reportInspectionTable.displayOrder, reportInspectionTable.id)
+            .limit(1)
+            .get();
+      const resultMetadata = safeParse(resultRow.metadataJson, {});
+      const imageUrl = resolveResultOriginalImageUrl(resultRow);
+      const now = new Date().toISOString();
+      const displayOrder = tx
+        .select({ id: reportIssueTable.id })
+        .from(reportIssueTable)
+        .where(eq(reportIssueTable.reportId, input.report_id))
+        .all().length;
+
+      const inserted = tx
+        .insert(reportIssueTable)
+        .values({
+          reportId: input.report_id,
+          resultId: input.result_id,
+          storeId: resultRow.storeId,
+          storeName: resultRow.storeName,
+          title,
+          category: "人工问题",
+          severity: "manual",
+          description: description || title,
+          suggestion: null,
+          imageUrl: imageUrl || null,
+          imageObjectKey: resultRow.objectKey || readMetadataString(resultMetadata, "oss_key") || null,
+          reviewState: "pending",
+          metadataJson: safeStringify({
+            issue_id: `manual-${randomUUID()}`,
+            source: "manual_review",
+            manual_issue: true,
+            inspection_id: linkedInspection?.inspectionId ?? inspectionId,
+            linked_inspection_id: linkedInspection?.inspectionId ?? inspectionId,
+            capture_id: readMetadataString(resultMetadata, "capture_id"),
+            image_id: readMetadataString(resultMetadata, "image_id"),
+            store_code: readMetadataString(resultMetadata, "store_code"),
+            skill_id: linkedInspection?.skillId ?? "",
+            skill_name: linkedInspection?.skillName ?? "",
+            capture_url: readMetadataString(resultMetadata, "capture_url"),
+            preview_url: readMetadataString(resultMetadata, "preview_url"),
+            oss_key: readMetadataString(resultMetadata, "oss_key"),
+            original_image_url: imageUrl,
+            display_image_url: imageUrl,
+            evidence_image_url: "",
+            evidence_image_source: "manual_review",
+            extra_json: {
+              source: "manual_review",
+              created_by: operatorName,
+              created_at: now
+            }
+          }),
+          displayOrder,
+          createdAt: now
+        })
+        .returning()
+        .get();
+
+      tx
+        .update(reportTable)
+        .set({
+          issueCount: sql`${reportTable.issueCount} + 1`
+        })
+        .where(eq(reportTable.id, input.report_id))
+        .run();
+
+      if (resultRow.storeId) {
+        tx
+          .update(reportStoreTable)
+          .set({
+            issueCount: sql`${reportStoreTable.issueCount} + 1`
+          })
+          .where(and(eq(reportStoreTable.reportId, input.report_id), eq(reportStoreTable.storeId, resultRow.storeId)))
+          .run();
+      }
+
+      return toReportIssue(inserted);
+    });
   }
 
   updateImageReviewStatus(

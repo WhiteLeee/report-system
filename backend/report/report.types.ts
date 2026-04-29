@@ -138,6 +138,15 @@ export interface ReviewSelectedIssue {
   title: string;
 }
 
+export interface CreateManualReportIssueInput {
+  report_id: number;
+  result_id: number;
+  title: string;
+  description?: string;
+  inspection_id?: string;
+  operator_name: string;
+}
+
 export interface ReviewResultUpdateResult {
   report_id: number;
   result_id: number;

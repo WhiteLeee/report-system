@@ -168,3 +168,23 @@ test("readIssueRectificationImageUrls 只让失败场景回退原图", () => {
     "https://oss.example.com/healthy-evidence.jpg"
   ]);
 });
+
+test("readIssueRectificationImageUrls 人工问题忽略历史上传 evidence", () => {
+  const manualIssue = createIssue({
+    image_url: "/uploads/report-issues/stale.png",
+    metadata: {
+      source: "manual_review",
+      manual_issue: true,
+      evidence_image_url: "/uploads/report-issues/stale.png",
+      linked_inspection_evidence_image_url: "",
+      preview_url: "https://example.com/current-preview.jpg",
+      original_image_url: "https://example.com/current-result.jpg",
+      display_image_url: "/uploads/report-issues/stale.png",
+      extra_json: {}
+    }
+  });
+
+  assert.deepEqual(readIssueRectificationImageUrls(manualIssue), [
+    "https://example.com/current-preview.jpg"
+  ]);
+});

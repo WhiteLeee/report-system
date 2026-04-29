@@ -60,6 +60,13 @@ function readMetadataString(metadata: unknown, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+function readMetadataBoolean(metadata: unknown, key: string): boolean {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return false;
+  }
+  return (metadata as Record<string, unknown>)[key] === true;
+}
+
 function issueMatchesInspection(
   issue: { metadata: unknown },
   inspection: { inspection_id: string; skill_id: string; skill_name: string | null }
@@ -86,6 +93,10 @@ function normalizeImageUrls(values: unknown[]): string[] {
   );
 }
 
+function isDeprecatedManualUploadUrl(url: string): boolean {
+  return url.trim().startsWith("/uploads/report-issues/");
+}
+
 function issueUsesInspection(issue: { metadata: unknown }, inspectionId: string): boolean {
   if (!inspectionId) {
     return false;
@@ -100,6 +111,8 @@ function buildIssueRectificationImageUrls(input: {
   resultDetail: { metadata: unknown; url: string };
   failedInspectionIds: Set<string>;
 }): string[] {
+  const isManualIssue = readMetadataBoolean(input.issue.metadata, "manual_issue") ||
+    readMetadataString(input.issue.metadata, "source") === "manual_review";
   const useOriginalFallback = Array.from(input.failedInspectionIds).some((inspectionId) =>
     issueUsesInspection(input.issue, inspectionId)
   );
@@ -115,6 +128,19 @@ function buildIssueRectificationImageUrls(input: {
   ]);
   if (useOriginalFallback) {
     return originalUrls.slice(0, 1);
+  }
+  if (isManualIssue) {
+    return normalizeImageUrls([
+      readMetadataString(input.resultDetail.metadata, "preview_url"),
+      readMetadataString(input.resultDetail.metadata, "display_url"),
+      input.resultDetail.url,
+      readMetadataString(input.issue.metadata, "preview_url"),
+      readMetadataString(input.issue.metadata, "original_image_url"),
+      input.issue.image_url || "",
+      readMetadataString(input.issue.metadata, "display_image_url"),
+      readMetadataString(input.issue.metadata, "capture_url"),
+      ...resultOriginalUrls
+    ].filter((url) => typeof url !== "string" || !isDeprecatedManualUploadUrl(url))).slice(0, 1);
   }
 
   const evidenceUrls = normalizeImageUrls([
@@ -157,6 +183,7 @@ export async function POST(
   const requestContext = buildRequestContext(currentUser);
   let resolvedSemanticState: ReportResultSemanticState | null = null;
   let effectiveSelectedIssues = selectedIssues;
+  let rectificationPartialFailed = false;
 
   let createdRectificationOrders: Array<{ id: number; huiyunying_order_id: string | null; status: string }> = [];
 
@@ -270,6 +297,7 @@ export async function POST(
           huiyunying_order_id: order.huiyunying_order_id,
           status: order.status
         }));
+        rectificationPartialFailed = createdRectificationOrders.some((order) => order.status === "sync_failed");
       } catch (error) {
         if (error instanceof RectificationSplitError) {
           return Response.json({ success: false, error: error.message }, { status: 400 });
@@ -331,6 +359,10 @@ export async function POST(
     result_semantic_state: resolvedSemanticState,
     selected_issues: effectiveSelectedIssues,
     rectification_orders: createdRectificationOrders,
+    rectification_partial_failed: rectificationPartialFailed,
+    warning: rectificationPartialFailed
+      ? "部分整改单创建失败，已保留成功和失败记录；请在整改单列表中核查失败项。"
+      : null,
     recent_log: result.recent_log,
     updated_at: result.updated_at
   });

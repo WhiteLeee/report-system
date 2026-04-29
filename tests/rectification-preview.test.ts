@@ -62,6 +62,22 @@ test("勾选问题项时在描述中标明对应图片序号", () => {
   assert.equal(orders[0].description, "1. 货架未摆满（对应图片：第1张）\n2. 通道堵塞（对应图片：第2张）");
 });
 
+test("勾选问题项缺少图片时拒绝生成整改单预览", () => {
+  assert.throws(
+    () =>
+      buildRectificationPreviewOrders({
+        selectedIssues: [{ id: 1, title: "货架未摆满", imageUrls: [] }],
+        note: "",
+        shouldCorrected: "2026-04-08",
+        imageUrls: ["https://example.com/fallback.jpg"],
+        maxLength: 500
+      }),
+    (error) =>
+      error instanceof RectificationPreviewError &&
+      error.message === "问题“货架未摆满”缺少可下发图片，请检查标注图或原图。"
+  );
+});
+
 test("勾选问题项图片超过 10 张时按图片数量自动拆单", () => {
   const selectedIssues = Array.from({ length: 11 }, (_, index) => ({
     id: index + 1,

@@ -30,6 +30,7 @@ process.env.REPORT_SYSTEM_SUPPORTED_PAYLOAD_VERSIONS = "2";
 let loginRoute: typeof import("../app/api/auth/login/route");
 let publishRoute: typeof import("../app/api/reports/publish/route");
 let reportRoute: typeof import("../app/api/reports/[reportId]/route");
+let issueRoute: typeof import("../app/api/reports/[reportId]/images/[imageId]/issues/route");
 let reviewRoute: typeof import("../app/api/reports/[reportId]/images/[imageId]/review-status/route");
 let reviewLogsRoute: typeof import("../app/api/reports/[reportId]/review-logs/route");
 let rolesSaveRoute: typeof import("../app/admin/roles/save/route");
@@ -151,6 +152,7 @@ before(async () => {
     importedLoginRoute,
     importedPublishRoute,
     importedReportRoute,
+    importedIssueRoute,
     importedReviewRoute,
     importedReviewLogsRoute,
     importedRolesSaveRoute
@@ -163,6 +165,7 @@ before(async () => {
     import("../app/api/auth/login/route"),
     import("../app/api/reports/publish/route"),
     import("../app/api/reports/[reportId]/route"),
+    import("../app/api/reports/[reportId]/images/[imageId]/issues/route"),
     import("../app/api/reports/[reportId]/images/[imageId]/review-status/route"),
     import("../app/api/reports/[reportId]/review-logs/route"),
     import("../app/admin/roles/save/route")
@@ -175,6 +178,7 @@ before(async () => {
   loginRoute = importedLoginRoute;
   publishRoute = importedPublishRoute;
   reportRoute = importedReportRoute;
+  issueRoute = importedIssueRoute;
   reviewRoute = importedReviewRoute;
   reviewLogsRoute = importedReviewLogsRoute;
   rolesSaveRoute = importedRolesSaveRoute;
@@ -721,6 +725,156 @@ test("review submit splits orders when selected issue images exceed ten", async 
   }
 });
 
+test("review submit records partial dispatch failure without losing successful split orders", async () => {
+  const originalFetch = globalThis.fetch;
+  const createBodies: Array<{ description?: string; imageUrls?: string[] }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.includes("/sign")) {
+      return new Response("token-123", {
+        status: 200,
+        headers: { "content-type": "text/plain" }
+      });
+    }
+    if (url.includes("/route/ri/open/item/create")) {
+      createBodies.push(JSON.parse(String(init?.body || "{}")) as { description?: string; imageUrls?: string[] });
+      if (createBodies.length === 2) {
+        return new Response(JSON.stringify({ status: 500, message: "remote failed" }), {
+          status: 500,
+          headers: { "content-type": "application/json" }
+        });
+      }
+      return new Response(JSON.stringify({ status: 200, data: true, disqualifiedId: 9301 }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const loginResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "ChangeMe123!");
+          return formData;
+        })()
+      })
+    );
+    const sessionCookie = loginResp.headers.get("set-cookie") || "";
+    const inspections = Array.from({ length: 11 }, (_, index) => ({
+      ...publishPayload.report.facts.inspections[0],
+      inspection_id: `inspection-partial-${index + 1}`,
+      skill_id: `skill-partial-${index + 1}`,
+      skill_name: `部分失败技能 ${index + 1}`,
+      evidence_image_url: `https://example.com/partial-${index + 1}.jpg`,
+      total_issues: 1
+    }));
+    const issues = Array.from({ length: 11 }, (_, index) => ({
+      ...publishPayload.report.facts.issues[0],
+      issue_id: `issue-partial-${index + 1}`,
+      inspection_id: `inspection-partial-${index + 1}`,
+      skill_id: `skill-partial-${index + 1}`,
+      skill_name: `部分失败技能 ${index + 1}`,
+      issue_type: `部分失败问题 ${index + 1}`,
+      description: `部分失败问题 ${index + 1}`,
+      evidence_image_url: `https://example.com/partial-${index + 1}.jpg`
+    }));
+
+    const publishResp = await publishRoute.POST(
+      new Request("http://127.0.0.1:3000/api/reports/publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...publishPayload,
+          idempotency_key: "review-test-partial-dispatch-failure",
+          published_at: "2026-04-10 10:00:00",
+          report: {
+            ...publishPayload.report,
+            summary: {
+              metrics: {
+                store_count: 1,
+                image_count: 1,
+                issue_count: 11
+              }
+            },
+            report_meta: {
+              ...publishPayload.report.report_meta,
+              start_date: "2026-04-10",
+              end_date: "2026-04-10",
+              generated_at: "2026-04-10 10:00:00"
+            },
+            facts: {
+              ...publishPayload.report.facts,
+              inspections,
+              issues
+            }
+          }
+        })
+      })
+    );
+    const publishJson = (await publishResp.json()) as { report_id: number };
+    const reportId = publishJson.report_id;
+
+    const detailResp = await reportRoute.GET(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
+      { params: Promise.resolve({ reportId: String(reportId) }) }
+    );
+    const detailJson = (await detailResp.json()) as {
+      report: {
+        images: Array<{ id: number }>;
+        issues: Array<{ id: number; title: string }>;
+      };
+    };
+    const imageId = detailJson.report.images[0].id;
+    const selectedIssues = detailJson.report.issues.map((issue) => ({ id: issue.id, title: issue.title }));
+
+    const reviewResp = await reviewRoute.POST(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({
+          review_status: "completed",
+          selected_issues_json: JSON.stringify(selectedIssues),
+          should_corrected: "2026-04-09",
+          result_semantic_state: "issue_found"
+        })
+      }),
+      {
+        params: Promise.resolve({ reportId: String(reportId), imageId: String(imageId) })
+      }
+    );
+
+    assert.equal(reviewResp.status, 200);
+    assert.equal(createBodies.length, 2);
+    const reviewJson = (await reviewResp.json()) as {
+      rectification_partial_failed: boolean;
+      rectification_orders: Array<{ huiyunying_order_id: string | null; status: string }>;
+      warning: string | null;
+      to_status: string;
+    };
+    assert.equal(reviewJson.to_status, "completed");
+    assert.equal(reviewJson.rectification_partial_failed, true);
+    assert.match(reviewJson.warning || "", /部分整改单创建失败/);
+    assert.equal(reviewJson.rectification_orders.length, 2);
+    assert.equal(reviewJson.rectification_orders[0].huiyunying_order_id, "9301");
+    assert.equal(reviewJson.rectification_orders[0].status, "created");
+    assert.equal(reviewJson.rectification_orders[1].huiyunying_order_id, null);
+    assert.equal(reviewJson.rectification_orders[1].status, "sync_failed");
+
+    const rectificationOrders = rectificationModule.createRectificationService().listByResultId(imageId);
+    assert.equal(rectificationOrders.length, 2);
+    assert.equal(rectificationOrders.filter((order) => order.status === "created").length, 1);
+    assert.equal(rectificationOrders.filter((order) => order.status === "sync_failed").length, 1);
+    assert.equal(rectificationOrders.find((order) => order.status === "sync_failed")?.huiyunying_order_id, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("review submit rejects issue result without selected issues", async () => {
   const originalFetch = globalThis.fetch;
   const fetchCalls: Array<string> = [];
@@ -830,37 +984,37 @@ test("review submit rejects selected issue without any deliverable image", async
         body: JSON.stringify({
           ...publishPayload,
           idempotency_key: "review-test-missing-issue-image",
-          published_at: "2026-04-07 10:00:00",
+          published_at: "2026-04-11 10:00:00",
           report: {
             ...publishPayload.report,
             report_meta: {
               ...publishPayload.report.report_meta,
-              start_date: "2026-04-07",
-              end_date: "2026-04-07",
-              generated_at: "2026-04-07 10:00:00"
+              start_date: "2026-04-11",
+              end_date: "2026-04-11",
+              generated_at: "2026-04-11 10:00:00"
             },
             facts: {
               ...publishPayload.report.facts,
               captures: [
                 {
                   ...publishPayload.report.facts.captures[0],
-                  capture_url: undefined,
-                  preview_url: undefined,
-                  oss_key: undefined
+                  capture_url: "",
+                  preview_url: "",
+                  oss_key: ""
                 }
               ],
               inspections: [
                 {
                   ...publishPayload.report.facts.inspections[0],
-                  evidence_image_url: undefined,
-                  original_image_url: undefined
+                  evidence_image_url: "",
+                  original_image_url: ""
                 }
               ],
               issues: [
                 {
                   ...publishPayload.report.facts.issues[0],
-                  evidence_image_url: undefined,
-                  original_image_url: undefined
+                  evidence_image_url: "",
+                  original_image_url: ""
                 }
               ]
             }
@@ -910,7 +1064,7 @@ test("review submit rejects selected issue without any deliverable image", async
   }
 });
 
-test("review submit treats huiyunying business failure as 502", async () => {
+test("review submit records huiyunying business failure as failed rectification order", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
@@ -994,11 +1148,181 @@ test("review submit treats huiyunying business failure as 502", async () => {
       }
     );
 
-    assert.equal(reviewResp.status, 502);
-    const reviewJson = (await reviewResp.json()) as { success: boolean; detail: string };
-    assert.equal(reviewJson.success, false);
-    assert.match(reviewJson.detail, /链接不是一个有效的图片类型的链接/);
-    assert.equal(rectificationModule.createRectificationService().listByResultId(imageId).length, 0);
+    assert.equal(reviewResp.status, 200);
+    const reviewJson = (await reviewResp.json()) as {
+      rectification_partial_failed: boolean;
+      rectification_orders: Array<{ huiyunying_order_id: string | null; status: string }>;
+      warning: string | null;
+      to_status: string;
+    };
+    assert.equal(reviewJson.to_status, "completed");
+    assert.equal(reviewJson.rectification_partial_failed, true);
+    assert.match(reviewJson.warning || "", /部分整改单创建失败/);
+    assert.equal(reviewJson.rectification_orders.length, 1);
+    assert.equal(reviewJson.rectification_orders[0].huiyunying_order_id, null);
+    assert.equal(reviewJson.rectification_orders[0].status, "sync_failed");
+    const rectificationOrders = rectificationModule.createRectificationService().listByResultId(imageId);
+    assert.equal(rectificationOrders.length, 1);
+    assert.equal(rectificationOrders[0].status, "sync_failed");
+    assert.match(JSON.stringify(rectificationOrders[0].response_payload), /链接不是一个有效的图片类型的链接/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("manual issue can be added to an inconclusive result and dispatched as rectification", async () => {
+  const originalFetch = globalThis.fetch;
+  const createBodies: Array<{ description?: string; imageUrls?: string[] }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.includes("/sign")) {
+      return new Response("token-123", {
+        status: 200,
+        headers: { "content-type": "text/plain" }
+      });
+    }
+    if (url.includes("/route/ri/open/item/create")) {
+      createBodies.push(JSON.parse(String(init?.body || "{}")) as { description?: string; imageUrls?: string[] });
+      return new Response(JSON.stringify({ status: 200, data: true, disqualifiedId: 9401 }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const loginResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "ChangeMe123!");
+          return formData;
+        })()
+      })
+    );
+    const sessionCookie = loginResp.headers.get("set-cookie") || "";
+
+    const publishResp = await publishRoute.POST(
+      new Request("http://127.0.0.1:3000/api/reports/publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...publishPayload,
+          idempotency_key: "review-test-manual-issue",
+          published_at: "2026-04-12 10:00:00",
+          report: {
+            ...publishPayload.report,
+            summary: {
+              metrics: {
+                store_count: 1,
+                image_count: 1,
+                issue_count: 0
+              }
+            },
+            report_meta: {
+              ...publishPayload.report.report_meta,
+              start_date: "2026-04-12",
+              end_date: "2026-04-12",
+              generated_at: "2026-04-12 10:00:00"
+            },
+            facts: {
+              ...publishPayload.report.facts,
+              inspections: [
+                {
+                  ...publishPayload.report.facts.inspections[0],
+                  inspection_id: "inspection-manual-issue",
+                  raw_result: "无法判定，需人工复核",
+                  total_issues: 0
+                }
+              ],
+              issues: []
+            }
+          }
+        })
+      })
+    );
+    const publishJson = (await publishResp.json()) as { report_id: number };
+    const reportId = publishJson.report_id;
+
+    const detailResp = await reportRoute.GET(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
+      { params: Promise.resolve({ reportId: String(reportId) }) }
+    );
+    const detailJson = (await detailResp.json()) as {
+      report: {
+        images: Array<{ id: number }>;
+        issue_count: number;
+        issues: Array<{ id: number; title: string }>;
+      };
+    };
+    const imageId = detailJson.report.images[0].id;
+    assert.equal(detailJson.report.issue_count, 0);
+    assert.equal(detailJson.report.issues.length, 0);
+
+    const addIssueResp = await issueRoute.POST(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/issues`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({
+          title: "冷柜货架陈列不完整",
+          description: "人工复核发现冷柜货架陈列需要整改。",
+          inspection_id: "inspection-manual-issue"
+        })
+      }),
+      {
+        params: Promise.resolve({ reportId: String(reportId), imageId: String(imageId) })
+      }
+    );
+    assert.equal(addIssueResp.status, 200);
+    const addIssueJson = (await addIssueResp.json()) as {
+      issue: { id: number; title: string; image_urls: string[] };
+    };
+    assert.equal(addIssueJson.issue.title, "冷柜货架陈列不完整");
+    assert.deepEqual(addIssueJson.issue.image_urls, ["https://example.com/preview.jpg"]);
+
+    const updatedDetailResp = await reportRoute.GET(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
+      { params: Promise.resolve({ reportId: String(reportId) }) }
+    );
+    const updatedDetailJson = (await updatedDetailResp.json()) as {
+      report: {
+        issue_count: number;
+        issues: Array<{ id: number; title: string }>;
+      };
+    };
+    assert.equal(updatedDetailJson.report.issue_count, 1);
+    assert.equal(updatedDetailJson.report.issues.length, 1);
+
+    const reviewResp = await reviewRoute.POST(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({
+          review_status: "completed",
+          selected_issues_json: JSON.stringify([{ id: addIssueJson.issue.id, title: addIssueJson.issue.title }]),
+          should_corrected: "2026-04-14",
+          result_semantic_state: "issue_found"
+        })
+      }),
+      {
+        params: Promise.resolve({ reportId: String(reportId), imageId: String(imageId) })
+      }
+    );
+
+    assert.equal(reviewResp.status, 200);
+    const reviewJson = (await reviewResp.json()) as {
+      rectification_orders: Array<{ huiyunying_order_id: string | null; status: string }>;
+      selected_issues: Array<{ id: number; title: string }>;
+    };
+    assert.equal(reviewJson.selected_issues.length, 1);
+    assert.equal(reviewJson.rectification_orders.length, 1);
+    assert.equal(reviewJson.rectification_orders[0].huiyunying_order_id, "9401");
+    assert.equal(createBodies.length, 1);
+    assert.deepEqual(createBodies[0].imageUrls, addIssueJson.issue.image_urls);
+    assert.match(createBodies[0].description || "", /冷柜货架陈列不完整（对应图片：第1张）/);
   } finally {
     globalThis.fetch = originalFetch;
   }

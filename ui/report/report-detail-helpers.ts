@@ -49,6 +49,10 @@ function normalizeIssueImageUrls(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter((url) => url && url !== "about:blank")));
 }
 
+function isDeprecatedManualUploadUrl(url: string): boolean {
+  return url.trim().startsWith("/uploads/report-issues/");
+}
+
 export type ReportImageMode = "evidence" | "original";
 
 export type ResolvedReportImageState = {
@@ -97,6 +101,8 @@ export function readIssueRectificationImageUrls(
   issue: ReportIssue | null | undefined,
   options?: { failedInspectionId?: string }
 ): string[] {
+  const isManualIssue = readMetadataBoolean(issue?.metadata ?? null, "manual_issue") ||
+    readMetadataString(issue?.metadata ?? null, "source") === "manual_review";
   const failedInspectionId = String(options?.failedInspectionId || "").trim();
   const useOriginalFallback = Boolean(
     failedInspectionId &&
@@ -112,6 +118,16 @@ export function readIssueRectificationImageUrls(
   ]);
   if (useOriginalFallback) {
     return originalUrls.slice(0, 1);
+  }
+  if (isManualIssue) {
+    return normalizeIssueImageUrls([
+      readMetadataString(issue?.metadata ?? null, "preview_url"),
+      readMetadataString(issue?.metadata ?? null, "display_url"),
+      readMetadataString(issue?.metadata ?? null, "original_image_url"),
+      issue?.image_url || "",
+      readMetadataString(issue?.metadata ?? null, "display_image_url"),
+      readMetadataString(issue?.metadata ?? null, "capture_url")
+    ].filter((url) => !isDeprecatedManualUploadUrl(url))).slice(0, 1);
   }
   const evidenceUrls = normalizeIssueImageUrls([
     readMetadataString(issue?.metadata ?? null, "evidence_image_url"),
