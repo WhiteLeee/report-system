@@ -111,6 +111,7 @@ function toAnalyticsReviewFactRecord(row: typeof analyticsReviewFactTable.$infer
     to_status: row.toStatus,
     operator_name: row.operatorName,
     review_action: row.reviewAction,
+    review_disposition: row.reviewDisposition,
     review_latency_minutes: row.reviewLatencyMinutes,
     note_length: row.noteLength,
     analytics_schema_version: row.analyticsSchemaVersion,

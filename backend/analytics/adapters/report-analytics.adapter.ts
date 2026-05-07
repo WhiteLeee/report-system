@@ -65,6 +65,8 @@ type SourceReviewLogRow = {
   toStatus: string;
   operatorName: string;
   note: string | null;
+  reviewAction: string;
+  reviewDisposition: string;
   metadataJson: string;
   createdAt: string;
 };
@@ -272,7 +274,8 @@ export function buildAnalyticsReviewFact(input: {
     fromStatus,
     toStatus,
     operatorName: input.reviewLogRow.operatorName,
-    reviewAction: inferReviewAction(fromStatus, toStatus),
+    reviewAction: input.reviewLogRow.reviewAction || inferReviewAction(fromStatus, toStatus),
+    reviewDisposition: input.reviewLogRow.reviewDisposition || readString(metadata, "review_disposition"),
     reviewLatencyMinutes: computeMinutesDiff(input.reportRow.publishedAt, input.reviewLogRow.createdAt),
     noteLength: String(input.reviewLogRow.note || "").trim().length,
     analyticsSchemaVersion: ANALYTICS_SCHEMA_VERSION,

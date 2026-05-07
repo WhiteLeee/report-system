@@ -6,7 +6,7 @@ import { classifyReportResultSemantics, type ReportResultSemanticState } from "@
 import { RectificationSplitError } from "@/backend/rectification/rectification.service";
 import { createRectificationService } from "@/backend/rectification/rectification.module";
 import { buildRequestUrl } from "@/backend/http/request-url";
-import type { ResultReviewState, ReviewSelectedIssue } from "@/backend/report/report.types";
+import type { ResultReviewState, ReviewSelectedIssue, ReviewAction, ReviewDisposition } from "@/backend/report/report.types";
 import type { RectificationIssueSelection } from "@/lib/rectification-preview";
 
 const reviewService = createReportReviewService();
@@ -50,6 +50,30 @@ function parseSelectedIssues(raw: string): ReviewSelectedIssue[] {
   } catch {
     return [];
   }
+}
+
+function normalizeReviewAction(value: string, reviewStatus: ResultReviewState): ReviewAction {
+  if (reviewStatus !== "completed") {
+    return "reopen";
+  }
+  return value === "create_rectification" ? "create_rectification" : "complete_only";
+}
+
+function normalizeReviewDisposition(value: string): ReviewDisposition {
+  if (
+    value === "rectification_required" ||
+    value === "no_rectification" ||
+    value === "offline_handled" ||
+    value === "false_positive" ||
+    value === "other"
+  ) {
+    return value;
+  }
+  return "";
+}
+
+function isAutoCompletedReviewPayload(value: unknown): boolean {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).auto_completed === true);
 }
 
 function readMetadataString(metadata: unknown, key: string): string {
@@ -178,6 +202,9 @@ export async function POST(
   const note = String(payload.note || "").trim();
   const selectedIssues = parseSelectedIssues(String(payload.selected_issues_json || ""));
   const shouldCorrected = String(payload.should_corrected || "").trim();
+  const requestedReviewAction = String(payload.review_action || "").trim();
+  let reviewAction = normalizeReviewAction(requestedReviewAction, normalizedReviewStatus);
+  let reviewDisposition = normalizeReviewDisposition(String(payload.review_disposition || "").trim());
   const failedInspectionId = String(payload.failed_inspection_id || "").trim();
   const requestedSemanticState = String(payload.result_semantic_state || "").trim();
   const requestContext = buildRequestContext(currentUser);
@@ -187,13 +214,19 @@ export async function POST(
 
   let createdRectificationOrders: Array<{ id: number; huiyunying_order_id: string | null; status: string }> = [];
 
-  if (normalizedReviewStatus === "completed") {
-    const report = reportService.getReportDetail(reportId, requestContext);
-    const resultDetail = report?.results.find((result) => result.id === imageId) ?? null;
-    if (!report || !resultDetail) {
-      return Response.json({ success: false, error: "Review target not found." }, { status: 404 });
-    }
+  const report = reportService.getReportDetail(reportId, requestContext);
+  const resultDetail = report?.results.find((result) => result.id === imageId) ?? null;
+  if (!report || !resultDetail) {
+    return Response.json({ success: false, error: "Review target not found." }, { status: 404 });
+  }
+  if (resultDetail.review_state === "completed" && !isAutoCompletedReviewPayload(resultDetail.review_payload)) {
+    return Response.json(
+      { success: false, error: "当前巡检结果已完成复核，不能再次修改复核状态或处理方式。" },
+      { status: 409 }
+    );
+  }
 
+  if (normalizedReviewStatus === "completed") {
     const resultIssues = report.issues.filter((issue) => {
       if (issue.result_id && issue.result_id === imageId) {
         return true;
@@ -208,7 +241,14 @@ export async function POST(
     });
     const semanticState: ReportResultSemanticState = classifyReportResultSemantics(resultIssues, resultInspections);
     resolvedSemanticState = semanticState;
-    const shouldCreateRectification = semanticState === "issue_found" || resultIssues.length > 0;
+    const resultHasIssue = semanticState === "issue_found" || resultIssues.length > 0;
+    if (!requestedReviewAction) {
+      reviewAction = resultHasIssue ? "create_rectification" : "complete_only";
+    }
+    if (reviewAction === "complete_only" && !reviewDisposition && !resultHasIssue) {
+      reviewDisposition = "no_rectification";
+    }
+    const shouldCreateRectification = reviewAction === "create_rectification" && resultHasIssue;
     const selectedIssueIdSet = new Set(selectedIssues.map((issue) => issue.id));
     const selectedResultIssues = selectedIssueIdSet.size > 0
       ? resultIssues.filter((issue) => selectedIssueIdSet.has(issue.id))
@@ -225,11 +265,19 @@ export async function POST(
         title: issue.title
       }));
     }
-    if (shouldCreateRectification && selectedIssueIdSet.size === 0) {
+    if (reviewAction === "create_rectification" && selectedIssueIdSet.size === 0) {
       return Response.json(
         { success: false, error: "请至少勾选一个问题项后再创建整改单。" },
         { status: 400 }
       );
+    }
+    if (reviewAction === "complete_only") {
+      if (!reviewDisposition || reviewDisposition === "rectification_required") {
+        return Response.json({ success: false, error: "请选择本次复核结论。" }, { status: 400 });
+      }
+      if (reviewDisposition === "other" && !note) {
+        return Response.json({ success: false, error: "选择其他结论时请填写复核备注。" }, { status: 400 });
+      }
     }
     const semanticMismatch = requestedSemanticState && requestedSemanticState !== semanticState;
     if (semanticMismatch) {
@@ -237,6 +285,9 @@ export async function POST(
         { success: false, error: "当前巡检结果状态已变化，请刷新页面后重试。" },
         { status: 409 }
       );
+    }
+    if (reviewAction === "create_rectification" && !resultHasIssue) {
+      return Response.json({ success: false, error: "当前结果没有可下发的问题项。" }, { status: 400 });
     }
     if (shouldCreateRectification && !shouldCorrected) {
       return Response.json({ success: false, error: "整改截止日期不能为空。" }, { status: 400 });
@@ -321,7 +372,9 @@ export async function POST(
     operatorName,
     note,
     requestContext,
-    effectiveSelectedIssues
+    effectiveSelectedIssues,
+    reviewAction,
+    reviewAction === "create_rectification" ? "rectification_required" : reviewDisposition
   );
   if (!result) {
     return Response.json({ success: false, error: "Review target not found." }, { status: 404 });
@@ -356,6 +409,8 @@ export async function POST(
     completed_result_count: result.completed_result_count,
     total_result_count: result.total_result_count,
     should_corrected: shouldCorrected || null,
+    review_action: reviewAction,
+    review_disposition: reviewAction === "create_rectification" ? "rectification_required" : reviewDisposition,
     result_semantic_state: resolvedSemanticState,
     selected_issues: effectiveSelectedIssues,
     rectification_orders: createdRectificationOrders,

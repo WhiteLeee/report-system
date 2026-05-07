@@ -1064,6 +1064,132 @@ test("review submit rejects selected issue without any deliverable image", async
   }
 });
 
+test("issue result can be completed locally without creating rectification order", async () => {
+  const originalFetch = globalThis.fetch;
+  const fetchCalls: Array<string> = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    fetchCalls.push(url);
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const loginResp = await loginRoute.POST(
+      new Request("http://127.0.0.1:3000/api/auth/login", {
+        method: "POST",
+        body: (() => {
+          const formData = new FormData();
+          formData.set("username", "admin");
+          formData.set("password", "ChangeMe123!");
+          return formData;
+        })()
+      })
+    );
+    const sessionCookie = loginResp.headers.get("set-cookie") || "";
+
+    const publishResp = await publishRoute.POST(
+      new Request("http://127.0.0.1:3000/api/reports/publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...publishPayload,
+          idempotency_key: "review-test-complete-only-issue",
+          published_at: "2026-04-04 11:00:00",
+          report: {
+            ...publishPayload.report,
+            report_meta: {
+              ...publishPayload.report.report_meta,
+              start_date: "2026-04-04",
+              end_date: "2026-04-04",
+              generated_at: "2026-04-04 11:00:00"
+            }
+          }
+        })
+      })
+    );
+    const publishJson = (await publishResp.json()) as { report_id: number };
+    const reportId = publishJson.report_id;
+
+    const detailResp = await reportRoute.GET(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
+      { params: Promise.resolve({ reportId: String(reportId) }) }
+    );
+    const detailJson = (await detailResp.json()) as { report: { images: Array<{ id: number }> } };
+    const imageId = detailJson.report.images[0].id;
+
+    const reviewResp = await reviewRoute.POST(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({
+          review_status: "completed",
+          review_action: "complete_only",
+          review_disposition: "false_positive",
+          note: "复核后确认不构成门店整改项。",
+          selected_issues_json: JSON.stringify([]),
+          result_semantic_state: "issue_found"
+        })
+      }),
+      {
+        params: Promise.resolve({ reportId: String(reportId), imageId: String(imageId) })
+      }
+    );
+
+    assert.equal(reviewResp.status, 200);
+    const reviewJson = (await reviewResp.json()) as {
+      success: boolean;
+      review_action: string;
+      review_disposition: string;
+      rectification_orders: Array<unknown>;
+      recent_log: { review_action: string; review_disposition: string };
+    };
+    assert.equal(reviewJson.success, true);
+    assert.equal(reviewJson.review_action, "complete_only");
+    assert.equal(reviewJson.review_disposition, "false_positive");
+    assert.equal(reviewJson.rectification_orders.length, 0);
+    assert.equal(reviewJson.recent_log.review_action, "complete_only");
+    assert.equal(reviewJson.recent_log.review_disposition, "false_positive");
+    assert.equal(rectificationModule.createRectificationService().listByResultId(imageId).length, 0);
+    assert.equal(fetchCalls.length, 0);
+
+    const updatedDetailResp = await reportRoute.GET(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}`, { headers: { cookie: sessionCookie } }),
+      { params: Promise.resolve({ reportId: String(reportId) }) }
+    );
+    const updatedDetailJson = (await updatedDetailResp.json()) as {
+      report: {
+        images: Array<{ id: number; review_action: string; review_disposition: string; review_payload: Record<string, unknown> }>;
+        review_logs: Array<{ review_action: string; review_disposition: string }>;
+      };
+    };
+    const updatedImage = updatedDetailJson.report.images.find((image) => image.id === imageId);
+    assert.equal(updatedImage?.review_action, "complete_only");
+    assert.equal(updatedImage?.review_disposition, "false_positive");
+    assert.equal(updatedImage?.review_payload.review_action, "complete_only");
+    assert.equal(updatedDetailJson.report.review_logs[0]?.review_disposition, "false_positive");
+
+    const reopenResp = await reviewRoute.POST(
+      new Request(`http://127.0.0.1:3000/api/reports/${reportId}/images/${imageId}/review-status`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({
+          review_status: "pending",
+          note: "尝试退回待复核"
+        })
+      }),
+      {
+        params: Promise.resolve({ reportId: String(reportId), imageId: String(imageId) })
+      }
+    );
+    assert.equal(reopenResp.status, 409);
+    const reopenJson = (await reopenResp.json()) as { success: boolean; error: string };
+    assert.equal(reopenJson.success, false);
+    assert.match(reopenJson.error, /已完成复核/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("review submit records huiyunying business failure as failed rectification order", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (input: string | URL | Request) => {

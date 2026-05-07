@@ -80,6 +80,7 @@ export interface AnalyticsReviewFactRecord {
   to_status: string;
   operator_name: string;
   review_action: string;
+  review_disposition: string;
   review_latency_minutes: number;
   note_length: number;
   analytics_schema_version: number;

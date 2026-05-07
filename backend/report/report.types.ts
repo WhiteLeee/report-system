@@ -4,6 +4,14 @@ export type ProgressState = "pending" | "in_progress" | "completed";
 export type ResultReviewState = "pending" | "completed";
 export type IncomingResultReviewState = ResultReviewState | "pending_review" | "reviewed";
 export type ReviewFilterState = ProgressState | "";
+export type ReviewAction = "transition" | "create_rectification" | "complete_only" | "reopen";
+export type ReviewDisposition =
+  | ""
+  | "rectification_required"
+  | "no_rectification"
+  | "offline_handled"
+  | "false_positive"
+  | "other";
 
 export interface ReviewProgressSummary {
   progress_state: ProgressState;
@@ -129,6 +137,8 @@ export interface ReportReviewLog {
   to_status: ResultReviewState;
   operator_name: string;
   note: string | null;
+  review_action: ReviewAction | string;
+  review_disposition: ReviewDisposition | string;
   metadata: JsonValue;
   created_at: string;
 }
@@ -160,6 +170,15 @@ export interface ReviewResultUpdateResult {
   total_result_count: number;
   recent_log: ReportReviewLog | null;
   updated_at: string;
+}
+
+export interface ReviewStatusUpdateInput {
+  review_status: ResultReviewState;
+  operator_name: string;
+  note?: string;
+  selected_issues?: ReviewSelectedIssue[];
+  review_action?: ReviewAction;
+  review_disposition?: ReviewDisposition;
 }
 
 export interface ReportFactsPayload {
@@ -249,6 +268,8 @@ export interface ReportResult {
   reviewed_by: string | null;
   reviewed_at: string | null;
   review_note: string | null;
+  review_action: ReviewAction | string;
+  review_disposition: ReviewDisposition | string;
   review_payload: JsonValue;
   metadata: JsonValue;
   display_order: number;

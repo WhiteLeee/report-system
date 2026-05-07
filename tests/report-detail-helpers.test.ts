@@ -21,6 +21,8 @@ function createResult(): ReportResult {
     reviewed_by: null,
     reviewed_at: null,
     review_note: null,
+    review_action: "",
+    review_disposition: "",
     review_payload: {},
     metadata: {
       capture_url: "https://example.com/original.jpg",
