@@ -88,13 +88,16 @@ export const reportImageTable = sqliteTable(
     reviewedBy: text("reviewed_by"),
     reviewedAt: text("reviewed_at"),
     reviewNote: text("review_note"),
+    reviewAction: text("review_action").notNull().default(""),
+    reviewDisposition: text("review_disposition").notNull().default(""),
     reviewPayloadJson: text("review_payload_json").notNull().default("{}"),
     metadataJson: text("metadata_json").notNull().default("{}"),
     displayOrder: integer("display_order").notNull().default(0),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
   },
   (table) => ({
-    reportIdx: index("idx_report_image_report").on(table.reportId, table.displayOrder)
+    reportIdx: index("idx_report_image_report").on(table.reportId, table.displayOrder),
+    reviewDispositionIdx: index("idx_report_image_review_disposition").on(table.reviewDisposition, table.reviewedAt)
   })
 );
 
@@ -159,12 +162,16 @@ export const reportReviewLogTable = sqliteTable(
     toStatus: text("to_status").notNull(),
     operatorName: text("operator_name").notNull(),
     note: text("note"),
+    reviewAction: text("review_action").notNull().default("transition"),
+    reviewDisposition: text("review_disposition").notNull().default(""),
     metadataJson: text("metadata_json").notNull().default("{}"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`)
   },
   (table) => ({
     reportIdx: index("idx_report_review_log_report").on(table.reportId, table.createdAt, table.id),
-    resultIdx: index("idx_report_review_log_result").on(table.resultId, table.createdAt, table.id)
+    resultIdx: index("idx_report_review_log_result").on(table.resultId, table.createdAt, table.id),
+    actionIdx: index("idx_report_review_log_action").on(table.reviewAction, table.createdAt),
+    dispositionIdx: index("idx_report_review_log_disposition").on(table.reviewDisposition, table.createdAt)
   })
 );
 
@@ -381,6 +388,7 @@ export const analyticsReviewFactTable = sqliteTable(
     toStatus: text("to_status").notNull().default(""),
     operatorName: text("operator_name").notNull().default(""),
     reviewAction: text("review_action").notNull().default("transition"),
+    reviewDisposition: text("review_disposition").notNull().default(""),
     reviewLatencyMinutes: integer("review_latency_minutes").notNull().default(0),
     noteLength: integer("note_length").notNull().default(0),
     analyticsSchemaVersion: integer("analytics_schema_version").notNull().default(1),
@@ -393,7 +401,8 @@ export const analyticsReviewFactTable = sqliteTable(
     reportIdx: index("idx_analytics_review_fact_report").on(table.reportId, table.reviewDate),
     enterpriseIdx: index("idx_analytics_review_fact_enterprise").on(table.sourceEnterpriseId, table.reviewDate),
     storeIdx: index("idx_analytics_review_fact_store").on(table.storeId, table.reviewDate),
-    actionIdx: index("idx_analytics_review_fact_action").on(table.reviewAction, table.reviewDate)
+    actionIdx: index("idx_analytics_review_fact_action").on(table.reviewAction, table.reviewDate),
+    dispositionIdx: index("idx_analytics_review_fact_disposition").on(table.reviewDisposition, table.reviewDate)
   })
 );
 

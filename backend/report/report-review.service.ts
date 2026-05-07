@@ -5,7 +5,9 @@ import type {
   ReviewResultUpdateResult,
   ResultReviewState,
   ReportReviewLog,
-  ReviewSelectedIssue
+  ReviewSelectedIssue,
+  ReviewAction,
+  ReviewDisposition
 } from "@/backend/report/report.types";
 import type { ReportRepository } from "@/backend/report/report.repository";
 
@@ -47,7 +49,9 @@ export class ReportReviewService {
     operatorName: string,
     note = "",
     context: RequestContext = {},
-    selectedIssues: ReviewSelectedIssue[] = []
+    selectedIssues: ReviewSelectedIssue[] = [],
+    reviewAction: ReviewAction = "transition",
+    reviewDisposition: ReviewDisposition = ""
   ): ReviewResultUpdateResult | null {
     if (!Number.isInteger(reportId) || reportId <= 0 || !Number.isInteger(imageId) || imageId <= 0) {
       return null;
@@ -56,15 +60,14 @@ export class ReportReviewService {
     if (!normalizedOperator) {
       return null;
     }
-    return this.repository.updateImageReviewStatus(
-      reportId,
-      imageId,
-      reviewStatus,
-      normalizedOperator,
-      note.trim(),
-      selectedIssues,
-      context
-    );
+    return this.repository.updateImageReviewStatus(reportId, imageId, {
+      review_status: reviewStatus,
+      operator_name: normalizedOperator,
+      note: note.trim(),
+      selected_issues: selectedIssues,
+      review_action: reviewAction,
+      review_disposition: reviewDisposition
+    }, context);
   }
 
   listRecentReviewLogs(

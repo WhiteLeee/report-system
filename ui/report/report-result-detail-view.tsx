@@ -273,6 +273,38 @@ function formatRectificationState(order: RectificationOrderRecord): string {
   return getRectificationStateLabel(order);
 }
 
+function formatReviewAction(value: string | null | undefined): string {
+  if (value === "create_rectification") {
+    return "下发整改单";
+  }
+  if (value === "complete_only") {
+    return "仅标记复核完成";
+  }
+  if (value === "reopen") {
+    return "退回待复核";
+  }
+  return "状态变更";
+}
+
+function formatReviewDisposition(value: string | null | undefined): string {
+  if (value === "rectification_required") {
+    return "需要整改";
+  }
+  if (value === "no_rectification") {
+    return "无需整改";
+  }
+  if (value === "offline_handled") {
+    return "已线下处理";
+  }
+  if (value === "false_positive") {
+    return "误报 / 不构成问题";
+  }
+  if (value === "other") {
+    return "其他";
+  }
+  return "";
+}
+
 function readSelectedIssueIds(reviewPayload: ReportDetail["results"][number]["review_payload"]): number[] {
   if (!reviewPayload || typeof reviewPayload !== "object" || Array.isArray(reviewPayload)) {
     return [];
@@ -289,6 +321,15 @@ function readSelectedIssueIds(reviewPayload: ReportDetail["results"][number]["re
       return Number(item.id);
     })
     .filter((value) => Number.isInteger(value) && value > 0);
+}
+
+function isAutoCompletedReviewPayload(reviewPayload: ReportDetail["results"][number]["review_payload"]): boolean {
+  return Boolean(
+    reviewPayload &&
+      typeof reviewPayload === "object" &&
+      !Array.isArray(reviewPayload) &&
+      (reviewPayload as Record<string, unknown>).auto_completed === true
+  );
 }
 
 export function ReportResultDetailView({
@@ -581,6 +622,10 @@ export function ReportResultDetailView({
                     failedInspectionId={effectiveFailedInspectionId}
                     imageNotice={imageNotice}
                     activeInspectionId={resolvedInspectionId}
+                    initialReviewLocked={
+                      selectedResult.review_state === "completed" &&
+                      (!isAutoCompletedReviewPayload(selectedResult.review_payload) || rectificationOrders.length > 0)
+                    }
                     initialReviewState={selectedResult.review_state}
                     initialSelectedIssueIds={initialSelectedIssueIds}
                     issues={reviewIssues}
@@ -604,6 +649,10 @@ export function ReportResultDetailView({
                             <p>
                               从 {formatResultReviewState(log.from_status)} 调整为 {formatResultReviewState(log.to_status)}
                             </p>
+                            <p>处理方式：{formatReviewAction(log.review_action)}</p>
+                            {formatReviewDisposition(log.review_disposition) ? (
+                              <p>复核结论：{formatReviewDisposition(log.review_disposition)}</p>
+                            ) : null}
                             {log.note ? <div className={styles.timelineNote}>{log.note}</div> : null}
                           </article>
                         ))}

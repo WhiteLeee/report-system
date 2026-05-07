@@ -33,7 +33,10 @@ import type {
   ResultReviewState,
   ReviewProgressSummary,
   ReviewSelectedIssue,
-  ReviewResultUpdateResult
+  ReviewResultUpdateResult,
+  ReviewStatusUpdateInput,
+  ReviewAction,
+  ReviewDisposition
 } from "@/backend/report/report.types";
 import type { JsonValue } from "@/backend/shared/json";
 import { canAccessEnterprise, normalizeScopeIds, resolveScopedStoreIds } from "@/backend/shared/request-scope";
@@ -154,6 +157,8 @@ function toReportResult(row: typeof reportImageTable.$inferSelect): ReportResult
     reviewed_by: row.reviewedBy,
     reviewed_at: row.reviewedAt,
     review_note: row.reviewNote,
+    review_action: row.reviewAction,
+    review_disposition: row.reviewDisposition,
     review_payload: safeParse(row.reviewPayloadJson, {}),
     metadata: safeParse(row.metadataJson, {}),
     display_order: row.displayOrder,
@@ -212,6 +217,8 @@ function toReportReviewLog(row: typeof reportReviewLogTable.$inferSelect): Repor
     to_status: row.toStatus as ResultReviewState,
     operator_name: row.operatorName,
     note: row.note,
+    review_action: row.reviewAction,
+    review_disposition: row.reviewDisposition,
     metadata: safeParse(row.metadataJson, {}),
     created_at: row.createdAt
   };
@@ -229,6 +236,31 @@ function normalizeSelectedIssues(values: ReviewSelectedIssue[] | undefined): Rev
         .map((item) => [item.id, item] as const)
     ).values()
   );
+}
+
+function normalizeReviewAction(value: ReviewAction | undefined, reviewState: ResultReviewState): ReviewAction {
+  if (value === "create_rectification" || value === "complete_only" || value === "reopen") {
+    return value;
+  }
+  return reviewState === "completed" ? "complete_only" : "reopen";
+}
+
+function normalizeReviewDisposition(value: ReviewDisposition | undefined): ReviewDisposition {
+  if (
+    value === "rectification_required" ||
+    value === "no_rectification" ||
+    value === "offline_handled" ||
+    value === "false_positive" ||
+    value === "other"
+  ) {
+    return value;
+  }
+  return "";
+}
+
+function isAutoCompletedReviewPayload(json: string): boolean {
+  const payload = safeParse(json, {});
+  return Boolean(payload && typeof payload === "object" && !Array.isArray(payload) && (payload as Record<string, unknown>).auto_completed === true);
 }
 
 function resolveResultOriginalImageUrl(result: typeof reportImageTable.$inferSelect): string {
@@ -840,16 +872,15 @@ export class SqliteReportRepository implements ReportRepository {
   updateImageReviewStatus(
     reportId: number,
     imageId: number,
-    reviewStatus: ResultReviewState,
-    operatorName: string,
-    note = "",
-    selectedIssues: ReviewSelectedIssue[] = [],
+    input: ReviewStatusUpdateInput,
     context: RequestContext = {}
   ): ReviewResultUpdateResult | null {
-    const normalizedReviewState = normalizeResultReviewState(reviewStatus);
-    const normalizedOperator = operatorName.trim();
-    const normalizedNote = note.trim();
-    const normalizedSelectedIssues = normalizeSelectedIssues(selectedIssues);
+    const normalizedReviewState = normalizeResultReviewState(input.review_status);
+    const normalizedOperator = input.operator_name.trim();
+    const normalizedNote = String(input.note || "").trim();
+    const normalizedSelectedIssues = normalizeSelectedIssues(input.selected_issues);
+    const normalizedReviewAction = normalizeReviewAction(input.review_action, normalizedReviewState);
+    const normalizedReviewDisposition = normalizeReviewDisposition(input.review_disposition);
 
     return db.transaction((tx) => {
       const reportRow = tx
@@ -884,7 +915,28 @@ export class SqliteReportRepository implements ReportRepository {
       }
 
       const fromState = (resultRow.reviewState as ResultReviewState) || "pending";
-      if (fromState === normalizedReviewState && !normalizedNote && normalizedSelectedIssues.length === 0) {
+      if (fromState === "completed" && !isAutoCompletedReviewPayload(resultRow.reviewPayloadJson)) {
+        return {
+          report_id: reportId,
+          result_id: imageId,
+          store_id: resultRow.storeId,
+          store_name: resultRow.storeName,
+          from_status: fromState,
+          to_status: fromState,
+          changed: false,
+          progress_state: reportRow.progressState as ProgressState,
+          completed_result_count: reportRow.completedResultCount,
+          total_result_count: reportRow.totalResultCount,
+          recent_log: null,
+          updated_at: resultRow.reviewedAt ?? resultRow.createdAt
+        };
+      }
+      if (
+        fromState === normalizedReviewState &&
+        !normalizedNote &&
+        normalizedSelectedIssues.length === 0 &&
+        !normalizedReviewDisposition
+      ) {
         return {
           report_id: reportId,
           result_id: imageId,
@@ -909,11 +961,15 @@ export class SqliteReportRepository implements ReportRepository {
           reviewedBy: normalizedReviewState === "completed" ? normalizedOperator : null,
           reviewedAt,
           reviewNote: normalizedNote || null,
+          reviewAction: normalizedReviewAction,
+          reviewDisposition: normalizedReviewDisposition,
           reviewPayloadJson: safeStringify({
             note: normalizedNote || null,
             updated_by: normalizedOperator,
             updated_at: reviewedAt,
             state: normalizedReviewState,
+            review_action: normalizedReviewAction,
+            review_disposition: normalizedReviewDisposition,
             selected_issues: normalizedSelectedIssues
           })
         })
@@ -1016,12 +1072,16 @@ export class SqliteReportRepository implements ReportRepository {
           toStatus: normalizedReviewState,
           operatorName: normalizedOperator,
           note: normalizedNote || null,
+          reviewAction: normalizedReviewAction,
+          reviewDisposition: normalizedReviewDisposition,
           metadataJson: safeStringify({
             report_progress_state: reportProgress.progress_state,
             completed_result_count: reportProgress.completed_result_count,
             total_result_count: reportProgress.total_result_count,
             result_id: imageId,
             report_id: reportId,
+            review_action: normalizedReviewAction,
+            review_disposition: normalizedReviewDisposition,
             selected_issues: normalizedSelectedIssues
           })
         })

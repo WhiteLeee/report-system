@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ISSUE_SELECTION_MODAL_MESSAGE,
@@ -63,6 +64,7 @@ export function ResultReviewWorkflow({
   canReview,
   currentImageUrl,
   currentPath,
+  initialReviewLocked,
   initialSelectedIssueIds,
   initialReviewState,
   failedInspectionId,
@@ -79,6 +81,7 @@ export function ResultReviewWorkflow({
   canReview: boolean;
   currentImageUrl: string;
   currentPath: string;
+  initialReviewLocked: boolean;
   failedInspectionId?: string;
   initialSelectedIssueIds: number[];
   initialReviewState: ResultReviewState;
@@ -95,6 +98,11 @@ export function ResultReviewWorkflow({
   );
   const [shouldCorrected, setShouldCorrected] = useState(() => buildDefaultShouldCorrectedDate(defaultShouldCorrectedDays));
   const [shouldCorrectedError, setShouldCorrectedError] = useState("");
+  const [reviewDispositionError, setReviewDispositionError] = useState("");
+  const [reviewAction, setReviewAction] = useState<"create_rectification" | "complete_only">(() =>
+    semanticState === "issue_found" || issues.length > 0 ? "create_rectification" : "complete_only"
+  );
+  const [reviewDisposition, setReviewDisposition] = useState("");
   const [note, setNote] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [issueSelectionModalOpen, setIssueSelectionModalOpen] = useState(false);
@@ -116,8 +124,10 @@ export function ResultReviewWorkflow({
   }));
   const selectedIssues: ReviewSelectedIssue[] = selectedIssueOptions.map((issue) => ({ id: issue.id, title: issue.title }));
   const requiresRectification = semanticState === "issue_found" || issueOptions.length > 0;
+  const reviewLocked = initialReviewLocked;
+  const createsRectification = reviewAction === "create_rectification";
   const selectedIssueImageUrls = uniqueNonEmptyStrings(selectedIssueOptions.flatMap((issue) => issue.imageUrls ?? []));
-  const effectiveRectificationImageUrls = requiresRectification
+  const effectiveRectificationImageUrls = createsRectification
     ? selectedIssueImageUrls
     : uniqueNonEmptyStrings([rectificationImageUrl || currentImageUrl || ""]);
   const effectiveRectificationImageUrl = effectiveRectificationImageUrls[0] || "";
@@ -176,6 +186,8 @@ export function ResultReviewWorkflow({
         body: JSON.stringify({
           review_status: reviewStatus,
           should_corrected: shouldCorrected,
+          review_action: reviewAction,
+          review_disposition: reviewAction === "create_rectification" ? "rectification_required" : reviewDisposition,
           active_inspection_id: activeInspectionId || "",
           failed_inspection_id: failedInspectionId || "",
           note,
@@ -183,7 +195,7 @@ export function ResultReviewWorkflow({
           selected_issues_json: JSON.stringify(selectedIssues),
           rectification_image_url: effectiveRectificationImageUrl,
           rectification_image_urls_json: JSON.stringify(effectiveRectificationImageUrls),
-          result_semantic_state: requiresRectification ? "issue_found" : semanticState
+          result_semantic_state: semanticState
         })
       });
 
@@ -211,18 +223,25 @@ export function ResultReviewWorkflow({
     setErrorMessage("");
     const validationResult = validateCompletedReviewSubmission({
       requiresRectification,
+      reviewAction,
+      reviewDisposition,
+      note,
       selectedIssueCount: selectedIssues.length,
       shouldCorrected
     });
     setShouldCorrectedError(validationResult.shouldCorrectedError);
+    setReviewDispositionError(validationResult.reviewDispositionError);
     if (validationResult.shouldCorrectedError) {
+      return;
+    }
+    if (validationResult.reviewDispositionError) {
       return;
     }
     if (validationResult.shouldShowIssueSelectionModal) {
       setIssueSelectionModalOpen(true);
       return;
     }
-    if (!requiresRectification) {
+    if (!createsRectification) {
       setIsSubmitting(true);
       setProcessingOpen(true);
       void submitReview("completed").catch((error) => {
@@ -252,13 +271,6 @@ export function ResultReviewWorkflow({
       }
       setErrorMessage(error instanceof Error ? error.message : "生成整改单预览失败。");
     }
-  }
-
-  function handleBackToPending() {
-    setIsSubmitting(true);
-    void submitReview("pending").catch((error) => {
-      setErrorMessage(error instanceof Error ? error.message : "退回待复核失败。");
-    });
   }
 
   async function handleAddManualIssue() {
@@ -301,6 +313,9 @@ export function ResultReviewWorkflow({
         return [...current, nextIssue];
       });
       setSelectedIssueIds((current) => Array.from(new Set([...current, nextIssue.id])));
+      setReviewAction("create_rectification");
+      setReviewDisposition("");
+      setReviewDispositionError("");
       resetManualIssueForm();
       setManualIssueOpen(false);
       router.refresh();
@@ -330,7 +345,7 @@ export function ResultReviewWorkflow({
               已选择 {selectedIssueIds.length} / {issueOptions.length}
             </span>
           </div>
-          {canReview ? (
+          {canReview && !reviewLocked ? (
             <Button
               className={styles.manualIssueTrigger}
               disabled={isSubmitting}
@@ -346,10 +361,10 @@ export function ResultReviewWorkflow({
         {issueOptions.length > 0 ? (
           <>
             <div className={styles.selectionToolbar}>
-              <Button className={styles.selectionAction} disabled={!canReview || isSubmitting} onClick={selectAll} size="sm" type="button" variant="ghost">
+              <Button className={styles.selectionAction} disabled={!canReview || reviewLocked || isSubmitting} onClick={selectAll} size="sm" type="button" variant="ghost">
                 全选
               </Button>
-              <Button className={styles.selectionAction} disabled={!canReview || isSubmitting} onClick={clearAll} size="sm" type="button" variant="ghost">
+              <Button className={styles.selectionAction} disabled={!canReview || reviewLocked || isSubmitting} onClick={clearAll} size="sm" type="button" variant="ghost">
                 清空
               </Button>
             </div>
@@ -362,7 +377,7 @@ export function ResultReviewWorkflow({
                       <input
                         checked={checked}
                         className={styles.issueCheckbox}
-                        disabled={!canReview || isSubmitting}
+                        disabled={!canReview || reviewLocked || isSubmitting}
                         onChange={() => toggleIssue(issue.id)}
                         type="checkbox"
                       />
@@ -433,13 +448,79 @@ export function ResultReviewWorkflow({
 
       <div className={styles.reviewBlock}>
         <h3 className={styles.blockTitle}>复核备注</h3>
-        {canReview ? (
+        {reviewLocked ? (
           <div className={styles.reviewForm}>
+            <EmptyState>当前巡检结果已完成复核，复核状态和处理方式不可再次修改。</EmptyState>
+          </div>
+        ) : canReview ? (
+          <div className={styles.reviewForm}>
+            <div className="field">
+              <label>处理方式</label>
+              <div className={styles.selectionToolbar}>
+                <Button
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setReviewAction("create_rectification");
+                    setReviewDisposition("");
+                    setReviewDispositionError("");
+                  }}
+                  size="sm"
+                  type="button"
+                  variant={reviewAction === "create_rectification" ? "default" : "secondary"}
+                >
+                  下发整改单
+                </Button>
+                <Button
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setReviewAction("complete_only");
+                    setReviewDispositionError("");
+                    if (!reviewDisposition) {
+                      setReviewDisposition("no_rectification");
+                    }
+                  }}
+                  size="sm"
+                  type="button"
+                  variant={reviewAction === "complete_only" ? "default" : "secondary"}
+                >
+                  仅标记复核完成
+                </Button>
+              </div>
+            </div>
+            {!createsRectification ? (
+              <div className="field">
+                <label htmlFor="reviewDisposition">复核结论</label>
+                <NativeSelect
+                  className={reviewDispositionError ? styles.reviewInputError : undefined}
+                  disabled={isSubmitting}
+                  id="reviewDisposition"
+                  name="review_disposition"
+                  onChange={(event) => {
+                    setReviewDisposition(event.target.value);
+                    if (reviewDispositionError) {
+                      setReviewDispositionError("");
+                    }
+                  }}
+                  value={reviewDisposition}
+                >
+                  <option value="">请选择</option>
+                  <option value="no_rectification">无需整改</option>
+                  <option value="offline_handled">已线下处理</option>
+                  <option value="false_positive">误报 / 不构成问题</option>
+                  <option value="other">其他</option>
+                </NativeSelect>
+                {reviewDispositionError ? (
+                  <div className={styles.reviewFieldError} id="reviewDisposition-error" role="alert">
+                    {reviewDispositionError}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <div className="field">
               <label htmlFor="shouldCorrected">整改截止日期</label>
               <DatePickerField
                 className={shouldCorrectedError ? styles.reviewInputError : undefined}
-                disabled={!requiresRectification}
+                disabled={!createsRectification}
                 id="shouldCorrected"
                 name="should_corrected"
                 onValueChange={(nextValue) => {
@@ -450,8 +531,8 @@ export function ResultReviewWorkflow({
                 }}
                 value={shouldCorrected}
               />
-              {!requiresRectification ? (
-                <div className={styles.analysisCopy}>当前结果状态不需要下发整改单，整改截止日期不会参与本次提交。</div>
+              {!createsRectification ? (
+                <div className={styles.analysisCopy}>本次仅标记复核完成，不会创建整改单，整改截止日期不会参与提交。</div>
               ) : null}
               {shouldCorrectedError ? (
                 <div className={styles.reviewFieldError} id="shouldCorrected-error" role="alert">
@@ -465,7 +546,7 @@ export function ResultReviewWorkflow({
                 id="note"
                 name="note"
                 onChange={(event) => setNote(event.target.value)}
-                placeholder="例如：已与门店确认问题属实，建议本周完成整改后再次复核。"
+                placeholder={createsRectification ? "例如：已与门店确认问题属实，建议本周完成整改后再次复核。" : "例如：经复核不需要下发整改单，原因已记录。"}
                 value={note}
               />
             </div>
@@ -473,21 +554,12 @@ export function ResultReviewWorkflow({
             {imageNotice ? <div className={styles.imageFallbackNotice}>{imageNotice}</div> : null}
             <div className={styles.reviewActions}>
               <Button
-                disabled={initialReviewState === "pending" || isSubmitting}
-                onClick={handleBackToPending}
-                size="sm"
-                type="button"
-                variant="secondary"
-              >
-                退回
-              </Button>
-              <Button
-                disabled={initialReviewState === "completed" || isSubmitting}
+                disabled={isSubmitting}
                 onClick={handleSubmitCompletedPreview}
                 size="sm"
                 type="button"
               >
-                {requiresRectification ? "提交" : "提交"}
+                {createsRectification ? "下发整改单" : "标记复核完成"}
               </Button>
             </div>
           </div>
@@ -635,7 +707,7 @@ export function ResultReviewWorkflow({
                 <div className={styles.processingContent}>
                   <h3 className={styles.blockTitle}>处理中</h3>
                   <p className={styles.analysisCopy}>
-                    {requiresRectification ? "正在创建整改单，请稍候。" : "正在提交本地复核，请稍候。"}
+                    {createsRectification ? "正在创建整改单，请稍候。" : "正在提交本地复核，请稍候。"}
                   </p>
                 </div>
               </div>

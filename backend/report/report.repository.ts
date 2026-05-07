@@ -10,6 +10,7 @@ import type {
   ReportReviewLog,
   ReportSummary,
   ReviewSelectedIssue,
+  ReviewStatusUpdateInput,
   ReviewResultUpdateResult,
   ResultReviewState
 } from "@/backend/report/report.types";
@@ -22,10 +23,7 @@ export interface ReportRepository {
   updateImageReviewStatus(
     reportId: number,
     imageId: number,
-    reviewStatus: ResultReviewState,
-    operatorName: string,
-    note?: string,
-    selectedIssues?: ReviewSelectedIssue[],
+    input: ReviewStatusUpdateInput,
     context?: RequestContext
   ): ReviewResultUpdateResult | null;
   createManualIssue(input: CreateManualReportIssueInput, context?: RequestContext): ReportIssue | null;
