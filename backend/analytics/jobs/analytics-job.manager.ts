@@ -15,7 +15,7 @@ declare global {
     | undefined;
 }
 
-async function triggerResultFactRefresh(): Promise<void> {
+async function triggerResultFactRefresh(): Promise<any> {
   const state = globalThis.__reportSystemAnalyticsJobManager;
   if (!state) {
     return;
@@ -40,7 +40,7 @@ async function triggerResultFactRefresh(): Promise<void> {
   await promise;
 }
 
-async function triggerSnapshotRefresh(): Promise<void> {
+async function triggerSnapshotRefresh(): Promise<any> {
   const state = globalThis.__reportSystemAnalyticsJobManager;
   if (!state) {
     return;
@@ -51,9 +51,9 @@ async function triggerSnapshotRefresh(): Promise<void> {
   }
 
   const promise = Promise.resolve()
-    .then(async () => {
+    .then(async (): Promise<any> => {
       await triggerResultFactRefresh();
-      createAnalyticsJobService().runDailySnapshotRebuild();
+      await createAnalyticsJobService().runDailySnapshotRebuild();
     })
     .catch((error) => {
       console.error(`[analytics][snapshot-refresh:error] ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -68,8 +68,8 @@ async function triggerSnapshotRefresh(): Promise<void> {
   await promise;
 }
 
-export function ensureAnalyticsJobManagerStarted(): void {
-  const settings = createSystemSettingsService().getHuiYunYingApiSettings();
+export async function ensureAnalyticsJobManagerStarted(): Promise<any> {
+  const settings = await createSystemSettingsService().getHuiYunYingApiSettings();
   const resultFactIntervalMs = Math.max(0, settings.analyticsFactRefreshIntervalMs);
   const snapshotIntervalMs = Math.max(0, settings.analyticsSnapshotRefreshIntervalMs);
   const state = globalThis.__reportSystemAnalyticsJobManager || {

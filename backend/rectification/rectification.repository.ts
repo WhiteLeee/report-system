@@ -10,11 +10,11 @@ import type {
 import type { RequestContext } from "@/backend/auth/request-context";
 
 export interface RectificationOrderRepository {
-  create(input: CreateRectificationOrderInput): RectificationOrderRecord;
-  listAll(filters?: RectificationOrderFilters, context?: RequestContext): RectificationOrderRecord[];
-  listByResultId(resultId: number): RectificationOrderRecord[];
-  listPendingSync(limit?: number): RectificationOrderRecord[];
-  createSyncBatch(input: CreateRectificationSyncBatchInput): RectificationSyncBatchRecord;
+  create(input: CreateRectificationOrderInput): Promise<any>;
+  listAll(filters?: RectificationOrderFilters, context?: RequestContext): Promise<any>;
+  listByResultId(resultId: number): Promise<any>;
+  listPendingSync(limit?: number): Promise<any>;
+  createSyncBatch(input: CreateRectificationSyncBatchInput): Promise<any>;
   finalizeSyncBatch(
     syncBatchId: string,
     patch: Partial<
@@ -31,11 +31,11 @@ export interface RectificationOrderRepository {
         | "finished_at"
       >
     >
-  ): void;
-  createSyncLog(input: CreateRectificationSyncLogInput): void;
-  listRecentSyncBatches(limit?: number): RectificationSyncBatchRecord[];
-  listDailySyncStats(days?: number): RectificationSyncDailyStat[];
-  attachSourceReviewLog(orderIds: number[], sourceReviewLogId: number): void;
+  ): Promise<any>;
+  createSyncLog(input: CreateRectificationSyncLogInput): Promise<any>;
+  listRecentSyncBatches(limit?: number): Promise<any>;
+  listDailySyncStats(days?: number): Promise<any>;
+  attachSourceReviewLog(orderIds: number[], sourceReviewLogId: number): Promise<any>;
   updateSyncState(
     orderId: number,
     patch: Partial<
@@ -50,5 +50,5 @@ export interface RectificationOrderRepository {
         | "response_payload"
       >
     >
-  ): void;
+  ): Promise<any>;
 }

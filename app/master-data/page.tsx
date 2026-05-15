@@ -24,14 +24,14 @@ function normalizeQueryValue(value: string | string[] | undefined): string {
   return typeof value === "string" ? value : "";
 }
 
-function formatDateLabel(value: string): string {
+function formatDateLabel(value: string): any {
   if (!value) {
     return "-";
   }
   return value.includes("T") ? value.replace("T", " ").slice(0, 16) : value.slice(0, 16);
 }
 
-function buildQueryString(params: Record<string, string>): string {
+function buildQueryString(params: Record<string, string>): any {
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value) {
@@ -110,10 +110,10 @@ function filterOrganizationTree(nodes: MasterDataOrganization[], keyword: string
         child
       };
     })
-    .filter((node): node is MasterDataOrganization => Boolean(node));
+    .filter((node): any => Boolean(node));
 }
 
-function renderStoreStatus(value: string): ReactNode {
+function renderStoreStatus(value: string): any {
   const normalized = value.trim();
   if (!normalized) {
     return "-";
@@ -130,7 +130,7 @@ function renderStoreStatus(value: string): ReactNode {
   return <span className={className}>{normalized}</span>;
 }
 
-function renderDocStatus(value: string): ReactNode {
+function renderDocStatus(value: string): any {
   const normalized = value.trim();
   if (!normalized) {
     return "-";
@@ -159,7 +159,7 @@ function renderOrganizationTree(
     expandedCodes: Set<string>;
     forcedOpenCodes: Set<string>;
   }
-): ReactNode {
+): any {
   return (
     <ul className={styles.orgTree}>
       {nodes.map((node) => (
@@ -198,7 +198,7 @@ export default async function MasterDataPage({
   searchParams
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("master-data:read", "/master-data");
   if (!currentUser.roles.includes("admin")) {
     redirect("/reports");
@@ -220,20 +220,29 @@ export default async function MasterDataPage({
     storeScopeIds: currentUser.storeScopeIds
   };
 
-  const enterprises = masterDataService.listEnterprises(context);
+  const enterprises = await masterDataService.listEnterprises(context);
   const activeEnterprise = enterprise || enterprises[0]?.enterprise_id || "";
-  const organizations = activeEnterprise ? sortOrganizationTree(masterDataService.listOrganizations(activeEnterprise, context)) : [];
+  const organizations = activeEnterprise
+    ? sortOrganizationTree(await masterDataService.listOrganizations(activeEnterprise, context))
+    : [];
   const organizationOptions = flattenOrganizations(organizations);
   const filteredTree = filterOrganizationTree(organizations, orgKeyword);
   const currentEnterprise = enterprises.find((item) => item.enterprise_id === activeEnterprise) ?? null;
-  const latestLogs = activeEnterprise ? masterDataService.listSyncLogs(activeEnterprise, 5, context) : [];
+  const latestLogs = activeEnterprise ? await masterDataService.listSyncLogs(activeEnterprise, 5, context) : [];
   const latestLog = latestLogs[0] ?? null;
-  const storeUniverse = activeEnterprise ? masterDataService.listStores({ enterpriseId: activeEnterprise }, context) : [];
+  const storeUniverse = activeEnterprise
+    ? await masterDataService.listStores({ enterpriseId: activeEnterprise }, context)
+    : [];
   const selectedPath = organizeCode ? findOrganizationPath(organizations, organizeCode) : [];
   const selectedNode = selectedPath.at(-1);
   const selectedCodes = selectedNode ? new Set(collectOrganizationCodes(selectedNode)) : null;
-  const expandedCodes = new Set(expanded.split(",").map((item) => item.trim()).filter(Boolean));
-  const forcedOpenCodes = new Set(selectedPath.slice(0, -1).map((item) => item.organize_code));
+  const expandedCodes = new Set<string>(
+    expanded
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item): item is string => item.length > 0)
+  );
+  const forcedOpenCodes = new Set<string>(selectedPath.slice(0, -1).map((item) => item.organize_code));
   const filteredStores = storeUniverse.filter((item) => {
     if (selectedCodes && !selectedCodes.has(item.organize_code)) {
       return false;
@@ -247,7 +256,13 @@ export default async function MasterDataPage({
     const normalizedKeyword = keyword.toLowerCase();
     return item.store_name.toLowerCase().includes(normalizedKeyword) || item.store_code.toLowerCase().includes(normalizedKeyword);
   });
-  const statusOptions = Array.from(new Set(storeUniverse.map((item) => item.status).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const statusOptions: string[] = Array.from(
+    new Set<string>(
+      storeUniverse
+        .map((item) => item.status)
+        .filter((item): item is string => typeof item === "string" && item.length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b));
   const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : 20;
   const total = filteredStores.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));

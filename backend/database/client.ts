@@ -1,21 +1,20 @@
-import fs from "node:fs";
-import path from "node:path";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
 import { getReportSystemConfig } from "@/backend/config/report-system-config";
 import * as schema from "@/backend/database/schema";
 
 const config = getReportSystemConfig();
-const dataDir = config.dataDir;
-const dbPath = config.dbPath;
 
-fs.mkdirSync(dataDir, { recursive: true });
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+export const pool = new Pool({
+  connectionString: config.dbUrl,
+  max: Number.parseInt(process.env.REPORT_SYSTEM_DB_POOL_MAX || "20", 10) || 20,
+  idleTimeoutMillis: Number.parseInt(process.env.REPORT_SYSTEM_DB_IDLE_TIMEOUT_MS || "30000", 10) || 30000
+});
 
-const sqlite = new Database(dbPath);
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
+export const db = drizzle(pool, { schema });
+export const dbUrl = config.dbUrl;
 
-export const db = drizzle(sqlite, { schema });
-export { sqlite, dbPath };
+export async function closeDatabasePool(): Promise<any> {
+  await pool.end();
+}

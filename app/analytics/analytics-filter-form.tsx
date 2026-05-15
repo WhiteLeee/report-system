@@ -79,7 +79,7 @@ export function AnalyticsFilterForm({
     setStoreId("");
   }, [linkedStores, storeId]);
 
-  const handleExportCsv = React.useCallback(async () => {
+  const handleExportCsv = React.useCallback(async (): Promise<any> => {
     if (isExporting) {
       return;
     }

@@ -3,7 +3,7 @@ import { masterDataPublishSchema } from "@/backend/master-data/master-data.schem
 
 const masterDataService = createMasterDataService();
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: Request): Promise<any> {
   let payload: unknown;
 
   try {
@@ -31,7 +31,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const result = masterDataService.publishSnapshot(parsed.data);
+    const result = await masterDataService.publishSnapshot(parsed.data);
     return Response.json(
       {
         ok: true,

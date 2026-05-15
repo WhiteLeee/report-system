@@ -1,6 +1,6 @@
 import { getReportSystemConfig } from "@/backend/config/report-system-config";
 
-function readForwardedValue(value: string | null): string {
+function readForwardedValue(value: string | null): any {
   if (!value) {
     return "";
   }
@@ -10,7 +10,7 @@ function readForwardedValue(value: string | null): string {
     .find(Boolean) || "";
 }
 
-function stripPort(host: string): string {
+function stripPort(host: string): any {
   const trimmed = host.trim();
   if (!trimmed) {
     return "";
@@ -33,12 +33,12 @@ function stripPort(host: string): string {
   return withoutIpv6Brackets;
 }
 
-function isLocalHost(host: string): boolean {
+function isLocalHost(host: string): any {
   const normalized = stripPort(host).toLowerCase();
   return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1" || normalized === "0.0.0.0";
 }
 
-function isValidHost(host: string): boolean {
+function isValidHost(host: string): any {
   if (!host.trim()) {
     return false;
   }
@@ -50,7 +50,7 @@ function isValidHost(host: string): boolean {
   }
 }
 
-function readRequestHost(request: Request): string {
+function readRequestHost(request: Request): any {
   const hostHeader = readForwardedValue(request.headers.get("host")).trim();
   const forwardedHost = readForwardedValue(request.headers.get("x-forwarded-host")).trim();
 
@@ -78,7 +78,7 @@ function readRequestHost(request: Request): string {
   return "";
 }
 
-function readRequestProtocol(request: Request): "http" | "https" {
+function readRequestProtocol(request: Request): any {
   const forwardedProtocol = readForwardedValue(request.headers.get("x-forwarded-proto")).toLowerCase();
   if (forwardedProtocol === "http" || forwardedProtocol === "https") {
     return forwardedProtocol;
@@ -90,7 +90,7 @@ function readRequestProtocol(request: Request): "http" | "https" {
   }
 }
 
-export function buildRequestUrl(request: Request, path: string): URL {
+export function buildRequestUrl(request: Request, path: string): any {
   if (/^https?:\/\//i.test(path)) {
     return new URL(path);
   }

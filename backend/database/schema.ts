@@ -1,10 +1,10 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, pgTable, serial, text, uniqueIndex } from "drizzle-orm/pg-core";
 
-export const reportTable = sqliteTable(
+export const reportTable = pgTable(
   "report",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     publishId: text("publish_id").notNull(),
     sourceSystem: text("source_system").notNull(),
     sourceEnterpriseId: text("source_enterprise_id").notNull(),
@@ -44,10 +44,10 @@ export const reportTable = sqliteTable(
   })
 );
 
-export const reportStoreTable = sqliteTable(
+export const reportStoreTable = pgTable(
   "report_store",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     reportId: integer("report_id").notNull().references(() => reportTable.id, { onDelete: "cascade" }),
     storeId: text("store_id").notNull(),
     storeName: text("store_name").notNull(),
@@ -70,10 +70,10 @@ export const reportStoreTable = sqliteTable(
   })
 );
 
-export const reportImageTable = sqliteTable(
+export const reportImageTable = pgTable(
   "report_image",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     reportId: integer("report_id").notNull().references(() => reportTable.id, { onDelete: "cascade" }),
     storeId: text("store_id"),
     storeName: text("store_name"),
@@ -101,10 +101,10 @@ export const reportImageTable = sqliteTable(
   })
 );
 
-export const reportIssueTable = sqliteTable(
+export const reportIssueTable = pgTable(
   "report_issue",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     reportId: integer("report_id").notNull().references(() => reportTable.id, { onDelete: "cascade" }),
     resultId: integer("result_id").references(() => reportImageTable.id, { onDelete: "set null" }),
     storeId: text("store_id"),
@@ -126,10 +126,10 @@ export const reportIssueTable = sqliteTable(
   })
 );
 
-export const reportInspectionTable = sqliteTable(
+export const reportInspectionTable = pgTable(
   "report_inspection",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     reportId: integer("report_id").notNull().references(() => reportTable.id, { onDelete: "cascade" }),
     resultId: integer("result_id").references(() => reportImageTable.id, { onDelete: "set null" }),
     storeId: text("store_id"),
@@ -150,10 +150,10 @@ export const reportInspectionTable = sqliteTable(
   })
 );
 
-export const reportReviewLogTable = sqliteTable(
+export const reportReviewLogTable = pgTable(
   "report_review_log",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     reportId: integer("report_id").notNull().references(() => reportTable.id, { onDelete: "cascade" }),
     resultId: integer("result_id").notNull().references(() => reportImageTable.id, { onDelete: "cascade" }),
     storeId: text("store_id"),
@@ -175,10 +175,10 @@ export const reportReviewLogTable = sqliteTable(
   })
 );
 
-export const reportRectificationOrderTable = sqliteTable(
+export const reportRectificationOrderTable = pgTable(
   "report_rectification_order",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     reportId: integer("report_id").notNull().references(() => reportTable.id, { onDelete: "cascade" }),
     resultId: integer("result_id").notNull().references(() => reportImageTable.id, { onDelete: "cascade" }),
     sourceReviewLogId: integer("source_review_log_id").references(() => reportReviewLogTable.id, {
@@ -211,10 +211,10 @@ export const reportRectificationOrderTable = sqliteTable(
   })
 );
 
-export const reportRectificationSyncBatchTable = sqliteTable(
+export const reportRectificationSyncBatchTable = pgTable(
   "report_rectification_sync_batch",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     syncBatchId: text("sync_batch_id").notNull(),
     triggerSource: text("trigger_source").notNull().default("scheduler"),
     status: text("status").notNull().default("running"),
@@ -239,10 +239,10 @@ export const reportRectificationSyncBatchTable = sqliteTable(
   })
 );
 
-export const reportRectificationSyncLogTable = sqliteTable(
+export const reportRectificationSyncLogTable = pgTable(
   "report_rectification_sync_log",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     syncBatchId: text("sync_batch_id").notNull(),
     orderId: integer("order_id")
       .notNull()
@@ -267,10 +267,10 @@ export const reportRectificationSyncLogTable = sqliteTable(
   })
 );
 
-export const analyticsResultFactTable = sqliteTable(
+export const analyticsResultFactTable = pgTable(
   "analytics_result_fact",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     reportId: integer("report_id")
       .notNull()
       .references(() => reportTable.id, { onDelete: "cascade" }),
@@ -311,10 +311,10 @@ export const analyticsResultFactTable = sqliteTable(
   })
 );
 
-export const analyticsIssueFactTable = sqliteTable(
+export const analyticsIssueFactTable = pgTable(
   "analytics_issue_fact",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     reportId: integer("report_id")
       .notNull()
       .references(() => reportTable.id, { onDelete: "cascade" }),
@@ -357,10 +357,10 @@ export const analyticsIssueFactTable = sqliteTable(
   })
 );
 
-export const analyticsReviewFactTable = sqliteTable(
+export const analyticsReviewFactTable = pgTable(
   "analytics_review_fact",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     reportId: integer("report_id")
       .notNull()
       .references(() => reportTable.id, { onDelete: "cascade" }),
@@ -406,10 +406,10 @@ export const analyticsReviewFactTable = sqliteTable(
   })
 );
 
-export const analyticsRectificationFactTable = sqliteTable(
+export const analyticsRectificationFactTable = pgTable(
   "analytics_rectification_fact",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     orderId: integer("order_id")
       .notNull()
       .references(() => reportRectificationOrderTable.id, { onDelete: "cascade" }),
@@ -454,10 +454,10 @@ export const analyticsRectificationFactTable = sqliteTable(
   })
 );
 
-export const analyticsDailyOverviewSnapshotTable = sqliteTable(
+export const analyticsDailyOverviewSnapshotTable = pgTable(
   "analytics_daily_overview_snapshot",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     snapshotDate: text("snapshot_date").notNull(),
     sourceEnterpriseId: text("source_enterprise_id").notNull(),
     enterpriseName: text("enterprise_name").notNull().default(""),
@@ -485,10 +485,10 @@ export const analyticsDailyOverviewSnapshotTable = sqliteTable(
   })
 );
 
-export const analyticsDailySemanticSnapshotTable = sqliteTable(
+export const analyticsDailySemanticSnapshotTable = pgTable(
   "analytics_daily_semantic_snapshot",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     snapshotDate: text("snapshot_date").notNull(),
     sourceEnterpriseId: text("source_enterprise_id").notNull(),
     enterpriseName: text("enterprise_name").notNull().default(""),
@@ -510,10 +510,10 @@ export const analyticsDailySemanticSnapshotTable = sqliteTable(
   })
 );
 
-export const analyticsJobRunTable = sqliteTable(
+export const analyticsJobRunTable = pgTable(
   "analytics_job_run",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     jobKey: text("job_key").notNull(),
     jobType: text("job_type").notNull(),
     status: text("status").notNull().default("running"),
@@ -532,10 +532,10 @@ export const analyticsJobRunTable = sqliteTable(
   })
 );
 
-export const analyticsJobCheckpointTable = sqliteTable(
+export const analyticsJobCheckpointTable = pgTable(
   "analytics_job_checkpoint",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     jobType: text("job_type").notNull(),
     scopeKey: text("scope_key").notNull().default("global"),
     checkpointJson: text("checkpoint_json").notNull().default("{}"),
@@ -546,10 +546,10 @@ export const analyticsJobCheckpointTable = sqliteTable(
   })
 );
 
-export const reportSourceSnapshotTable = sqliteTable(
+export const reportSourceSnapshotTable = pgTable(
   "report_source_snapshot",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     reportId: integer("report_id")
       .notNull()
       .references(() => reportTable.id, { onDelete: "cascade" }),
@@ -566,10 +566,10 @@ export const reportSourceSnapshotTable = sqliteTable(
   })
 );
 
-export const organizationMasterTable = sqliteTable(
+export const organizationMasterTable = pgTable(
   "organization_master",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     enterpriseId: text("enterprise_id").notNull(),
     enterpriseName: text("enterprise_name").notNull().default(""),
     organizeCode: text("organize_code").notNull(),
@@ -588,10 +588,10 @@ export const organizationMasterTable = sqliteTable(
   })
 );
 
-export const storeMasterProfileTable = sqliteTable(
+export const storeMasterProfileTable = pgTable(
   "store_master_profile",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     enterpriseId: text("enterprise_id").notNull(),
     enterpriseName: text("enterprise_name").notNull().default(""),
     storeId: text("store_id").notNull(),
@@ -617,10 +617,10 @@ export const storeMasterProfileTable = sqliteTable(
   })
 );
 
-export const masterDataSyncLogTable = sqliteTable(
+export const masterDataSyncLogTable = pgTable(
   "master_data_sync_log",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     syncBatchId: text("sync_batch_id").notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
     sourceSystem: text("source_system").notNull(),
@@ -646,10 +646,10 @@ export const masterDataSyncLogTable = sqliteTable(
   })
 );
 
-export const systemSettingTable = sqliteTable(
+export const systemSettingTable = pgTable(
   "system_setting",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     settingKey: text("setting_key").notNull(),
     category: text("category").notNull().default("general"),
     valueJson: text("value_json").notNull().default("{}"),
@@ -662,10 +662,10 @@ export const systemSettingTable = sqliteTable(
   })
 );
 
-export const reportUserTable = sqliteTable(
+export const reportUserTable = pgTable(
   "report_user",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     username: text("username").notNull(),
     passwordHash: text("password_hash").notNull(),
     displayName: text("display_name").notNull(),
@@ -679,10 +679,10 @@ export const reportUserTable = sqliteTable(
   })
 );
 
-export const reportRoleTable = sqliteTable(
+export const reportRoleTable = pgTable(
   "report_role",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     code: text("code").notNull(),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
@@ -693,10 +693,10 @@ export const reportRoleTable = sqliteTable(
   })
 );
 
-export const reportPermissionTable = sqliteTable(
+export const reportPermissionTable = pgTable(
   "report_permission",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     code: text("code").notNull(),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
@@ -707,10 +707,10 @@ export const reportPermissionTable = sqliteTable(
   })
 );
 
-export const reportMenuTable = sqliteTable(
+export const reportMenuTable = pgTable(
   "report_menu",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     code: text("code").notNull(),
     name: text("name").notNull(),
     path: text("path").notNull(),
@@ -726,10 +726,10 @@ export const reportMenuTable = sqliteTable(
   })
 );
 
-export const reportUserRoleTable = sqliteTable(
+export const reportUserRoleTable = pgTable(
   "report_user_role",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     userId: integer("user_id")
       .notNull()
       .references(() => reportUserTable.id, { onDelete: "cascade" }),
@@ -744,10 +744,10 @@ export const reportUserRoleTable = sqliteTable(
   })
 );
 
-export const reportRoleMenuTable = sqliteTable(
+export const reportRoleMenuTable = pgTable(
   "report_role_menu",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     roleId: integer("role_id")
       .notNull()
       .references(() => reportRoleTable.id, { onDelete: "cascade" }),
@@ -762,10 +762,10 @@ export const reportRoleMenuTable = sqliteTable(
   })
 );
 
-export const reportRolePermissionTable = sqliteTable(
+export const reportRolePermissionTable = pgTable(
   "report_role_permission",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     roleId: integer("role_id")
       .notNull()
       .references(() => reportRoleTable.id, { onDelete: "cascade" }),
@@ -780,10 +780,10 @@ export const reportRolePermissionTable = sqliteTable(
   })
 );
 
-export const reportSessionTable = sqliteTable(
+export const reportSessionTable = pgTable(
   "report_session",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     userId: integer("user_id")
       .notNull()
       .references(() => reportUserTable.id, { onDelete: "cascade" }),
@@ -798,10 +798,10 @@ export const reportSessionTable = sqliteTable(
   })
 );
 
-export const authLoginGuardTable = sqliteTable(
+export const authLoginGuardTable = pgTable(
   "auth_login_guard",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     username: text("username").notNull(),
     failedCount: integer("failed_count").notNull().default(0),
     lockedUntil: text("locked_until"),
@@ -815,10 +815,10 @@ export const authLoginGuardTable = sqliteTable(
   })
 );
 
-export const reportUserScopeTable = sqliteTable(
+export const reportUserScopeTable = pgTable(
   "report_user_scope",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     userId: integer("user_id")
       .notNull()
       .references(() => reportUserTable.id, { onDelete: "cascade" }),
@@ -832,10 +832,10 @@ export const reportUserScopeTable = sqliteTable(
   })
 );
 
-export const authAuditLogTable = sqliteTable(
+export const authAuditLogTable = pgTable(
   "auth_audit_log",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     operatorUserId: integer("operator_user_id").references(() => reportUserTable.id, { onDelete: "set null" }),
     operatorUsername: text("operator_username").notNull().default(""),
     targetUserId: integer("target_user_id").references(() => reportUserTable.id, { onDelete: "set null" }),

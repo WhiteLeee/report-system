@@ -104,7 +104,7 @@ export function DashboardHeader({
       : fallbackNavigationItems
   ).filter((item) => item.href !== "/master-data" || canManageSystem);
 
-  async function handleLogout() {
+  async function handleLogout(): Promise<any> {
     if (isLoggingOut) {
       return;
     }

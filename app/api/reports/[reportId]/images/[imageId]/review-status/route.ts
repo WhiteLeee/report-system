@@ -13,7 +13,7 @@ const reviewService = createReportReviewService();
 const reportService = createReportService();
 const rectificationService = createRectificationService();
 
-async function readPayload(request: Request): Promise<Record<string, string>> {
+async function readPayload(request: Request): Promise<any> {
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     const json = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -25,7 +25,7 @@ async function readPayload(request: Request): Promise<Record<string, string>> {
   return Object.fromEntries(Array.from(formData.entries()).map(([key, value]) => [key, String(value)]));
 }
 
-function parseSelectedIssues(raw: string): ReviewSelectedIssue[] {
+function parseSelectedIssues(raw: string): any {
   if (!raw.trim()) {
     return [];
   }
@@ -46,20 +46,20 @@ function parseSelectedIssues(raw: string): ReviewSelectedIssue[] {
         }
         return { id, title };
       })
-      .filter((item): item is ReviewSelectedIssue => Boolean(item));
+      .filter((item): any => Boolean(item));
   } catch {
     return [];
   }
 }
 
-function normalizeReviewAction(value: string, reviewStatus: ResultReviewState): ReviewAction {
+function normalizeReviewAction(value: string, reviewStatus: ResultReviewState): any {
   if (reviewStatus !== "completed") {
     return "reopen";
   }
   return value === "create_rectification" ? "create_rectification" : "complete_only";
 }
 
-function normalizeReviewDisposition(value: string): ReviewDisposition {
+function normalizeReviewDisposition(value: string): any {
   if (
     value === "rectification_required" ||
     value === "no_rectification" ||
@@ -72,11 +72,11 @@ function normalizeReviewDisposition(value: string): ReviewDisposition {
   return "";
 }
 
-function isAutoCompletedReviewPayload(value: unknown): boolean {
+function isAutoCompletedReviewPayload(value: unknown): any {
   return Boolean(value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).auto_completed === true);
 }
 
-function readMetadataString(metadata: unknown, key: string): string {
+function readMetadataString(metadata: unknown, key: string): any {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return "";
   }
@@ -84,7 +84,7 @@ function readMetadataString(metadata: unknown, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function readMetadataBoolean(metadata: unknown, key: string): boolean {
+function readMetadataBoolean(metadata: unknown, key: string): any {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return false;
   }
@@ -94,7 +94,7 @@ function readMetadataBoolean(metadata: unknown, key: string): boolean {
 function issueMatchesInspection(
   issue: { metadata: unknown },
   inspection: { inspection_id: string; skill_id: string; skill_name: string | null }
-): boolean {
+): any {
   const issueInspectionId = readMetadataString(issue.metadata, "inspection_id");
   const issueSkillId = readMetadataString(issue.metadata, "skill_id");
   const issueSkillName = readMetadataString(issue.metadata, "skill_name");
@@ -107,7 +107,7 @@ function issueMatchesInspection(
   return Boolean(inspection.skill_name && issueSkillName && issueSkillName === inspection.skill_name);
 }
 
-function normalizeImageUrls(values: unknown[]): string[] {
+function normalizeImageUrls(values: unknown[]): any {
   return Array.from(
     new Set(
       values
@@ -117,11 +117,11 @@ function normalizeImageUrls(values: unknown[]): string[] {
   );
 }
 
-function isDeprecatedManualUploadUrl(url: string): boolean {
+function isDeprecatedManualUploadUrl(url: string): any {
   return url.trim().startsWith("/uploads/report-issues/");
 }
 
-function issueUsesInspection(issue: { metadata: unknown }, inspectionId: string): boolean {
+function issueUsesInspection(issue: { metadata: unknown }, inspectionId: string): any {
   if (!inspectionId) {
     return false;
   }
@@ -134,7 +134,7 @@ function buildIssueRectificationImageUrls(input: {
   linkedInspection: { metadata: unknown } | null;
   resultDetail: { metadata: unknown; url: string };
   failedInspectionIds: Set<string>;
-}): string[] {
+}): any {
   const isManualIssue = readMetadataBoolean(input.issue.metadata, "manual_issue") ||
     readMetadataString(input.issue.metadata, "source") === "manual_review";
   const useOriginalFallback = Array.from(input.failedInspectionIds).some((inspectionId) =>
@@ -178,8 +178,8 @@ function buildIssueRectificationImageUrls(input: {
 export async function POST(
   request: Request,
   context: { params: Promise<{ reportId: string; imageId: string }> }
-): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "review:write")) {
     return Response.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
@@ -214,7 +214,7 @@ export async function POST(
 
   let createdRectificationOrders: Array<{ id: number; huiyunying_order_id: string | null; status: string }> = [];
 
-  const report = reportService.getReportDetail(reportId, requestContext);
+  const report = await reportService.getReportDetail(reportId, requestContext);
   const resultDetail = report?.results.find((result) => result.id === imageId) ?? null;
   if (!report || !resultDetail) {
     return Response.json({ success: false, error: "Review target not found." }, { status: 404 });
@@ -365,7 +365,7 @@ export async function POST(
     }
   }
 
-  const result = reviewService.updateImageReviewStatus(
+  const result = await reviewService.updateImageReviewStatus(
     reportId,
     imageId,
     normalizedReviewStatus,
@@ -387,7 +387,7 @@ export async function POST(
   );
 
   if (result.recent_log?.id && createdRectificationOrders.length > 0) {
-    rectificationService.attachReviewLog(
+    await rectificationService.attachReviewLog(
       createdRectificationOrders.map((order) => order.id),
       result.recent_log.id
     );

@@ -17,11 +17,11 @@ export const dynamic = "force-dynamic";
 const authService = createAuthService();
 const pageSizeOptions = [20, 50, 100] as const;
 
-function normalizeQueryValue(value: string | string[] | undefined): string {
+function normalizeQueryValue(value: string | string[] | undefined): any {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function decodeQueryValue(value: string): string {
+function decodeQueryValue(value: string): any {
   if (!value) {
     return "";
   }
@@ -32,7 +32,7 @@ function decodeQueryValue(value: string): string {
   }
 }
 
-function formatDateLabel(value: string): string {
+function formatDateLabel(value: string): any {
   if (!value) {
     return "-";
   }
@@ -42,7 +42,7 @@ function formatDateLabel(value: string): string {
 function toAuditQuery(
   current: Record<string, string | string[] | undefined>,
   updates: Record<string, string>
-): string {
+): any {
   const params = new URLSearchParams();
   Object.entries(current).forEach(([key, value]) => {
     if (typeof value === "string" && value.trim()) {
@@ -65,7 +65,7 @@ export default async function AdminAuditPage({
   searchParams
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("user:read", "/admin/audit");
   if (!currentUser.roles.includes("admin")) {
     redirect("/reports");
@@ -83,14 +83,20 @@ export default async function AdminAuditPage({
     : pageSizeOptions[0];
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
-  const auditLogPage = authService.queryAuditLogs({
+  const auditLogPage = await authService.queryAuditLogs({
     action: auditAction || undefined,
     keyword: auditKeyword || undefined,
     page,
     pageSize
   });
   const totalPages = Math.max(1, Math.ceil(auditLogPage.total / auditLogPage.pageSize));
-  const actionOptions = Array.from(new Set(authService.listAuditLogs(300).map((item) => item.action).filter(Boolean))).sort();
+  const actionOptions: string[] = Array.from(
+    new Set<string>(
+      (await authService.listAuditLogs(300))
+        .map((item) => item.action)
+        .filter((action): action is string => typeof action === "string" && action.length > 0)
+    )
+  ).sort();
 
   return (
     <main className="page-shell">

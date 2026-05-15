@@ -6,14 +6,14 @@ import { SESSION_COOKIE_NAME } from "@/backend/auth/session";
 
 const authService = createAuthService();
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: Request): Promise<any> {
   const cookieHeader = request.headers.get("cookie") || "";
   const target = cookieHeader
     .split(";")
     .map((item) => item.trim())
     .find((item) => item.startsWith(`${SESSION_COOKIE_NAME}=`));
   if (target) {
-    authService.logout(decodeURIComponent(target.slice(`${SESSION_COOKIE_NAME}=`.length)));
+    await authService.logout(decodeURIComponent(target.slice(`${SESSION_COOKIE_NAME}=`.length)));
   }
 
   const response = NextResponse.redirect(buildRequestUrl(request, "/login"), 303);

@@ -1,6 +1,6 @@
 {
-  "tenantId": "dlb",
-  "tenantName": "德伦堡",
+  "tenantId": "default-tenant",
+  "tenantName": "默认客户",
   "brandName": "Report System",
   "baseUrl": "http://127.0.0.1:3000",
   "logoUrl": "",
@@ -8,11 +8,11 @@
   "primaryColorStrong": "#6b421d",
   "defaultTimezone": "Asia/Shanghai",
   "dataDir": "/Users/wick/Desktop/ZhiQing Selection/SourceCode/report-system/data",
-  "dbPath": "/Users/wick/Desktop/ZhiQing Selection/SourceCode/report-system/data/report-system.sqlite",
+  "dbUrl": "postgres://wick@127.0.0.1:5432/report_system",
+  "dbMigrationsSchema": "public",
+  "dbMigrationsTable": "__drizzle_migrations",
   "adminUsername": "admin",
   "adminPassword": "ChangeMe123!",
   "adminDisplayName": "系统管理员",
-  "supportedPayloadVersions": [
-    2
-  ]
+  "supportedPayloadVersions": [2]
 }

@@ -12,7 +12,7 @@ declare global {
     | undefined;
 }
 
-async function triggerRectificationSync(): Promise<void> {
+async function triggerRectificationSync(): Promise<any> {
   const state = globalThis.__reportSystemRectificationSyncManager;
   if (!state) {
     return;
@@ -39,8 +39,8 @@ async function triggerRectificationSync(): Promise<void> {
   await promise;
 }
 
-export function ensureRectificationSyncManagerStarted(): void {
-  const settings = createSystemSettingsService().getHuiYunYingApiSettings();
+export async function ensureRectificationSyncManagerStarted(): Promise<any> {
+  const settings = await createSystemSettingsService().getHuiYunYingApiSettings();
   const intervalMs = Math.max(0, settings.rectificationSyncIntervalMs);
   const state = globalThis.__reportSystemRectificationSyncManager || {
     timer: null,

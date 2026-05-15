@@ -8,13 +8,13 @@ import type {
 export class HuiYunYingRectificationService {
   constructor(private readonly client: HuiYunYingClient) {}
 
-  async createRectificationOrder(input: HuiYunYingCreateRectificationInput): Promise<unknown> {
+  async createRectificationOrder(input: HuiYunYingCreateRectificationInput): Promise<any> {
     return this.client.createRectificationOrder(input);
   }
 
   async listRectificationOrders(
     input: HuiYunYingListRectificationInput
-  ): Promise<HuiYunYingRectificationOrderItem[]> {
+  ): Promise<any> {
     return this.client.listRectificationOrders(input);
   }
 }

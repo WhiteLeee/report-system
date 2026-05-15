@@ -22,11 +22,11 @@ import type {
 } from "@/backend/rectification/rectification.types";
 import type { JsonValue } from "@/backend/shared/json";
 
-function safeStringify(value: unknown, fallback: unknown): string {
+function safeStringify(value: unknown, fallback: unknown): any {
   return JSON.stringify(value ?? fallback);
 }
 
-function safeParse<T extends JsonValue>(value: string, fallback: T): T {
+function safeParse<T extends JsonValue>(value: string, fallback: T): any {
   try {
     return JSON.parse(value) as T;
   } catch {
@@ -37,7 +37,7 @@ function safeParse<T extends JsonValue>(value: string, fallback: T): T {
 function toRectificationOrderRecord(
   row: typeof reportRectificationOrderTable.$inferSelect,
   reportRow?: typeof reportTable.$inferSelect | null
-): RectificationOrderRecord {
+): any {
   return {
     id: row.id,
     report_id: row.reportId,
@@ -71,7 +71,7 @@ function toRectificationOrderRecord(
 
 function toRectificationSyncBatchRecord(
   row: typeof reportRectificationSyncBatchTable.$inferSelect
-): RectificationSyncBatchRecord {
+): any {
   return {
     id: row.id,
     sync_batch_id: row.syncBatchId,
@@ -93,7 +93,7 @@ function toRectificationSyncBatchRecord(
   };
 }
 
-function normalizeScopeIds(values?: string[]): string[] {
+function normalizeScopeIds(values?: string[]): any {
   return Array.from(
     new Set(
       (values || [])
@@ -103,7 +103,7 @@ function normalizeScopeIds(values?: string[]): string[] {
   );
 }
 
-function canAccessEnterprise(context: RequestContext, enterpriseId: string): boolean {
+function canAccessEnterprise(context: RequestContext, enterpriseId: string): any {
   const enterpriseScopeIds = normalizeScopeIds(context.enterpriseScopeIds);
   if (enterpriseScopeIds.length === 0) {
     return true;
@@ -111,7 +111,7 @@ function canAccessEnterprise(context: RequestContext, enterpriseId: string): boo
   return enterpriseScopeIds.includes(enterpriseId);
 }
 
-function resolveScopedStoreIds(context: RequestContext, enterpriseId?: string): string[] | null {
+async function resolveScopedStoreIds(context: RequestContext, enterpriseId?: string): Promise<any> {
   const storeScopeIds = normalizeScopeIds(context.storeScopeIds);
   if (storeScopeIds.length > 0) {
     return storeScopeIds;
@@ -127,15 +127,14 @@ function resolveScopedStoreIds(context: RequestContext, enterpriseId?: string): 
     organizationWhere.push(eq(organizationMasterTable.enterpriseId, enterpriseId));
   }
 
-  const organizationRows = db
-    .select({
-      enterpriseId: organizationMasterTable.enterpriseId,
-      organizeCode: organizationMasterTable.organizeCode,
-      parentCode: organizationMasterTable.parentCode
-    })
-    .from(organizationMasterTable)
-    .where(and(...organizationWhere))
-    .all()
+  const organizationRows = (await db
+      .select({
+        enterpriseId: organizationMasterTable.enterpriseId,
+        organizeCode: organizationMasterTable.organizeCode,
+        parentCode: organizationMasterTable.parentCode
+      })
+      .from(organizationMasterTable)
+      .where(and(...organizationWhere)))
     .filter((row) => canAccessEnterprise(context, row.enterpriseId));
 
   const childrenMap = new Map<string, string[]>();
@@ -169,15 +168,14 @@ function resolveScopedStoreIds(context: RequestContext, enterpriseId?: string): 
 
   return Array.from(
     new Set(
-      db
-        .select({
-          enterpriseId: storeMasterProfileTable.enterpriseId,
-          storeId: storeMasterProfileTable.storeId,
-          organizeCode: storeMasterProfileTable.organizeCode
-        })
-        .from(storeMasterProfileTable)
-        .where(and(...storeWhere))
-        .all()
+      (await db
+                .select({
+                  enterpriseId: storeMasterProfileTable.enterpriseId,
+                  storeId: storeMasterProfileTable.storeId,
+                  organizeCode: storeMasterProfileTable.organizeCode
+                })
+                .from(storeMasterProfileTable)
+                .where(and(...storeWhere)))
         .filter(
           (row) =>
             canAccessEnterprise(context, row.enterpriseId) &&
@@ -188,7 +186,7 @@ function resolveScopedStoreIds(context: RequestContext, enterpriseId?: string): 
   );
 }
 
-function matchesKeyword(order: RectificationOrderRecord, keyword: string): boolean {
+function matchesKeyword(order: RectificationOrderRecord, keyword: string): any {
   const normalizedKeyword = keyword.trim().toLowerCase();
   if (!normalizedKeyword) {
     return true;
@@ -209,7 +207,7 @@ function matchesKeyword(order: RectificationOrderRecord, keyword: string): boole
     .some((value) => value.includes(normalizedKeyword));
 }
 
-function matchesDateRange(order: RectificationOrderRecord, startDate: string, endDate: string): boolean {
+function matchesDateRange(order: RectificationOrderRecord, startDate: string, endDate: string): any {
   const createdDate = String(order.created_at || "").slice(0, 10);
   if (startDate && createdDate < startDate) {
     return false;
@@ -220,50 +218,49 @@ function matchesDateRange(order: RectificationOrderRecord, startDate: string, en
   return true;
 }
 
-export class SqliteRectificationOrderRepository implements RectificationOrderRepository {
-  create(input: CreateRectificationOrderInput): RectificationOrderRecord {
+export class PgRectificationOrderRepository implements RectificationOrderRepository {
+  async create(input: CreateRectificationOrderInput): Promise<any> {
     const now = new Date().toISOString();
-    const inserted = db
-      .insert(reportRectificationOrderTable)
-      .values({
-        reportId: input.report_id,
-        resultId: input.result_id,
-        sourceReviewLogId: input.source_review_log_id ?? null,
-        storeId: input.store_id ?? null,
-        storeCode: input.store_code ?? null,
-        storeName: input.store_name ?? null,
-        huiYunYingOrderId: input.huiyunying_order_id ?? null,
-        requestDescription: input.request_description,
-        selectedIssuesJson: safeStringify(input.selected_issues, []),
-        imageUrlsJson: safeStringify(input.image_urls, []),
-        requestPayloadJson: safeStringify(input.request_payload, {}),
-        responsePayloadJson: safeStringify(input.response_payload, {}),
-        status: input.status,
-        ifCorrected: input.if_corrected ?? null,
-        shouldCorrected: input.should_corrected ?? null,
-        realCorrectedTime: input.real_corrected_time ?? null,
-        rectificationReplyContent: input.rectification_reply_content ?? null,
-        lastSyncedAt: input.last_synced_at ?? null,
-        createdBy: input.created_by,
-        createdAt: now,
-        updatedAt: now
-      })
-      .returning()
-      .get();
+    const inserted = (await db
+          .insert(reportRectificationOrderTable)
+          .values({
+            reportId: input.report_id,
+            resultId: input.result_id,
+            sourceReviewLogId: input.source_review_log_id ?? null,
+            storeId: input.store_id ?? null,
+            storeCode: input.store_code ?? null,
+            storeName: input.store_name ?? null,
+            huiYunYingOrderId: input.huiyunying_order_id ?? null,
+            requestDescription: input.request_description,
+            selectedIssuesJson: safeStringify(input.selected_issues, []),
+            imageUrlsJson: safeStringify(input.image_urls, []),
+            requestPayloadJson: safeStringify(input.request_payload, {}),
+            responsePayloadJson: safeStringify(input.response_payload, {}),
+            status: input.status,
+            ifCorrected: input.if_corrected ?? null,
+            shouldCorrected: input.should_corrected ?? null,
+            realCorrectedTime: input.real_corrected_time ?? null,
+            rectificationReplyContent: input.rectification_reply_content ?? null,
+            lastSyncedAt: input.last_synced_at ?? null,
+            createdBy: input.created_by,
+            createdAt: now,
+            updatedAt: now
+          })
+          .returning())[0];
     return toRectificationOrderRecord(inserted);
   }
 
-  listAll(filters: RectificationOrderFilters = {}, context: RequestContext = {}): RectificationOrderRecord[] {
-    const rows = db
-      .select({
-        rectification: reportRectificationOrderTable,
-        report: reportTable
-      })
-      .from(reportRectificationOrderTable)
-      .leftJoin(reportTable, eq(reportRectificationOrderTable.reportId, reportTable.id))
-      .orderBy(desc(reportRectificationOrderTable.createdAt), desc(reportRectificationOrderTable.id))
-      .all()
+  async listAll(filters: RectificationOrderFilters = {}, context: RequestContext = {}): Promise<any> {
+    const rows = (await db
+          .select({
+            rectification: reportRectificationOrderTable,
+            report: reportTable
+          })
+          .from(reportRectificationOrderTable)
+          .leftJoin(reportTable, eq(reportRectificationOrderTable.reportId, reportTable.id))
+          .orderBy(desc(reportRectificationOrderTable.createdAt), desc(reportRectificationOrderTable.id)))
       .map(({ rectification, report }) => toRectificationOrderRecord(rectification, report));
+    const scopedStoreIds = await resolveScopedStoreIds(context);
 
     return rows.filter((order) => {
       const enterpriseId = String(order.source_enterprise_id || "").trim();
@@ -271,7 +268,6 @@ export class SqliteRectificationOrderRepository implements RectificationOrderRep
         return false;
       }
 
-      const scopedStoreIds = resolveScopedStoreIds(context, enterpriseId || undefined);
       if (scopedStoreIds && !scopedStoreIds.includes(String(order.store_id || "").trim())) {
         return false;
       }
@@ -292,58 +288,55 @@ export class SqliteRectificationOrderRepository implements RectificationOrderRep
     });
   }
 
-  listByResultId(resultId: number): RectificationOrderRecord[] {
-    return db
-      .select()
-      .from(reportRectificationOrderTable)
-      .where(eq(reportRectificationOrderTable.resultId, resultId))
-      .orderBy(desc(reportRectificationOrderTable.createdAt), desc(reportRectificationOrderTable.id))
-      .all()
+  async listByResultId(resultId: number): Promise<any> {
+    return (await db
+          .select()
+          .from(reportRectificationOrderTable)
+          .where(eq(reportRectificationOrderTable.resultId, resultId))
+          .orderBy(desc(reportRectificationOrderTable.createdAt), desc(reportRectificationOrderTable.id)))
       .map((row) => toRectificationOrderRecord(row));
   }
 
-  listPendingSync(limit = 50): RectificationOrderRecord[] {
-    return db
-      .select()
-      .from(reportRectificationOrderTable)
-      .where(
-        or(
-          eq(reportRectificationOrderTable.status, "created"),
-          eq(reportRectificationOrderTable.status, "pending_review"),
-          eq(reportRectificationOrderTable.status, "sync_failed")
-        )
-      )
-      .orderBy(
-        asc(reportRectificationOrderTable.lastSyncedAt),
-        asc(reportRectificationOrderTable.updatedAt),
-        asc(reportRectificationOrderTable.id)
-      )
-      .limit(limit)
-      .all()
+  async listPendingSync(limit = 50): Promise<any> {
+    return (await db
+          .select()
+          .from(reportRectificationOrderTable)
+          .where(
+            or(
+              eq(reportRectificationOrderTable.status, "created"),
+              eq(reportRectificationOrderTable.status, "pending_review"),
+              eq(reportRectificationOrderTable.status, "sync_failed")
+            )
+          )
+          .orderBy(
+            asc(reportRectificationOrderTable.lastSyncedAt),
+            asc(reportRectificationOrderTable.updatedAt),
+            asc(reportRectificationOrderTable.id)
+          )
+          .limit(limit))
       .map((row) => toRectificationOrderRecord(row));
   }
 
-  createSyncBatch(input: CreateRectificationSyncBatchInput): RectificationSyncBatchRecord {
+  async createSyncBatch(input: CreateRectificationSyncBatchInput): Promise<any> {
     const now = new Date().toISOString();
-    const inserted = db
-      .insert(reportRectificationSyncBatchTable)
-      .values({
-        syncBatchId: input.sync_batch_id,
-        triggerSource: input.trigger_source,
-        status: input.status,
-        scannedCount: input.scanned_count,
-        configJson: safeStringify(input.config, {}),
-        summaryJson: safeStringify(input.summary ?? {}, {}),
-        startedAt: input.started_at,
-        createdAt: now,
-        updatedAt: now
-      })
-      .returning()
-      .get();
+    const inserted = (await db
+          .insert(reportRectificationSyncBatchTable)
+          .values({
+            syncBatchId: input.sync_batch_id,
+            triggerSource: input.trigger_source,
+            status: input.status,
+            scannedCount: input.scanned_count,
+            configJson: safeStringify(input.config, {}),
+            summaryJson: safeStringify(input.summary ?? {}, {}),
+            startedAt: input.started_at,
+            createdAt: now,
+            updatedAt: now
+          })
+          .returning())[0];
     return toRectificationSyncBatchRecord(inserted);
   }
 
-  finalizeSyncBatch(
+  async finalizeSyncBatch(
     syncBatchId: string,
     patch: Partial<
       Pick<
@@ -359,77 +352,72 @@ export class SqliteRectificationOrderRepository implements RectificationOrderRep
         | "finished_at"
       >
     >
-  ): void {
+  ): Promise<any> {
     if (!String(syncBatchId || "").trim()) {
       return;
     }
 
-    db.update(reportRectificationSyncBatchTable)
-      .set({
-        status: patch.status,
-        successCount: patch.success_count,
-        failedCount: patch.failed_count,
-        notFoundCount: patch.not_found_count,
-        skippedCount: patch.skipped_count,
-        averageResponseTimeMs:
-          patch.average_response_time_ms === undefined ? undefined : patch.average_response_time_ms,
-        maxResponseTimeMs: patch.max_response_time_ms === undefined ? undefined : patch.max_response_time_ms,
-        summaryJson: patch.summary === undefined ? undefined : safeStringify(patch.summary, {}),
-        finishedAt: patch.finished_at === undefined ? undefined : patch.finished_at ?? null,
-        updatedAt: new Date().toISOString()
-      })
-      .where(eq(reportRectificationSyncBatchTable.syncBatchId, syncBatchId))
-      .run();
+    await db.update(reportRectificationSyncBatchTable)
+            .set({
+              status: patch.status,
+              successCount: patch.success_count,
+              failedCount: patch.failed_count,
+              notFoundCount: patch.not_found_count,
+              skippedCount: patch.skipped_count,
+              averageResponseTimeMs:
+                patch.average_response_time_ms === undefined ? undefined : patch.average_response_time_ms,
+              maxResponseTimeMs: patch.max_response_time_ms === undefined ? undefined : patch.max_response_time_ms,
+              summaryJson: patch.summary === undefined ? undefined : safeStringify(patch.summary, {}),
+              finishedAt: patch.finished_at === undefined ? undefined : patch.finished_at ?? null,
+              updatedAt: new Date().toISOString()
+            })
+            .where(eq(reportRectificationSyncBatchTable.syncBatchId, syncBatchId));
   }
 
-  createSyncLog(input: CreateRectificationSyncLogInput): void {
-    db.insert(reportRectificationSyncLogTable)
-      .values({
-        syncBatchId: input.sync_batch_id,
-        orderId: input.order_id,
-        huiYunYingOrderId: input.huiyunying_order_id ?? null,
-        status: input.status,
-        errorType: input.error_type ?? null,
-        errorMessage: input.error_message || "",
-        attemptCount: input.attempt_count,
-        responseTimeMs: input.response_time_ms ?? null,
-        remoteStatus: input.remote_status ?? null,
-        remoteIfCorrected: input.remote_if_corrected ?? null,
-        requestPayloadJson: safeStringify(input.request_payload, {}),
-        responsePayloadJson: safeStringify(input.response_payload, {}),
-        syncedAt: input.synced_at,
-        createdAt: input.synced_at
-      })
-      .run();
+  async createSyncLog(input: CreateRectificationSyncLogInput): Promise<any> {
+    await db.insert(reportRectificationSyncLogTable)
+            .values({
+              syncBatchId: input.sync_batch_id,
+              orderId: input.order_id,
+              huiYunYingOrderId: input.huiyunying_order_id ?? null,
+              status: input.status,
+              errorType: input.error_type ?? null,
+              errorMessage: input.error_message || "",
+              attemptCount: input.attempt_count,
+              responseTimeMs: input.response_time_ms ?? null,
+              remoteStatus: input.remote_status ?? null,
+              remoteIfCorrected: input.remote_if_corrected ?? null,
+              requestPayloadJson: safeStringify(input.request_payload, {}),
+              responsePayloadJson: safeStringify(input.response_payload, {}),
+              syncedAt: input.synced_at,
+              createdAt: input.synced_at
+            });
   }
 
-  listRecentSyncBatches(limit = 10): RectificationSyncBatchRecord[] {
-    return db
-      .select()
-      .from(reportRectificationSyncBatchTable)
-      .orderBy(desc(reportRectificationSyncBatchTable.startedAt), desc(reportRectificationSyncBatchTable.id))
-      .limit(limit)
-      .all()
+  async listRecentSyncBatches(limit = 10): Promise<any> {
+    return (await db
+          .select()
+          .from(reportRectificationSyncBatchTable)
+          .orderBy(desc(reportRectificationSyncBatchTable.startedAt), desc(reportRectificationSyncBatchTable.id))
+          .limit(limit))
       .map((row) => toRectificationSyncBatchRecord(row));
   }
 
-  listDailySyncStats(days = 7): RectificationSyncDailyStat[] {
+  async listDailySyncStats(days = 7): Promise<any> {
     const safeDays = Math.max(1, Math.floor(days));
     const startBoundary = new Date();
     startBoundary.setHours(0, 0, 0, 0);
     startBoundary.setDate(startBoundary.getDate() - safeDays + 1);
     const startIso = startBoundary.toISOString();
 
-    const batches = db
-      .select()
-      .from(reportRectificationSyncBatchTable)
-      .where(gte(reportRectificationSyncBatchTable.startedAt, startIso))
-      .all();
-    const logs = db
-      .select()
-      .from(reportRectificationSyncLogTable)
-      .where(gte(reportRectificationSyncLogTable.syncedAt, startIso))
-      .all();
+    const batches = await db
+          .select()
+          .from(reportRectificationSyncBatchTable)
+          .where(gte(reportRectificationSyncBatchTable.startedAt, startIso));
+    const logs = await db
+          .select()
+          .from(reportRectificationSyncLogTable)
+          .where(gte(reportRectificationSyncLogTable.syncedAt, startIso));
 
     const statsMap = new Map<string, RectificationSyncDailyStat>();
 
@@ -507,7 +495,7 @@ export class SqliteRectificationOrderRepository implements RectificationOrderRep
       .sort((left, right) => right.sync_date.localeCompare(left.sync_date));
   }
 
-  attachSourceReviewLog(orderIds: number[], sourceReviewLogId: number): void {
+  async attachSourceReviewLog(orderIds: number[], sourceReviewLogId: number): Promise<any> {
     const normalizedOrderIds = Array.from(
       new Set(orderIds.filter((orderId) => Number.isInteger(orderId) && orderId > 0))
     );
@@ -515,16 +503,15 @@ export class SqliteRectificationOrderRepository implements RectificationOrderRep
       return;
     }
 
-    db.update(reportRectificationOrderTable)
-      .set({
-        sourceReviewLogId,
-        updatedAt: new Date().toISOString()
-      })
-      .where(inArray(reportRectificationOrderTable.id, normalizedOrderIds))
-      .run();
+    await db.update(reportRectificationOrderTable)
+            .set({
+              sourceReviewLogId,
+              updatedAt: new Date().toISOString()
+            })
+            .where(inArray(reportRectificationOrderTable.id, normalizedOrderIds));
   }
 
-  updateSyncState(
+  async updateSyncState(
     orderId: number,
     patch: Partial<
       Pick<
@@ -538,27 +525,26 @@ export class SqliteRectificationOrderRepository implements RectificationOrderRep
         | "response_payload"
       >
     >
-  ): void {
+  ): Promise<any> {
     if (!Number.isInteger(orderId) || orderId <= 0) {
       return;
     }
 
-    db.update(reportRectificationOrderTable)
-      .set({
-        huiYunYingOrderId:
-          patch.huiyunying_order_id === undefined ? undefined : patch.huiyunying_order_id ?? null,
-        status: patch.status,
-        ifCorrected: patch.if_corrected === undefined ? undefined : patch.if_corrected ?? null,
-        realCorrectedTime:
-          patch.real_corrected_time === undefined ? undefined : patch.real_corrected_time ?? null,
-        rectificationReplyContent:
-          patch.rectification_reply_content === undefined ? undefined : patch.rectification_reply_content ?? null,
-        lastSyncedAt: patch.last_synced_at === undefined ? undefined : patch.last_synced_at ?? null,
-        responsePayloadJson:
-          patch.response_payload === undefined ? undefined : safeStringify(patch.response_payload, {}),
-        updatedAt: new Date().toISOString()
-      })
-      .where(eq(reportRectificationOrderTable.id, orderId))
-      .run();
+    await db.update(reportRectificationOrderTable)
+            .set({
+              huiYunYingOrderId:
+                patch.huiyunying_order_id === undefined ? undefined : patch.huiyunying_order_id ?? null,
+              status: patch.status,
+              ifCorrected: patch.if_corrected === undefined ? undefined : patch.if_corrected ?? null,
+              realCorrectedTime:
+                patch.real_corrected_time === undefined ? undefined : patch.real_corrected_time ?? null,
+              rectificationReplyContent:
+                patch.rectification_reply_content === undefined ? undefined : patch.rectification_reply_content ?? null,
+              lastSyncedAt: patch.last_synced_at === undefined ? undefined : patch.last_synced_at ?? null,
+              responsePayloadJson:
+                patch.response_payload === undefined ? undefined : safeStringify(patch.response_payload, {}),
+              updatedAt: new Date().toISOString()
+            })
+            .where(eq(reportRectificationOrderTable.id, orderId));
   }
 }

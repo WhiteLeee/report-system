@@ -37,7 +37,7 @@ function parsePositiveInt(value: string | string[] | undefined, fallback: number
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function buildFilters(searchParams: Record<string, string | string[] | undefined>): RectificationOrderFilters {
+function buildFilters(searchParams: Record<string, string | string[] | undefined>): any {
   return {
     keyword: typeof searchParams.keyword === "string" ? searchParams.keyword.trim() : "",
     status: typeof searchParams.status === "string" ? searchParams.status : "",
@@ -47,11 +47,11 @@ function buildFilters(searchParams: Record<string, string | string[] | undefined
   };
 }
 
-function formatRectificationState(order: RectificationOrderRecord): string {
+function formatRectificationState(order: RectificationOrderRecord): any {
   return getRectificationStateLabel(order);
 }
 
-function formatStateTone(order: RectificationOrderRecord): "default" | "secondary" | "outline" {
+function formatStateTone(order: RectificationOrderRecord): any {
   const normalized = normalizeRemoteIfCorrected(order.if_corrected);
   if (normalized === "1" || order.status === "corrected") {
     return "secondary";
@@ -66,12 +66,12 @@ export default async function RectificationsPage({
   searchParams
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("rectification:read", "/rectifications");
   const resolvedSearchParams = await searchParams;
   const filters = buildFilters(resolvedSearchParams);
   const requestContext = buildRequestContext(currentUser);
-  const filteredOrders = rectificationService.listOrders(filters, requestContext);
+  const filteredOrders = await rectificationService.listOrders(filters, requestContext);
   const pageSize = parsePositiveInt(resolvedSearchParams.pageSize, PAGE_SIZE_OPTIONS[0]);
   const totalOrders = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));

@@ -1,23 +1,30 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { randomUUID } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { before, after, test } from "node:test";
+import { Client } from "pg";
+import { resolveTestAdminDbUrl, resolveTestDbUrl, shouldManageIsolatedDatabase } from "./postgres-test-env";
 
 import type { ReactElement } from "react";
+import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const require = createRequire(import.meta.url);
 require.extensions[".css"] = () => ({});
+(globalThis as any).React = React;
 
 const tempRoot = mkdtempSync(join(tmpdir(), "report-review-"));
 const dataDir = join(tempRoot, "data");
-const dbPath = join(dataDir, "report-system.sqlite");
+const isolatedDbName = `report_test_review_${randomUUID().replace(/-/g, "_")}`;
+const dbUrl = resolveTestDbUrl(isolatedDbName);
+const adminDbUrl = resolveTestAdminDbUrl();
 mkdirSync(dataDir, { recursive: true });
 
 process.env.REPORT_SYSTEM_DATA_DIR = dataDir;
-process.env.REPORT_SYSTEM_DB_PATH = dbPath;
+process.env.REPORT_SYSTEM_DB_URL = dbUrl;
 process.env.REPORT_SYSTEM_TENANT_ID = "demo";
 process.env.REPORT_SYSTEM_TENANT_NAME = "示例客户";
 process.env.REPORT_SYSTEM_BRAND_NAME = "示例报告系统";
@@ -34,6 +41,33 @@ let issueRoute: typeof import("../app/api/reports/[reportId]/images/[imageId]/is
 let reviewRoute: typeof import("../app/api/reports/[reportId]/images/[imageId]/review-status/route");
 let reviewLogsRoute: typeof import("../app/api/reports/[reportId]/review-logs/route");
 let rolesSaveRoute: typeof import("../app/admin/roles/save/route");
+
+async function createIsolatedDatabase(): Promise<void> {
+  if (!shouldManageIsolatedDatabase()) {
+    return;
+  }
+  const client = new Client({ connectionString: adminDbUrl });
+  await client.connect();
+  try {
+    await client.query(`create database "${isolatedDbName}"`);
+  } finally {
+    await client.end();
+  }
+}
+
+async function dropIsolatedDatabase(): Promise<void> {
+  if (!shouldManageIsolatedDatabase()) {
+    return;
+  }
+  const client = new Client({ connectionString: adminDbUrl });
+  await client.connect();
+  try {
+    await client.query("select pg_terminate_backend(pid) from pg_stat_activity where datname = $1 and pid <> pg_backend_pid()", [isolatedDbName]);
+    await client.query(`drop database if exists "${isolatedDbName}"`);
+  } finally {
+    await client.end();
+  }
+}
 let authService: typeof import("../backend/auth/auth.module");
 let reportServiceModule: typeof import("../backend/report/report.module");
 let systemSettingsModule: typeof import("../backend/system-settings/system-settings.module");
@@ -141,8 +175,10 @@ const publishPayload = {
   }
 };
 
-before(async () => {
-  await import("../backend/database/migrate");
+before(async (): Promise<any> => {
+  await createIsolatedDatabase();
+  const migrateModule = await import("../backend/database/migrate");
+  await migrateModule.runMigrations();
   const [
     authModule,
     reportModule,
@@ -182,8 +218,8 @@ before(async () => {
   reviewRoute = importedReviewRoute;
   reviewLogsRoute = importedReviewLogsRoute;
   rolesSaveRoute = importedRolesSaveRoute;
-  authService.createAuthService().ensureBootstrap();
-  systemSettingsModule.createSystemSettingsService().saveHuiYunYingApiSettings({
+  await authService.createAuthService().ensureBootstrap();
+  await systemSettingsModule.createSystemSettingsService().saveHuiYunYingApiSettings({
     uri: "https://huiyunying.example.com",
     route: "/route",
     appid: "appid-demo",
@@ -203,14 +239,17 @@ before(async () => {
   });
 });
 
-after(() => {
+after(async (): Promise<any> => {
+  const { closeDatabasePool } = await import("../backend/database/client");
+  await closeDatabasePool();
+  await dropIsolatedDatabase();
   rmSync(tempRoot, { recursive: true, force: true });
 });
 
-test("image review status updates persist and render recent logs", async () => {
+test("image review status updates persist and render recent logs", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
   const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
-  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     fetchCalls.push({ url, init });
     if (url.includes("/sign")) {
@@ -344,10 +383,11 @@ test("image review status updates persist and render recent logs", async () => {
   assert.equal(logsJson.count, 1);
   assert.equal(logsJson.logs[0].operator_name, "系统管理员");
 
+  const reportDetail = await reportServiceModule.createReportService().getReportDetail(reportId);
   const pageJsx = ReportDetailView({
-    currentUser: authService.createAuthService().getSessionUser(sessionCookie.split(";")[0].split("=")[1])!,
+    currentUser: await authService.createAuthService().getSessionUser(sessionCookie.split(";")[0].split("=")[1]),
     filters: { organization: "", storeId: "", reviewStatus: "", semanticState: "", page: 1, pageSize: 30 },
-    report: reportServiceModule.createReportService().getReportDetail(reportId)!,
+    report: reportDetail,
     showCollaboration: true
   });
   const pageHtml = renderToStaticMarkup(pageJsx as ReactElement);
@@ -355,13 +395,13 @@ test("image review status updates persist and render recent logs", async () => {
   assert.ok(pageHtml.includes("系统管理员"));
   assert.ok(pageHtml.includes("结果清单"));
 
-  const rectificationOrders = rectificationModule.createRectificationService().listByResultId(imageId);
+  const rectificationOrders = await rectificationModule.createRectificationService().listByResultId(imageId);
   assert.equal(rectificationOrders.length, 1);
   assert.equal(rectificationOrders[0].huiyunying_order_id, "9001");
   assert.equal(rectificationOrders[0].selected_issues.length, 1);
   assert.equal(rectificationOrders[0].selected_issues[0].title, "货架未摆满");
 
-  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes("/sign")) {
       return new Response("token-123", {
@@ -401,7 +441,7 @@ test("image review status updates persist and render recent logs", async () => {
   }
 });
 
-test("publish rejects unsupported payload_version with 422", async () => {
+test("publish rejects unsupported payload_version with 422", async (): Promise<any> => {
   const publishResp = await publishRoute.POST(
     new Request("http://127.0.0.1:3000/api/reports/publish", {
       method: "POST",
@@ -428,10 +468,10 @@ test("publish rejects unsupported payload_version with 422", async () => {
   assert.deepEqual(publishJson.supported_payload_versions, [2]);
 });
 
-test("review submit sends annotation images for selected issues across scenes", async () => {
+test("review submit sends annotation images for selected issues across scenes", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
   const createBodies: Array<{ description?: string; imageUrls?: string[] }> = [];
-  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes("/sign")) {
       return new Response("token-123", {
@@ -598,10 +638,10 @@ test("review submit sends annotation images for selected issues across scenes", 
   }
 });
 
-test("review submit splits orders when selected issue images exceed ten", async () => {
+test("review submit splits orders when selected issue images exceed ten", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
   const createBodies: Array<{ description?: string; imageUrls?: string[] }> = [];
-  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes("/sign")) {
       return new Response("token-123", {
@@ -725,10 +765,10 @@ test("review submit splits orders when selected issue images exceed ten", async 
   }
 });
 
-test("review submit records partial dispatch failure without losing successful split orders", async () => {
+test("review submit records partial dispatch failure without losing successful split orders", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
   const createBodies: Array<{ description?: string; imageUrls?: string[] }> = [];
-  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes("/sign")) {
       return new Response("token-123", {
@@ -865,7 +905,7 @@ test("review submit records partial dispatch failure without losing successful s
     assert.equal(reviewJson.rectification_orders[1].huiyunying_order_id, null);
     assert.equal(reviewJson.rectification_orders[1].status, "sync_failed");
 
-    const rectificationOrders = rectificationModule.createRectificationService().listByResultId(imageId);
+    const rectificationOrders = await rectificationModule.createRectificationService().listByResultId(imageId);
     assert.equal(rectificationOrders.length, 2);
     assert.equal(rectificationOrders.filter((order) => order.status === "created").length, 1);
     assert.equal(rectificationOrders.filter((order) => order.status === "sync_failed").length, 1);
@@ -875,10 +915,10 @@ test("review submit records partial dispatch failure without losing successful s
   }
 });
 
-test("review submit rejects issue result without selected issues", async () => {
+test("review submit rejects issue result without selected issues", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
   const fetchCalls: Array<string> = [];
-  globalThis.fetch = (async (input: string | URL | Request) => {
+  globalThis.fetch = (async (input: string | URL | Request): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     fetchCalls.push(url);
     throw new Error(`Unexpected fetch url: ${url}`);
@@ -954,10 +994,10 @@ test("review submit rejects issue result without selected issues", async () => {
   }
 });
 
-test("review submit rejects selected issue without any deliverable image", async () => {
+test("review submit rejects selected issue without any deliverable image", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
   const fetchCalls: Array<string> = [];
-  globalThis.fetch = (async (input: string | URL | Request) => {
+  globalThis.fetch = (async (input: string | URL | Request): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     fetchCalls.push(url);
     throw new Error(`Unexpected fetch url: ${url}`);
@@ -1064,10 +1104,10 @@ test("review submit rejects selected issue without any deliverable image", async
   }
 });
 
-test("issue result can be completed locally without creating rectification order", async () => {
+test("issue result can be completed locally without creating rectification order", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
   const fetchCalls: Array<string> = [];
-  globalThis.fetch = (async (input: string | URL | Request) => {
+  globalThis.fetch = (async (input: string | URL | Request): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     fetchCalls.push(url);
     throw new Error(`Unexpected fetch url: ${url}`);
@@ -1149,7 +1189,7 @@ test("issue result can be completed locally without creating rectification order
     assert.equal(reviewJson.rectification_orders.length, 0);
     assert.equal(reviewJson.recent_log.review_action, "complete_only");
     assert.equal(reviewJson.recent_log.review_disposition, "false_positive");
-    assert.equal(rectificationModule.createRectificationService().listByResultId(imageId).length, 0);
+    assert.equal((await rectificationModule.createRectificationService().listByResultId(imageId)).length, 0);
     assert.equal(fetchCalls.length, 0);
 
     const updatedDetailResp = await reportRoute.GET(
@@ -1190,9 +1230,9 @@ test("issue result can be completed locally without creating rectification order
   }
 });
 
-test("review submit records huiyunying business failure as failed rectification order", async () => {
+test("review submit records huiyunying business failure as failed rectification order", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
+  globalThis.fetch = (async (input: string | URL | Request): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes("/sign")) {
       return new Response("token-123", {
@@ -1287,7 +1327,7 @@ test("review submit records huiyunying business failure as failed rectification 
     assert.equal(reviewJson.rectification_orders.length, 1);
     assert.equal(reviewJson.rectification_orders[0].huiyunying_order_id, null);
     assert.equal(reviewJson.rectification_orders[0].status, "sync_failed");
-    const rectificationOrders = rectificationModule.createRectificationService().listByResultId(imageId);
+    const rectificationOrders = await rectificationModule.createRectificationService().listByResultId(imageId);
     assert.equal(rectificationOrders.length, 1);
     assert.equal(rectificationOrders[0].status, "sync_failed");
     assert.match(JSON.stringify(rectificationOrders[0].response_payload), /链接不是一个有效的图片类型的链接/);
@@ -1296,10 +1336,10 @@ test("review submit records huiyunying business failure as failed rectification 
   }
 });
 
-test("manual issue can be added to an inconclusive result and dispatched as rectification", async () => {
+test("manual issue can be added to an inconclusive result and dispatched as rectification", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
   const createBodies: Array<{ description?: string; imageUrls?: string[] }> = [];
-  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes("/sign")) {
       return new Response("token-123", {
@@ -1454,10 +1494,10 @@ test("manual issue can be added to an inconclusive result and dispatched as rect
   }
 });
 
-test("inconclusive result completes locally without creating rectification order", async () => {
+test("inconclusive result completes locally without creating rectification order", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
   const fetchCalls: Array<string> = [];
-  globalThis.fetch = (async (input: string | URL | Request) => {
+  globalThis.fetch = (async (input: string | URL | Request): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     fetchCalls.push(url);
     throw new Error(`Unexpected fetch url: ${url}`);
@@ -1561,16 +1601,16 @@ test("inconclusive result completes locally without creating rectification order
     assert.equal(reviewJson.should_corrected, null);
     assert.equal(reviewJson.rectification_orders.length, 0);
     assert.equal(fetchCalls.length, 0);
-    assert.equal(rectificationModule.createRectificationService().listByResultId(imageId).length, 0);
+    assert.equal((await rectificationModule.createRectificationService().listByResultId(imageId)).length, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("inspection failed result also completes locally without creating rectification order", async () => {
+test("inspection failed result also completes locally without creating rectification order", async (): Promise<any> => {
   const originalFetch = globalThis.fetch;
   const fetchCalls: Array<string> = [];
-  globalThis.fetch = (async (input: string | URL | Request) => {
+  globalThis.fetch = (async (input: string | URL | Request): Promise<any> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     fetchCalls.push(url);
     throw new Error(`Unexpected fetch url: ${url}`);
@@ -1676,15 +1716,15 @@ test("inspection failed result also completes locally without creating rectifica
     assert.equal(reviewJson.should_corrected, null);
     assert.equal(reviewJson.rectification_orders.length, 0);
     assert.equal(fetchCalls.length, 0);
-    assert.equal(rectificationModule.createRectificationService().listByResultId(imageId).length, 0);
+    assert.equal((await rectificationModule.createRectificationService().listByResultId(imageId)).length, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("roles save route updates viewer/reviewer permissions for admin", async () => {
+test("roles save route updates viewer/reviewer permissions for admin", async (): Promise<any> => {
   const auth = authService.createAuthService();
-  const matrixBefore = auth.listRolePermissionMatrix();
+  const matrixBefore = await auth.listRolePermissionMatrix();
   const viewerBefore = matrixBefore.find((item) => item.roleCode === "viewer")?.permissionCodes || [];
   const reviewerBefore = matrixBefore.find((item) => item.roleCode === "reviewer")?.permissionCodes || [];
 
@@ -1722,22 +1762,22 @@ test("roles save route updates viewer/reviewer permissions for admin", async () 
     assert.equal(saveResp.status, 303);
     assert.equal(saveResp.headers.get("location"), "http://127.0.0.1:3000/admin/roles?saved=1");
 
-    const matrixAfter = auth.listRolePermissionMatrix();
+    const matrixAfter = await auth.listRolePermissionMatrix();
     const viewerAfter = matrixAfter.find((item) => item.roleCode === "viewer")?.permissionCodes || [];
     const reviewerAfter = matrixAfter.find((item) => item.roleCode === "reviewer")?.permissionCodes || [];
 
     assert.deepEqual(viewerAfter, ["report:read", "rectification:read"]);
     assert.deepEqual(reviewerAfter, ["report:read", "review:write", "analytics:read", "role:write"]);
   } finally {
-    auth.replaceRolePermissions("viewer", viewerBefore);
-    auth.replaceRolePermissions("reviewer", reviewerBefore);
+    await auth.replaceRolePermissions("viewer", viewerBefore);
+    await auth.replaceRolePermissions("reviewer", reviewerBefore);
   }
 });
 
-test("roles save route rejects non-admin role write", async () => {
+test("roles save route rejects non-admin role write", async (): Promise<any> => {
   const auth = authService.createAuthService();
   const username = `viewer_scope_${Date.now()}`;
-  auth.createUser({
+  await auth.createUser({
     username,
     displayName: "仅查看用户",
     password: "ViewerPass123!Aa",
@@ -1774,11 +1814,11 @@ test("roles save route rejects non-admin role write", async () => {
   assert.equal(saveResp.status, 403);
 });
 
-test("service rejects creating user with admin role", () => {
+test("service rejects creating user with admin role", async (): Promise<any> => {
   const auth = authService.createAuthService();
-  assert.throws(
-    () =>
-      auth.createUser({
+  await assert.rejects(
+    async () =>
+      await auth.createUser({
         username: `admin_like_${Date.now()}`,
         displayName: "非法管理员",
         password: "StrongPass1234!Aa",
@@ -1791,9 +1831,9 @@ test("service rejects creating user with admin role", () => {
   );
 });
 
-test("service rejects assigning admin role to non-bootstrap user", () => {
+test("service rejects assigning admin role to non-bootstrap user", async (): Promise<any> => {
   const auth = authService.createAuthService();
-  const created = auth.createUser({
+  const created = await auth.createUser({
     username: `manage_case_${Date.now()}`,
     displayName: "业务管理员用户",
     password: "StrongPass1234!Aa",
@@ -1803,14 +1843,14 @@ test("service rejects assigning admin role to non-bootstrap user", () => {
     storeScopeIds: []
   });
 
-  assert.throws(() => auth.updateUserRole(created.id, "admin"), /Admin role is reserved/);
+  await assert.rejects(async () => await auth.updateUserRole(created.id, "admin"), /Admin role is reserved/);
 });
 
-test("service profile update is atomic when password policy validation fails", () => {
+test("service profile update is atomic when password policy validation fails", async (): Promise<any> => {
   const auth = authService.createAuthService();
   const systemSettingsService = systemSettingsModule.createSystemSettingsService();
-  const previousPolicy = systemSettingsService.getAuthSecurityPolicy();
-  systemSettingsService.saveAuthSecurityPolicy({
+  const previousPolicy = await systemSettingsService.getAuthSecurityPolicy();
+  await systemSettingsService.saveAuthSecurityPolicy({
     ...previousPolicy,
     passwordMinLength: 16,
     requireUppercase: true,
@@ -1820,7 +1860,7 @@ test("service profile update is atomic when password policy validation fails", (
   });
 
   try {
-    const created = auth.createUser({
+    const created = await auth.createUser({
       username: `atomic_case_${Date.now()}`,
       displayName: "原子更新测试用户",
       password: "AtomicPass1234!Aa",
@@ -1829,13 +1869,13 @@ test("service profile update is atomic when password policy validation fails", (
       organizationScopeIds: [],
       storeScopeIds: []
     });
-    const before = auth.listUsers().find((item) => item.id === created.id);
+    const before = (await auth.listUsers()).find((item): any => item.id === created.id);
     assert.ok(before);
     assert.equal(before?.status, "active");
 
-    assert.throws(
-      () =>
-        auth.updateUserProfile({
+    await assert.rejects(
+      async () =>
+        await auth.updateUserProfile({
           userId: created.id,
           status: "disabled",
           password: "short"
@@ -1843,25 +1883,25 @@ test("service profile update is atomic when password policy validation fails", (
       /密码|password|Password|至少|minimum/
     );
 
-    const after = auth.listUsers().find((item) => item.id === created.id);
+    const after = (await auth.listUsers()).find((item): any => item.id === created.id);
     assert.ok(after);
     assert.equal(after?.status, "active");
   } finally {
-    systemSettingsService.saveAuthSecurityPolicy(previousPolicy);
+    await systemSettingsService.saveAuthSecurityPolicy(previousPolicy);
   }
 });
 
-test("login applies lock policy after max failures", async () => {
+test("login applies lock policy after max failures", async (): Promise<any> => {
   const systemSettingsService = systemSettingsModule.createSystemSettingsService();
-  const previousPolicy = systemSettingsService.getAuthSecurityPolicy();
-  systemSettingsService.saveAuthSecurityPolicy({
+  const previousPolicy = await systemSettingsService.getAuthSecurityPolicy();
+  await systemSettingsService.saveAuthSecurityPolicy({
     ...previousPolicy,
     loginMaxFailures: 2,
     loginLockDurationMs: 600000
   });
 
   try {
-    function readLoginError(location: string): string {
+    function readLoginError(location: string): any {
       const url = new URL(location, "http://127.0.0.1:3000");
       const errorParam = url.searchParams.get("error") || "";
       return decodeURIComponent(errorParam);
@@ -1913,14 +1953,14 @@ test("login applies lock policy after max failures", async () => {
     const lockedLocation = validPasswordWhileLockedResp.headers.get("location") || "";
     assert.ok(readLoginError(lockedLocation).includes("账号已锁定"));
   } finally {
-    systemSettingsService.saveAuthSecurityPolicy(previousPolicy);
+    await systemSettingsService.saveAuthSecurityPolicy(previousPolicy);
   }
 });
 
-test("password policy is enforced for create and reset password", () => {
+test("password policy is enforced for create and reset password", async (): Promise<any> => {
   const systemSettingsService = systemSettingsModule.createSystemSettingsService();
-  const previousPolicy = systemSettingsService.getAuthSecurityPolicy();
-  systemSettingsService.saveAuthSecurityPolicy({
+  const previousPolicy = await systemSettingsService.getAuthSecurityPolicy();
+  await systemSettingsService.saveAuthSecurityPolicy({
     ...previousPolicy,
     passwordMinLength: 16,
     requireUppercase: true,
@@ -1931,9 +1971,9 @@ test("password policy is enforced for create and reset password", () => {
 
   const auth = authService.createAuthService();
   try {
-    assert.throws(
-      () =>
-        auth.createUser({
+    await assert.rejects(
+      async () =>
+        await auth.createUser({
           username: "policy-user-weak",
           displayName: "策略用户弱密码",
           password: "12345678",
@@ -1945,7 +1985,7 @@ test("password policy is enforced for create and reset password", () => {
       /密码不符合安全策略/
     );
 
-    const createdUser = auth.createUser({
+    const createdUser = await auth.createUser({
       username: "policy-user-strong",
       displayName: "策略用户强密码",
       password: "StrongPass1234!Aa",
@@ -1956,8 +1996,8 @@ test("password policy is enforced for create and reset password", () => {
     });
     assert.ok(createdUser.id > 0);
 
-    assert.throws(() => auth.updateUserPassword(createdUser.id, "weak"), /密码不符合安全策略/);
+    await assert.rejects(async () => await auth.updateUserPassword(createdUser.id, "weak"), /密码不符合安全策略/);
   } finally {
-    systemSettingsService.saveAuthSecurityPolicy(previousPolicy);
+    await systemSettingsService.saveAuthSecurityPolicy(previousPolicy);
   }
 });

@@ -6,17 +6,17 @@ import { SESSION_COOKIE_NAME } from "@/backend/auth/session";
 
 const authService = createAuthService();
 
-function readString(formData: FormData, key: string): string {
+function readString(formData: FormData, key: string): any {
   return String(formData.get(key) || "").trim();
 }
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: Request): Promise<any> {
   const formData = await request.formData().catch(() => new FormData());
   const username = readString(formData, "username");
   const password = readString(formData, "password");
   const nextPath = readString(formData, "next") || "/reports";
 
-  const result = authService.authenticate(username, password);
+  const result = await authService.authenticate(username, password);
   if (!result.ok) {
     const loginUrl = buildRequestUrl(request, "/login");
     if (result.reason === "locked") {

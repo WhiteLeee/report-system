@@ -432,7 +432,7 @@ backend/
   analytics/
     analytics.types.ts
     analytics.repository.ts
-    sqlite-analytics.repository.ts
+    pg-analytics.repository.ts
     analytics.service.ts
     analytics.module.ts
 ```

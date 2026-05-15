@@ -4,7 +4,7 @@ import { normalizeAnalyticsFilters, type AnalyticsFilters } from "@/backend/anal
 
 const analyticsService = createAnalyticsService();
 
-function buildFilters(searchParams: URLSearchParams): AnalyticsFilters {
+function buildFilters(searchParams: URLSearchParams): any {
   return normalizeAnalyticsFilters({
     startDate: searchParams.get("startDate") || "",
     endDate: searchParams.get("endDate") || "",
@@ -18,7 +18,7 @@ function buildFilters(searchParams: URLSearchParams): AnalyticsFilters {
   });
 }
 
-function escapeCsvValue(value: unknown): string {
+function escapeCsvValue(value: unknown): any {
   const text = String(value ?? "");
   if (/[",\n]/.test(text)) {
     return `"${text.replace(/"/g, "\"\"")}"`;
@@ -26,7 +26,7 @@ function escapeCsvValue(value: unknown): string {
   return text;
 }
 
-function buildCsv(dashboard: ReturnType<typeof analyticsService.getDashboard>): string {
+function buildCsv(dashboard: ReturnType<typeof analyticsService.getDashboard>): any {
   const rows: string[] = [];
 
   rows.push("section,key,value");
@@ -308,15 +308,15 @@ function buildCsv(dashboard: ReturnType<typeof analyticsService.getDashboard>): 
   return rows.join("\n");
 }
 
-export async function GET(request: Request): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+export async function GET(request: Request): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "analytics:read")) {
     return Response.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 
   const url = new URL(request.url);
   const filters = buildFilters(url.searchParams);
-  const dashboard = analyticsService.getDashboard(filters, buildRequestContext(currentUser), 20);
+  const dashboard = await analyticsService.getDashboard(filters, buildRequestContext(currentUser), 20);
   const csv = buildCsv(dashboard);
   const fileName = `analytics-export-${new Date().toISOString().slice(0, 10)}.csv`;
 

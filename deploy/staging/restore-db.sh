@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ "${1:-}" = "" ]; then
-  echo "Usage: $0 /absolute/path/to/backup.sqlite3" >&2
+  echo "Usage: $0 /absolute/path/to/backup.dump" >&2
   exit 1
 fi
 

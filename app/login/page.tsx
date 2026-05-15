@@ -13,7 +13,7 @@ export default async function LoginPage({
   searchParams
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await getCurrentSessionUser();
   if (currentUser) {
     redirect("/reports");
@@ -22,8 +22,8 @@ export default async function LoginPage({
   const resolvedSearchParams = await searchParams;
   const error = typeof resolvedSearchParams.error === "string" ? decodeURIComponent(resolvedSearchParams.error) : "";
   const nextPath = typeof resolvedSearchParams.next === "string" ? resolvedSearchParams.next : "/reports";
-  const securityPolicy = systemSettingsService.getAuthSecurityPolicy();
-  const branding = systemSettingsService.getEnterpriseBrandingSettings();
+  const securityPolicy = await systemSettingsService.getAuthSecurityPolicy();
+  const branding = await systemSettingsService.getEnterpriseBrandingSettings();
 
   return (
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">

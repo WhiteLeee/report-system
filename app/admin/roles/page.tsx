@@ -32,7 +32,7 @@ const permissionMeta: Record<(typeof permissionCodes)[number], { label: string; 
   "system:settings:write": { label: "设置管理", description: "可修改系统设置。" }
 };
 
-function normalizeQueryValue(value: string | string[] | undefined): string {
+function normalizeQueryValue(value: string | string[] | undefined): any {
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -40,11 +40,13 @@ export default async function AdminRolesPage({
   searchParams
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("role:read", "/admin/roles");
   const isAdmin = currentUser.roles.includes("admin");
   const canWriteRoles = currentUser.permissions.includes("role:write");
-  const matrix = authService.listRolePermissionMatrix().filter((roleItem) => (isAdmin ? true : roleItem.roleCode !== "admin"));
+  const matrix = (await authService.listRolePermissionMatrix()).filter((roleItem) =>
+    isAdmin ? true : roleItem.roleCode !== "admin"
+  );
   const resolvedSearchParams = await searchParams;
   const saved = normalizeQueryValue(resolvedSearchParams.saved) === "1";
 

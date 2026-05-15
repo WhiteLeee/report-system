@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, gte, inArray, like, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 
 import type { RequestContext } from "@/backend/auth/request-context";
 import { db } from "@/backend/database/client";
@@ -41,11 +41,11 @@ import type {
 import type { JsonValue } from "@/backend/shared/json";
 import { canAccessEnterprise, normalizeScopeIds, resolveScopedStoreIds } from "@/backend/shared/request-scope";
 
-function safeStringify(value: unknown, fallback: unknown = {}): string {
+function safeStringify(value: unknown, fallback: unknown = {}): any {
   return JSON.stringify(value ?? fallback);
 }
 
-function safeParse(json: string, fallback: JsonValue = {}): JsonValue {
+function safeParse(json: string, fallback: JsonValue = {}): any {
   try {
     return JSON.parse(json) as JsonValue;
   } catch {
@@ -53,7 +53,7 @@ function safeParse(json: string, fallback: JsonValue = {}): JsonValue {
   }
 }
 
-function readMetadataString(metadata: JsonValue, key: string): string {
+function readMetadataString(metadata: JsonValue, key: string): any {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return "";
   }
@@ -61,7 +61,7 @@ function readMetadataString(metadata: JsonValue, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function buildProgressSummary(total: number, completed: number): ReviewProgressSummary {
+function buildProgressSummary(total: number, completed: number): any {
   const normalizedTotal = Math.max(0, total);
   const normalizedCompleted = Math.max(0, Math.min(completed, normalizedTotal));
   const pending = Math.max(0, normalizedTotal - normalizedCompleted);
@@ -82,11 +82,11 @@ function buildProgressSummary(total: number, completed: number): ReviewProgressS
   };
 }
 
-function normalizeResultReviewState(value: unknown): ResultReviewState {
+function normalizeResultReviewState(value: unknown): any {
   return value === "completed" || value === "reviewed" ? "completed" : "pending";
 }
 
-function toReportSummary(row: typeof reportTable.$inferSelect): ReportSummary {
+function toReportSummary(row: typeof reportTable.$inferSelect): any {
   const extensions = safeParse(row.extensionsJson, {}) as Record<string, JsonValue>;
   return {
     id: row.id,
@@ -119,7 +119,7 @@ function toReportSummary(row: typeof reportTable.$inferSelect): ReportSummary {
   };
 }
 
-function toReportStore(row: typeof reportStoreTable.$inferSelect): ReportStore {
+function toReportStore(row: typeof reportStoreTable.$inferSelect): any {
   return {
     id: row.id,
     report_id: row.reportId,
@@ -140,7 +140,7 @@ function toReportStore(row: typeof reportStoreTable.$inferSelect): ReportStore {
   };
 }
 
-function toReportResult(row: typeof reportImageTable.$inferSelect): ReportResult {
+function toReportResult(row: typeof reportImageTable.$inferSelect): any {
   return {
     id: row.id,
     report_id: row.reportId,
@@ -166,7 +166,7 @@ function toReportResult(row: typeof reportImageTable.$inferSelect): ReportResult
   };
 }
 
-function toReportIssue(row: typeof reportIssueTable.$inferSelect): ReportIssue {
+function toReportIssue(row: typeof reportIssueTable.$inferSelect): any {
   return {
     id: row.id,
     report_id: row.reportId,
@@ -187,7 +187,7 @@ function toReportIssue(row: typeof reportIssueTable.$inferSelect): ReportIssue {
   };
 }
 
-function toReportInspection(row: typeof reportInspectionTable.$inferSelect): ReportInspection {
+function toReportInspection(row: typeof reportInspectionTable.$inferSelect): any {
   return {
     id: row.id,
     report_id: row.reportId,
@@ -206,7 +206,7 @@ function toReportInspection(row: typeof reportInspectionTable.$inferSelect): Rep
   };
 }
 
-function toReportReviewLog(row: typeof reportReviewLogTable.$inferSelect): ReportReviewLog {
+function toReportReviewLog(row: typeof reportReviewLogTable.$inferSelect): any {
   return {
     id: row.id,
     report_id: row.reportId,
@@ -224,7 +224,7 @@ function toReportReviewLog(row: typeof reportReviewLogTable.$inferSelect): Repor
   };
 }
 
-function normalizeSelectedIssues(values: ReviewSelectedIssue[] | undefined): ReviewSelectedIssue[] {
+function normalizeSelectedIssues(values: ReviewSelectedIssue[] | undefined): any {
   return Array.from(
     new Map(
       (values || [])
@@ -238,14 +238,14 @@ function normalizeSelectedIssues(values: ReviewSelectedIssue[] | undefined): Rev
   );
 }
 
-function normalizeReviewAction(value: ReviewAction | undefined, reviewState: ResultReviewState): ReviewAction {
+function normalizeReviewAction(value: ReviewAction | undefined, reviewState: ResultReviewState): any {
   if (value === "create_rectification" || value === "complete_only" || value === "reopen") {
     return value;
   }
   return reviewState === "completed" ? "complete_only" : "reopen";
 }
 
-function normalizeReviewDisposition(value: ReviewDisposition | undefined): ReviewDisposition {
+function normalizeReviewDisposition(value: ReviewDisposition | undefined): any {
   if (
     value === "rectification_required" ||
     value === "no_rectification" ||
@@ -258,12 +258,12 @@ function normalizeReviewDisposition(value: ReviewDisposition | undefined): Revie
   return "";
 }
 
-function isAutoCompletedReviewPayload(json: string): boolean {
+function isAutoCompletedReviewPayload(json: string): any {
   const payload = safeParse(json, {});
   return Boolean(payload && typeof payload === "object" && !Array.isArray(payload) && (payload as Record<string, unknown>).auto_completed === true);
 }
 
-function resolveResultOriginalImageUrl(result: typeof reportImageTable.$inferSelect): string {
+function resolveResultOriginalImageUrl(result: typeof reportImageTable.$inferSelect): any {
   const metadata = safeParse(result.metadataJson, {});
   return readMetadataString(metadata, "preview_url") ||
     readMetadataString(metadata, "display_url") ||
@@ -272,42 +272,42 @@ function resolveResultOriginalImageUrl(result: typeof reportImageTable.$inferSel
     "";
 }
 
-function filterStoresByScope(stores: ReportStore[], scopedStoreIds: string[] | null): ReportStore[] {
+function filterStoresByScope(stores: ReportStore[], scopedStoreIds: string[] | null): any {
   if (!scopedStoreIds) {
     return stores;
   }
   return stores.filter((store) => scopedStoreIds.includes(store.store_id));
 }
 
-function filterResultsByScope(results: ReportResult[], scopedStoreIds: string[] | null): ReportResult[] {
+function filterResultsByScope(results: ReportResult[], scopedStoreIds: string[] | null): any {
   if (!scopedStoreIds) {
     return results;
   }
   return results.filter((result) => result.store_id && scopedStoreIds.includes(result.store_id));
 }
 
-function filterIssuesByScope(issues: ReportIssue[], scopedStoreIds: string[] | null): ReportIssue[] {
+function filterIssuesByScope(issues: ReportIssue[], scopedStoreIds: string[] | null): any {
   if (!scopedStoreIds) {
     return issues;
   }
   return issues.filter((issue) => issue.store_id && scopedStoreIds.includes(issue.store_id));
 }
 
-function filterLogsByScope(logs: ReportReviewLog[], scopedStoreIds: string[] | null): ReportReviewLog[] {
+function filterLogsByScope(logs: ReportReviewLog[], scopedStoreIds: string[] | null): any {
   if (!scopedStoreIds) {
     return logs;
   }
   return logs.filter((log) => log.store_id && scopedStoreIds.includes(log.store_id));
 }
 
-function filterInspectionsByScope(inspections: ReportInspection[], scopedStoreIds: string[] | null): ReportInspection[] {
+function filterInspectionsByScope(inspections: ReportInspection[], scopedStoreIds: string[] | null): any {
   if (!scopedStoreIds) {
     return inspections;
   }
   return inspections.filter((inspection) => inspection.store_id && scopedStoreIds.includes(inspection.store_id));
 }
 
-function summarizeStores(stores: ReportStore[]): Pick<ReportSummary, "completed_store_count" | "pending_store_count" | "in_progress_store_count"> {
+function summarizeStores(stores: ReportStore[]): any {
   const completedStoreCount = stores.filter((store) => store.progress_state === "completed").length;
   const inProgressStoreCount = stores.filter((store) => store.progress_state === "in_progress").length;
   const pendingStoreCount = stores.length - completedStoreCount - inProgressStoreCount;
@@ -318,20 +318,19 @@ function summarizeStores(stores: ReportStore[]): Pick<ReportSummary, "completed_
   };
 }
 
-export class SqliteReportRepository implements ReportRepository {
-  publishReport(payload: ReportPublishPayload, _context: RequestContext = {}): PublishReceipt {
+export class PgReportRepository implements ReportRepository {
+  async publishReport(payload: ReportPublishPayload, _context: RequestContext = {}): Promise<any> {
     const receivedAt = new Date().toISOString();
     const normalized = normalizePublishedReport(payload);
 
-    const existingByPublishId = db
-      .select({
-        id: reportTable.id,
-        publishId: reportTable.publishId,
-        reportVersion: reportTable.reportVersion
-      })
-      .from(reportTable)
-      .where(eq(reportTable.publishId, normalized.publishId))
-      .get();
+    const existingByPublishId = (await db
+          .select({
+            id: reportTable.id,
+            publishId: reportTable.publishId,
+            reportVersion: reportTable.reportVersion
+          })
+          .from(reportTable)
+          .where(eq(reportTable.publishId, normalized.publishId)))[0];
 
     if (existingByPublishId) {
       return {
@@ -344,21 +343,20 @@ export class SqliteReportRepository implements ReportRepository {
       };
     }
 
-    const existingByVersion = db
-      .select({
-        id: reportTable.id,
-        publishId: reportTable.publishId,
-        reportVersion: reportTable.reportVersion
-      })
-      .from(reportTable)
-      .where(
-        and(
-          eq(reportTable.sourceEnterpriseId, normalized.sourceEnterpriseId),
-          eq(reportTable.reportType, normalized.reportType),
-          eq(reportTable.reportVersion, normalized.reportVersion)
-        )
-      )
-      .get();
+    const existingByVersion = (await db
+          .select({
+            id: reportTable.id,
+            publishId: reportTable.publishId,
+            reportVersion: reportTable.reportVersion
+          })
+          .from(reportTable)
+          .where(
+            and(
+              eq(reportTable.sourceEnterpriseId, normalized.sourceEnterpriseId),
+              eq(reportTable.reportType, normalized.reportType),
+              eq(reportTable.reportVersion, normalized.reportVersion)
+            )
+          ))[0];
 
     if (existingByVersion) {
       return {
@@ -371,53 +369,51 @@ export class SqliteReportRepository implements ReportRepository {
       };
     }
 
-    const reportId = db.transaction((tx) => {
-      const inserted = tx
-        .insert(reportTable)
-        .values({
-          publishId: normalized.publishId,
-          sourceSystem: normalized.sourceSystem,
-          sourceEnterpriseId: normalized.sourceEnterpriseId,
-          enterpriseName: normalized.enterpriseName,
-          reportType: normalized.reportType,
-          reportVersion: normalized.reportVersion,
-          progressState: normalized.progress_state,
-          periodStart: normalized.periodStart,
-          periodEnd: normalized.periodEnd,
-          operatorName: normalized.operatorName,
-          storeCount: normalized.storeCount,
-          imageCount: normalized.imageCount,
-          issueCount: normalized.issueCount,
-          completedStoreCount: normalized.completedStoreCount,
-          pendingStoreCount: normalized.pendingStoreCount,
-          inProgressStoreCount: normalized.inProgressStoreCount,
-          totalResultCount: normalized.total_result_count,
-          completedResultCount: normalized.completed_result_count,
-          pendingResultCount: normalized.pending_result_count,
-          progressPercent: normalized.progress_percent,
-          summaryMetricsJson: safeStringify(normalized.summaryMetrics),
-          stateSnapshotJson: safeStringify(normalized.stateSnapshot),
-          extensionsJson: safeStringify(normalized.extensions),
-          publishedAt: normalized.publishedAt
-        })
-        .returning({ id: reportTable.id })
-        .get();
+    const reportId = await db.transaction(async (tx): Promise<any> => {
+      const inserted = (await tx
+              .insert(reportTable)
+              .values({
+                publishId: normalized.publishId,
+                sourceSystem: normalized.sourceSystem,
+                sourceEnterpriseId: normalized.sourceEnterpriseId,
+                enterpriseName: normalized.enterpriseName,
+                reportType: normalized.reportType,
+                reportVersion: normalized.reportVersion,
+                progressState: normalized.progress_state,
+                periodStart: normalized.periodStart,
+                periodEnd: normalized.periodEnd,
+                operatorName: normalized.operatorName,
+                storeCount: normalized.storeCount,
+                imageCount: normalized.imageCount,
+                issueCount: normalized.issueCount,
+                completedStoreCount: normalized.completedStoreCount,
+                pendingStoreCount: normalized.pendingStoreCount,
+                inProgressStoreCount: normalized.inProgressStoreCount,
+                totalResultCount: normalized.total_result_count,
+                completedResultCount: normalized.completed_result_count,
+                pendingResultCount: normalized.pending_result_count,
+                progressPercent: normalized.progress_percent,
+                summaryMetricsJson: safeStringify(normalized.summaryMetrics),
+                stateSnapshotJson: safeStringify(normalized.stateSnapshot),
+                extensionsJson: safeStringify(normalized.extensions),
+                publishedAt: normalized.publishedAt
+              })
+              .returning({ id: reportTable.id }))[0];
 
-      tx
-        .insert(reportSourceSnapshotTable)
-        .values({
-          reportId: inserted.id,
-          sourceSystem: normalized.sourceSystem,
-          payloadVersion: normalized.payloadVersion,
-          payloadHash: normalized.payloadHash,
-          payloadJson: safeStringify(normalized.rawPayload),
-          publishedAt: normalized.publishedAt,
-          receivedAt
-        })
-        .run();
+      await tx
+                .insert(reportSourceSnapshotTable)
+                .values({
+                  reportId: inserted.id,
+                  sourceSystem: normalized.sourceSystem,
+                  payloadVersion: normalized.payloadVersion,
+                  payloadHash: normalized.payloadHash,
+                  payloadJson: safeStringify(normalized.rawPayload),
+                  publishedAt: normalized.publishedAt,
+                  receivedAt
+                });
 
-      normalized.stores.forEach((store, index) => {
-        tx
+      for (const [index, store] of normalized.stores.entries()) {
+        await tx
           .insert(reportStoreTable)
           .values({
             reportId: inserted.id,
@@ -434,13 +430,12 @@ export class SqliteReportRepository implements ReportRepository {
             metadataJson: safeStringify(store.metadata),
             stateSnapshotJson: safeStringify(store.state_snapshot),
             displayOrder: index
-          })
-          .run();
-      });
+          });
+      }
 
       const resultMap = new Map<string, number>();
-      normalized.images.forEach((image, index) => {
-        const insertedResult = tx
+      for (const [index, image] of normalized.images.entries()) {
+        const insertedResult = (await tx
           .insert(reportImageTable)
           .values({
             reportId: inserted.id,
@@ -461,8 +456,7 @@ export class SqliteReportRepository implements ReportRepository {
             metadataJson: safeStringify(image.metadata),
             displayOrder: index
           })
-          .returning({ id: reportImageTable.id })
-          .get();
+          .returning({ id: reportImageTable.id }))[0];
 
         const captureId = readMetadataString(image.metadata, "capture_id");
         const imageExternalId = readMetadataString(image.metadata, "image_id");
@@ -472,14 +466,14 @@ export class SqliteReportRepository implements ReportRepository {
         if (imageExternalId) {
           resultMap.set(`image:${imageExternalId}`, insertedResult.id);
         }
-      });
+      }
 
-      normalized.issues.forEach((issue, index) => {
+      for (const [index, issue] of normalized.issues.entries()) {
         const captureId = readMetadataString(issue.metadata, "capture_id");
         const imageExternalId = readMetadataString(issue.metadata, "image_id");
         const resultId = resultMap.get(`capture:${captureId}`) ?? resultMap.get(`image:${imageExternalId}`) ?? null;
 
-        tx
+        await tx
           .insert(reportIssueTable)
           .values({
             reportId: inserted.id,
@@ -496,16 +490,15 @@ export class SqliteReportRepository implements ReportRepository {
             reviewState: issue.review_state,
             metadataJson: safeStringify(issue.metadata),
             displayOrder: index
-          })
-          .run();
-      });
+          });
+      }
 
-      normalized.inspections.forEach((inspection, index) => {
+      for (const [index, inspection] of normalized.inspections.entries()) {
         const captureId = readMetadataString(inspection.metadata, "capture_id");
         const imageExternalId = readMetadataString(inspection.metadata, "image_id");
         const resultId = resultMap.get(`capture:${captureId}`) ?? resultMap.get(`image:${imageExternalId}`) ?? null;
 
-        tx
+        await tx
           .insert(reportInspectionTable)
           .values({
             reportId: inserted.id,
@@ -520,9 +513,8 @@ export class SqliteReportRepository implements ReportRepository {
             errorMessage: inspection.error_message ?? null,
             metadataJson: safeStringify(inspection.metadata),
             displayOrder: index
-          })
-          .run();
-      });
+          });
+      }
 
       return inserted.id;
     });
@@ -537,17 +529,16 @@ export class SqliteReportRepository implements ReportRepository {
     };
   }
 
-  getPublishStatus(publishId: string, _context: RequestContext = {}): PublishStatusReceipt {
+  async getPublishStatus(publishId: string, _context: RequestContext = {}): Promise<any> {
     const receivedAt = new Date().toISOString();
-    const row = db
-      .select({
-        id: reportTable.id,
-        publishId: reportTable.publishId,
-        reportVersion: reportTable.reportVersion
-      })
-      .from(reportTable)
-      .where(eq(reportTable.publishId, publishId))
-      .get();
+    const row = (await db
+          .select({
+            id: reportTable.id,
+            publishId: reportTable.publishId,
+            reportVersion: reportTable.reportVersion
+          })
+          .from(reportTable)
+          .where(eq(reportTable.publishId, publishId)))[0];
 
     if (!row) {
       return {
@@ -570,18 +561,18 @@ export class SqliteReportRepository implements ReportRepository {
     };
   }
 
-  listReports(filters: ReportFilters = {}, context: RequestContext = {}): ReportSummary[] {
+  async listReports(filters: ReportFilters = {}, context: RequestContext = {}): Promise<any> {
     const whereClauses = [];
     if (filters.enterprise) {
       whereClauses.push(
         or(
-          like(reportTable.enterpriseName, `%${filters.enterprise}%`),
-          like(reportTable.sourceEnterpriseId, `%${filters.enterprise}%`)
+          ilike(reportTable.enterpriseName, `%${filters.enterprise}%`),
+          ilike(reportTable.sourceEnterpriseId, `%${filters.enterprise}%`)
         )
       );
     }
     if (filters.publishId) {
-      whereClauses.push(like(reportTable.publishId, `%${filters.publishId}%`));
+      whereClauses.push(ilike(reportTable.publishId, `%${filters.publishId}%`));
     }
     if (filters.reportType) {
       whereClauses.push(eq(reportTable.reportType, filters.reportType));
@@ -598,16 +589,15 @@ export class SqliteReportRepository implements ReportRepository {
 
     const whereCondition = whereClauses.length > 0 ? and(...whereClauses) : undefined;
 
-    const summaries = db
-      .select()
-      .from(reportTable)
-      .where(whereCondition)
-      .orderBy(desc(reportTable.publishedAt), desc(reportTable.id))
-      .all()
+    const summaries = (await db
+          .select()
+          .from(reportTable)
+          .where(whereCondition)
+          .orderBy(desc(reportTable.publishedAt), desc(reportTable.id)))
       .map(toReportSummary);
 
     const enterpriseScoped = summaries.filter((summary) => canAccessEnterprise(context, summary.source_enterprise_id));
-    const scopedStoreIds = resolveScopedStoreIds(context);
+    const scopedStoreIds = await resolveScopedStoreIds(context);
     if (!scopedStoreIds) {
       return enterpriseScoped;
     }
@@ -620,19 +610,18 @@ export class SqliteReportRepository implements ReportRepository {
       return [];
     }
     const visibleReportIds = new Set(
-      db
-        .select({ reportId: reportStoreTable.reportId })
-        .from(reportStoreTable)
-        .where(and(inArray(reportStoreTable.reportId, reportIds), inArray(reportStoreTable.storeId, scopedStoreIds)))
-        .all()
+      (await db
+                .select({ reportId: reportStoreTable.reportId })
+                .from(reportStoreTable)
+                .where(and(inArray(reportStoreTable.reportId, reportIds), inArray(reportStoreTable.storeId, scopedStoreIds))))
         .map((row) => row.reportId)
     );
 
     return enterpriseScoped.filter((summary) => visibleReportIds.has(summary.id));
   }
 
-  getReportDetail(reportId: number, context: RequestContext = {}): ReportDetail | null {
-    const reportRow = db.select().from(reportTable).where(eq(reportTable.id, reportId)).get();
+  async getReportDetail(reportId: number, context: RequestContext = {}): Promise<any> {
+    const reportRow = (await db.select().from(reportTable).where(eq(reportTable.id, reportId)))[0];
 
     if (!reportRow) {
       return null;
@@ -642,54 +631,48 @@ export class SqliteReportRepository implements ReportRepository {
       return null;
     }
 
-    const stores = db
-      .select()
-      .from(reportStoreTable)
-      .where(eq(reportStoreTable.reportId, reportId))
-      .orderBy(reportStoreTable.displayOrder, reportStoreTable.id)
-      .all()
+    const stores = (await db
+          .select()
+          .from(reportStoreTable)
+          .where(eq(reportStoreTable.reportId, reportId))
+          .orderBy(reportStoreTable.displayOrder, reportStoreTable.id))
       .map(toReportStore);
 
-    const results = db
-      .select()
-      .from(reportImageTable)
-      .where(eq(reportImageTable.reportId, reportId))
-      .orderBy(reportImageTable.displayOrder, reportImageTable.id)
-      .all()
+    const results = (await db
+          .select()
+          .from(reportImageTable)
+          .where(eq(reportImageTable.reportId, reportId))
+          .orderBy(reportImageTable.displayOrder, reportImageTable.id))
       .map(toReportResult);
 
-    const issues = db
-      .select()
-      .from(reportIssueTable)
-      .where(eq(reportIssueTable.reportId, reportId))
-      .orderBy(reportIssueTable.displayOrder, reportIssueTable.id)
-      .all()
+    const issues = (await db
+          .select()
+          .from(reportIssueTable)
+          .where(eq(reportIssueTable.reportId, reportId))
+          .orderBy(reportIssueTable.displayOrder, reportIssueTable.id))
       .map(toReportIssue);
 
-    const inspections = db
-      .select()
-      .from(reportInspectionTable)
-      .where(eq(reportInspectionTable.reportId, reportId))
-      .orderBy(reportInspectionTable.displayOrder, reportInspectionTable.id)
-      .all()
+    const inspections = (await db
+          .select()
+          .from(reportInspectionTable)
+          .where(eq(reportInspectionTable.reportId, reportId))
+          .orderBy(reportInspectionTable.displayOrder, reportInspectionTable.id))
       .map(toReportInspection);
 
-    const reviewLogs = db
-      .select()
-      .from(reportReviewLogTable)
-      .where(eq(reportReviewLogTable.reportId, reportId))
-      .orderBy(desc(reportReviewLogTable.createdAt), desc(reportReviewLogTable.id))
-      .limit(20)
-      .all()
+    const reviewLogs = (await db
+          .select()
+          .from(reportReviewLogTable)
+          .where(eq(reportReviewLogTable.reportId, reportId))
+          .orderBy(desc(reportReviewLogTable.createdAt), desc(reportReviewLogTable.id))
+          .limit(20))
       .map(toReportReviewLog);
 
-    const snapshotRow = db
-      .select()
-      .from(reportSourceSnapshotTable)
-      .where(eq(reportSourceSnapshotTable.reportId, reportId))
-      .get();
+    const snapshotRow = (await db
+          .select()
+          .from(reportSourceSnapshotTable)
+          .where(eq(reportSourceSnapshotTable.reportId, reportId)))[0];
 
-    const scopedStoreIds = resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
+    const scopedStoreIds = await resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
     const visibleStores = filterStoresByScope(stores, scopedStoreIds);
     const visibleResults = filterResultsByScope(results, scopedStoreIds);
     const visibleIssues = filterIssuesByScope(issues, scopedStoreIds);
@@ -735,7 +718,7 @@ export class SqliteReportRepository implements ReportRepository {
     };
   }
 
-  createManualIssue(input: CreateManualReportIssueInput, context: RequestContext = {}): ReportIssue | null {
+  createManualIssue(input: CreateManualReportIssueInput, context: RequestContext = {}): any {
     const title = input.title.trim();
     const description = String(input.description || "").trim();
     const operatorName = input.operator_name.trim();
@@ -744,29 +727,27 @@ export class SqliteReportRepository implements ReportRepository {
       return null;
     }
 
-    return db.transaction((tx) => {
-      const reportRow = tx
-        .select({
-          id: reportTable.id,
-          sourceEnterpriseId: reportTable.sourceEnterpriseId
-        })
-        .from(reportTable)
-        .where(eq(reportTable.id, input.report_id))
-        .get();
+    return db.transaction(async (tx): Promise<any> => {
+      const reportRow = (await tx
+              .select({
+                id: reportTable.id,
+                sourceEnterpriseId: reportTable.sourceEnterpriseId
+              })
+              .from(reportTable)
+              .where(eq(reportTable.id, input.report_id)))[0];
       if (!reportRow || !canAccessEnterprise(context, reportRow.sourceEnterpriseId)) {
         return null;
       }
 
-      const resultRow = tx
-        .select()
-        .from(reportImageTable)
-        .where(and(eq(reportImageTable.reportId, input.report_id), eq(reportImageTable.id, input.result_id)))
-        .get();
+      const resultRow = (await tx
+              .select()
+              .from(reportImageTable)
+              .where(and(eq(reportImageTable.reportId, input.report_id), eq(reportImageTable.id, input.result_id))))[0];
       if (!resultRow) {
         return null;
       }
 
-      const scopedStoreIds = resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
+      const scopedStoreIds = await resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
       if (scopedStoreIds) {
         const resultStoreId = String(resultRow.storeId || "").trim();
         if (!resultStoreId || !scopedStoreIds.includes(resultStoreId)) {
@@ -775,94 +756,88 @@ export class SqliteReportRepository implements ReportRepository {
       }
 
       const linkedInspection = inspectionId
-        ? tx
-            .select()
-            .from(reportInspectionTable)
-            .where(
-              and(
-                eq(reportInspectionTable.reportId, input.report_id),
-                eq(reportInspectionTable.resultId, input.result_id),
-                eq(reportInspectionTable.inspectionId, inspectionId)
-              )
-            )
-            .get()
-        : tx
-            .select()
-            .from(reportInspectionTable)
-            .where(and(eq(reportInspectionTable.reportId, input.report_id), eq(reportInspectionTable.resultId, input.result_id)))
-            .orderBy(reportInspectionTable.displayOrder, reportInspectionTable.id)
-            .limit(1)
-            .get();
+        ? (await tx
+                      .select()
+                      .from(reportInspectionTable)
+                      .where(
+                        and(
+                          eq(reportInspectionTable.reportId, input.report_id),
+                          eq(reportInspectionTable.resultId, input.result_id),
+                          eq(reportInspectionTable.inspectionId, inspectionId)
+                        )
+                      ))[0]
+        : (await tx
+                      .select()
+                      .from(reportInspectionTable)
+                      .where(and(eq(reportInspectionTable.reportId, input.report_id), eq(reportInspectionTable.resultId, input.result_id)))
+                      .orderBy(reportInspectionTable.displayOrder, reportInspectionTable.id)
+                      .limit(1))[0];
       const resultMetadata = safeParse(resultRow.metadataJson, {});
       const imageUrl = resolveResultOriginalImageUrl(resultRow);
       const now = new Date().toISOString();
-      const displayOrder = tx
-        .select({ id: reportIssueTable.id })
-        .from(reportIssueTable)
-        .where(eq(reportIssueTable.reportId, input.report_id))
-        .all().length;
+      const displayOrder = (await tx
+              .select({ id: reportIssueTable.id })
+              .from(reportIssueTable)
+              .where(eq(reportIssueTable.reportId, input.report_id))).length;
 
-      const inserted = tx
-        .insert(reportIssueTable)
-        .values({
-          reportId: input.report_id,
-          resultId: input.result_id,
-          storeId: resultRow.storeId,
-          storeName: resultRow.storeName,
-          title,
-          category: "人工问题",
-          severity: "manual",
-          description: description || title,
-          suggestion: null,
-          imageUrl: imageUrl || null,
-          imageObjectKey: resultRow.objectKey || readMetadataString(resultMetadata, "oss_key") || null,
-          reviewState: "pending",
-          metadataJson: safeStringify({
-            issue_id: `manual-${randomUUID()}`,
-            source: "manual_review",
-            manual_issue: true,
-            inspection_id: linkedInspection?.inspectionId ?? inspectionId,
-            linked_inspection_id: linkedInspection?.inspectionId ?? inspectionId,
-            capture_id: readMetadataString(resultMetadata, "capture_id"),
-            image_id: readMetadataString(resultMetadata, "image_id"),
-            store_code: readMetadataString(resultMetadata, "store_code"),
-            skill_id: linkedInspection?.skillId ?? "",
-            skill_name: linkedInspection?.skillName ?? "",
-            capture_url: readMetadataString(resultMetadata, "capture_url"),
-            preview_url: readMetadataString(resultMetadata, "preview_url"),
-            oss_key: readMetadataString(resultMetadata, "oss_key"),
-            original_image_url: imageUrl,
-            display_image_url: imageUrl,
-            evidence_image_url: "",
-            evidence_image_source: "manual_review",
-            extra_json: {
-              source: "manual_review",
-              created_by: operatorName,
-              created_at: now
-            }
-          }),
-          displayOrder,
-          createdAt: now
-        })
-        .returning()
-        .get();
+      const inserted = (await tx
+              .insert(reportIssueTable)
+              .values({
+                reportId: input.report_id,
+                resultId: input.result_id,
+                storeId: resultRow.storeId,
+                storeName: resultRow.storeName,
+                title,
+                category: "人工问题",
+                severity: "manual",
+                description: description || title,
+                suggestion: null,
+                imageUrl: imageUrl || null,
+                imageObjectKey: resultRow.objectKey || readMetadataString(resultMetadata, "oss_key") || null,
+                reviewState: "pending",
+                metadataJson: safeStringify({
+                  issue_id: `manual-${randomUUID()}`,
+                  source: "manual_review",
+                  manual_issue: true,
+                  inspection_id: linkedInspection?.inspectionId ?? inspectionId,
+                  linked_inspection_id: linkedInspection?.inspectionId ?? inspectionId,
+                  capture_id: readMetadataString(resultMetadata, "capture_id"),
+                  image_id: readMetadataString(resultMetadata, "image_id"),
+                  store_code: readMetadataString(resultMetadata, "store_code"),
+                  skill_id: linkedInspection?.skillId ?? "",
+                  skill_name: linkedInspection?.skillName ?? "",
+                  capture_url: readMetadataString(resultMetadata, "capture_url"),
+                  preview_url: readMetadataString(resultMetadata, "preview_url"),
+                  oss_key: readMetadataString(resultMetadata, "oss_key"),
+                  original_image_url: imageUrl,
+                  display_image_url: imageUrl,
+                  evidence_image_url: "",
+                  evidence_image_source: "manual_review",
+                  extra_json: {
+                    source: "manual_review",
+                    created_by: operatorName,
+                    created_at: now
+                  }
+                }),
+                displayOrder,
+                createdAt: now
+              })
+              .returning())[0];
 
-      tx
-        .update(reportTable)
-        .set({
-          issueCount: sql`${reportTable.issueCount} + 1`
-        })
-        .where(eq(reportTable.id, input.report_id))
-        .run();
+      await tx
+                .update(reportTable)
+                .set({
+                  issueCount: sql`${reportTable.issueCount} + 1`
+                })
+                .where(eq(reportTable.id, input.report_id));
 
       if (resultRow.storeId) {
-        tx
-          .update(reportStoreTable)
-          .set({
-            issueCount: sql`${reportStoreTable.issueCount} + 1`
-          })
-          .where(and(eq(reportStoreTable.reportId, input.report_id), eq(reportStoreTable.storeId, resultRow.storeId)))
-          .run();
+        await tx
+                    .update(reportStoreTable)
+                    .set({
+                      issueCount: sql`${reportStoreTable.issueCount} + 1`
+                    })
+                    .where(and(eq(reportStoreTable.reportId, input.report_id), eq(reportStoreTable.storeId, resultRow.storeId)));
       }
 
       return toReportIssue(inserted);
@@ -874,7 +849,7 @@ export class SqliteReportRepository implements ReportRepository {
     imageId: number,
     input: ReviewStatusUpdateInput,
     context: RequestContext = {}
-  ): ReviewResultUpdateResult | null {
+  ): any {
     const normalizedReviewState = normalizeResultReviewState(input.review_status);
     const normalizedOperator = input.operator_name.trim();
     const normalizedNote = String(input.note || "").trim();
@@ -882,31 +857,29 @@ export class SqliteReportRepository implements ReportRepository {
     const normalizedReviewAction = normalizeReviewAction(input.review_action, normalizedReviewState);
     const normalizedReviewDisposition = normalizeReviewDisposition(input.review_disposition);
 
-    return db.transaction((tx) => {
-      const reportRow = tx
-        .select({
-          id: reportTable.id,
-          sourceEnterpriseId: reportTable.sourceEnterpriseId,
-          progressState: reportTable.progressState,
-          completedResultCount: reportTable.completedResultCount,
-          totalResultCount: reportTable.totalResultCount
-        })
-        .from(reportTable)
-        .where(eq(reportTable.id, reportId))
-        .get();
+    return db.transaction(async (tx): Promise<any> => {
+      const reportRow = (await tx
+              .select({
+                id: reportTable.id,
+                sourceEnterpriseId: reportTable.sourceEnterpriseId,
+                progressState: reportTable.progressState,
+                completedResultCount: reportTable.completedResultCount,
+                totalResultCount: reportTable.totalResultCount
+              })
+              .from(reportTable)
+              .where(eq(reportTable.id, reportId)))[0];
       if (!reportRow || !canAccessEnterprise(context, reportRow.sourceEnterpriseId)) {
         return null;
       }
 
-      const resultRow = tx
-        .select()
-        .from(reportImageTable)
-        .where(and(eq(reportImageTable.reportId, reportId), eq(reportImageTable.id, imageId)))
-        .get();
+      const resultRow = (await tx
+              .select()
+              .from(reportImageTable)
+              .where(and(eq(reportImageTable.reportId, reportId), eq(reportImageTable.id, imageId))))[0];
       if (!resultRow) {
         return null;
       }
-      const scopedStoreIds = resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
+      const scopedStoreIds = await resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
       if (scopedStoreIds) {
         const resultStoreId = String(resultRow.storeId || "").trim();
         if (!resultStoreId || !scopedStoreIds.includes(resultStoreId)) {
@@ -954,43 +927,40 @@ export class SqliteReportRepository implements ReportRepository {
       }
 
       const reviewedAt = normalizedReviewState === "completed" ? new Date().toISOString() : null;
-      tx
-        .update(reportImageTable)
-        .set({
-          reviewState: normalizedReviewState,
-          reviewedBy: normalizedReviewState === "completed" ? normalizedOperator : null,
-          reviewedAt,
-          reviewNote: normalizedNote || null,
-          reviewAction: normalizedReviewAction,
-          reviewDisposition: normalizedReviewDisposition,
-          reviewPayloadJson: safeStringify({
-            note: normalizedNote || null,
-            updated_by: normalizedOperator,
-            updated_at: reviewedAt,
-            state: normalizedReviewState,
-            review_action: normalizedReviewAction,
-            review_disposition: normalizedReviewDisposition,
-            selected_issues: normalizedSelectedIssues
-          })
-        })
-        .where(eq(reportImageTable.id, imageId))
-        .run();
+      await tx
+                .update(reportImageTable)
+                .set({
+                  reviewState: normalizedReviewState,
+                  reviewedBy: normalizedReviewState === "completed" ? normalizedOperator : null,
+                  reviewedAt,
+                  reviewNote: normalizedNote || null,
+                  reviewAction: normalizedReviewAction,
+                  reviewDisposition: normalizedReviewDisposition,
+                  reviewPayloadJson: safeStringify({
+                    note: normalizedNote || null,
+                    updated_by: normalizedOperator,
+                    updated_at: reviewedAt,
+                    state: normalizedReviewState,
+                    review_action: normalizedReviewAction,
+                    review_disposition: normalizedReviewDisposition,
+                    selected_issues: normalizedSelectedIssues
+                  })
+                })
+                .where(eq(reportImageTable.id, imageId));
 
-      tx
-        .update(reportIssueTable)
-        .set({ reviewState: normalizedReviewState })
-        .where(and(eq(reportIssueTable.reportId, reportId), eq(reportIssueTable.resultId, imageId)))
-        .run();
+      await tx
+                .update(reportIssueTable)
+                .set({ reviewState: normalizedReviewState })
+                .where(and(eq(reportIssueTable.reportId, reportId), eq(reportIssueTable.resultId, imageId)));
 
-      const allResults = tx
-        .select({
-          id: reportImageTable.id,
-          storeId: reportImageTable.storeId,
-          reviewState: reportImageTable.reviewState
-        })
-        .from(reportImageTable)
-        .where(eq(reportImageTable.reportId, reportId))
-        .all();
+      const allResults = await tx
+              .select({
+                id: reportImageTable.id,
+                storeId: reportImageTable.storeId,
+                reviewState: reportImageTable.reviewState
+              })
+              .from(reportImageTable)
+              .where(eq(reportImageTable.reportId, reportId));
 
       const resultStatesByStore = new Map<string, ResultReviewState[]>();
       allResults.forEach((row) => {
@@ -1007,7 +977,7 @@ export class SqliteReportRepository implements ReportRepository {
       let inProgressStoreCount = 0;
       let pendingStoreCount = 0;
 
-      resultStatesByStore.forEach((states, storeId) => {
+      for (const [storeId, states] of resultStatesByStore.entries()) {
         const completedCount = states.filter((state) => state === "completed").length;
         const progress = buildProgressSummary(states.length, completedCount);
         if (progress.progress_state === "completed") {
@@ -1018,7 +988,7 @@ export class SqliteReportRepository implements ReportRepository {
           pendingStoreCount += 1;
         }
 
-        tx
+        await tx
           .update(reportStoreTable)
           .set({
             progressState: progress.progress_state,
@@ -1031,74 +1001,69 @@ export class SqliteReportRepository implements ReportRepository {
               result_progress: progress
             })
           })
-          .where(and(eq(reportStoreTable.reportId, reportId), eq(reportStoreTable.storeId, storeId)))
-          .run();
-      });
+          .where(and(eq(reportStoreTable.reportId, reportId), eq(reportStoreTable.storeId, storeId)));
+      }
 
       const completedResultCount = allResults.filter((row) => row.reviewState === "completed").length;
       const reportProgress = buildProgressSummary(allResults.length, completedResultCount);
-      tx
-        .update(reportTable)
-        .set({
-          progressState: reportProgress.progress_state,
-          completedStoreCount,
-          pendingStoreCount,
-          inProgressStoreCount,
-          totalResultCount: reportProgress.total_result_count,
-          completedResultCount: reportProgress.completed_result_count,
-          pendingResultCount: reportProgress.pending_result_count,
-          progressPercent: reportProgress.progress_percent,
-          stateSnapshotJson: safeStringify({
-            level: "report",
-            result_progress: reportProgress,
-            store_progress: {
-              completed_store_count: completedStoreCount,
-              in_progress_store_count: inProgressStoreCount,
-              pending_store_count: pendingStoreCount
-            }
-          })
-        })
-        .where(eq(reportTable.id, reportId))
-        .run();
+      await tx
+                .update(reportTable)
+                .set({
+                  progressState: reportProgress.progress_state,
+                  completedStoreCount,
+                  pendingStoreCount,
+                  inProgressStoreCount,
+                  totalResultCount: reportProgress.total_result_count,
+                  completedResultCount: reportProgress.completed_result_count,
+                  pendingResultCount: reportProgress.pending_result_count,
+                  progressPercent: reportProgress.progress_percent,
+                  stateSnapshotJson: safeStringify({
+                    level: "report",
+                    result_progress: reportProgress,
+                    store_progress: {
+                      completed_store_count: completedStoreCount,
+                      in_progress_store_count: inProgressStoreCount,
+                      pending_store_count: pendingStoreCount
+                    }
+                  })
+                })
+                .where(eq(reportTable.id, reportId));
 
-      const logRow = tx
-        .insert(reportReviewLogTable)
-        .values({
-          reportId,
-          resultId: imageId,
-          storeId: resultRow.storeId,
-          storeName: resultRow.storeName,
-          fromStatus: fromState,
-          toStatus: normalizedReviewState,
-          operatorName: normalizedOperator,
-          note: normalizedNote || null,
-          reviewAction: normalizedReviewAction,
-          reviewDisposition: normalizedReviewDisposition,
-          metadataJson: safeStringify({
-            report_progress_state: reportProgress.progress_state,
-            completed_result_count: reportProgress.completed_result_count,
-            total_result_count: reportProgress.total_result_count,
-            result_id: imageId,
-            report_id: reportId,
-            review_action: normalizedReviewAction,
-            review_disposition: normalizedReviewDisposition,
-            selected_issues: normalizedSelectedIssues
-          })
-        })
-        .returning({ id: reportReviewLogTable.id })
-        .get();
+      const logRow = (await tx
+              .insert(reportReviewLogTable)
+              .values({
+                reportId,
+                resultId: imageId,
+                storeId: resultRow.storeId,
+                storeName: resultRow.storeName,
+                fromStatus: fromState,
+                toStatus: normalizedReviewState,
+                operatorName: normalizedOperator,
+                note: normalizedNote || null,
+                reviewAction: normalizedReviewAction,
+                reviewDisposition: normalizedReviewDisposition,
+                metadataJson: safeStringify({
+                  report_progress_state: reportProgress.progress_state,
+                  completed_result_count: reportProgress.completed_result_count,
+                  total_result_count: reportProgress.total_result_count,
+                  result_id: imageId,
+                  report_id: reportId,
+                  review_action: normalizedReviewAction,
+                  review_disposition: normalizedReviewDisposition,
+                  selected_issues: normalizedSelectedIssues
+                })
+              })
+              .returning({ id: reportReviewLogTable.id }))[0];
 
-      const recentLogRow = tx
-        .select()
-        .from(reportReviewLogTable)
-        .where(eq(reportReviewLogTable.id, logRow.id))
-        .get();
+      const recentLogRow = (await tx
+              .select()
+              .from(reportReviewLogTable)
+              .where(eq(reportReviewLogTable.id, logRow.id)))[0];
 
-      const updatedResultRow = tx
-        .select()
-        .from(reportImageTable)
-        .where(eq(reportImageTable.id, imageId))
-        .get();
+      const updatedResultRow = (await tx
+              .select()
+              .from(reportImageTable)
+              .where(eq(reportImageTable.id, imageId)))[0];
 
       return {
         report_id: reportId,
@@ -1117,28 +1082,26 @@ export class SqliteReportRepository implements ReportRepository {
     });
   }
 
-  listReviewLogs(reportId: number, limit = 20, imageId?: number, context: RequestContext = {}): ReportReviewLog[] {
-    const reportRow = db
-      .select({ sourceEnterpriseId: reportTable.sourceEnterpriseId })
-      .from(reportTable)
-      .where(eq(reportTable.id, reportId))
-      .get();
+  async listReviewLogs(reportId: number, limit = 20, imageId?: number, context: RequestContext = {}): Promise<any> {
+    const reportRow = (await db
+          .select({ sourceEnterpriseId: reportTable.sourceEnterpriseId })
+          .from(reportTable)
+          .where(eq(reportTable.id, reportId)))[0];
     if (!reportRow || !canAccessEnterprise(context, reportRow.sourceEnterpriseId)) {
       return [];
     }
-    const query = db
-      .select()
-      .from(reportReviewLogTable)
-      .where(
-        imageId && imageId > 0
-          ? and(eq(reportReviewLogTable.reportId, reportId), eq(reportReviewLogTable.resultId, imageId))
-          : eq(reportReviewLogTable.reportId, reportId)
-      )
-      .orderBy(desc(reportReviewLogTable.createdAt), desc(reportReviewLogTable.id))
-      .limit(Math.min(Math.max(1, Math.trunc(limit)), 100))
-      .all();
+    const query = await db
+          .select()
+          .from(reportReviewLogTable)
+          .where(
+            imageId && imageId > 0
+              ? and(eq(reportReviewLogTable.reportId, reportId), eq(reportReviewLogTable.resultId, imageId))
+              : eq(reportReviewLogTable.reportId, reportId)
+          )
+          .orderBy(desc(reportReviewLogTable.createdAt), desc(reportReviewLogTable.id))
+          .limit(Math.min(Math.max(1, Math.trunc(limit)), 100));
 
-    const scopedStoreIds = resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
+    const scopedStoreIds = await resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
     return filterLogsByScope(query.map(toReportReviewLog), scopedStoreIds);
   }
 }

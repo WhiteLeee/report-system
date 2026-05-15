@@ -13,7 +13,9 @@ type ReinitOptions = {
   primaryColorStrong: string;
   defaultTimezone: string;
   dataDir: string;
-  dbPath: string;
+  dbUrl: string;
+  dbMigrationsSchema: string;
+  dbMigrationsTable: string;
   envPath: string;
   configPath: string;
   adminUsername: string;
@@ -23,17 +25,17 @@ type ReinitOptions = {
   dryRun: boolean;
 };
 
-function readArg(flag: string): string {
+function readArg(flag: string): any {
   const index = process.argv.indexOf(flag);
   if (index < 0) return "";
   return String(process.argv[index + 1] || "").trim();
 }
 
-function hasFlag(flag: string): boolean {
+function hasFlag(flag: string): any {
   return process.argv.includes(flag);
 }
 
-function buildOptions(): ReinitOptions {
+function buildOptions(): any {
   const currentConfig = getReportSystemConfig();
   return {
     tenantId: readArg("--tenant-id") || currentConfig.tenantId,
@@ -45,7 +47,9 @@ function buildOptions(): ReinitOptions {
     primaryColorStrong: readArg("--primary-color-strong") || currentConfig.primaryColorStrong,
     defaultTimezone: readArg("--default-timezone") || currentConfig.defaultTimezone,
     dataDir: readArg("--data-dir") || currentConfig.dataDir,
-    dbPath: readArg("--db-path") || currentConfig.dbPath,
+    dbUrl: readArg("--db-url") || currentConfig.dbUrl,
+    dbMigrationsSchema: readArg("--db-migrations-schema") || currentConfig.dbMigrationsSchema,
+    dbMigrationsTable: readArg("--db-migrations-table") || currentConfig.dbMigrationsTable,
     envPath: readArg("--env-path") || path.resolve(process.cwd(), ".env.local"),
     configPath: readArg("--config-path") || currentConfig.tenantConfigPath,
     adminUsername: readArg("--admin-username") || currentConfig.adminUsername,
@@ -57,7 +61,7 @@ function buildOptions(): ReinitOptions {
   };
 }
 
-function main(): void {
+function main(): any {
   const options = buildOptions();
   const args = [
     "run",
@@ -81,8 +85,12 @@ function main(): void {
     options.defaultTimezone,
     "--data-dir",
     options.dataDir,
-    "--db-path",
-    options.dbPath,
+    "--db-url",
+    options.dbUrl,
+    "--db-migrations-schema",
+    options.dbMigrationsSchema,
+    "--db-migrations-table",
+    options.dbMigrationsTable,
     "--env-path",
     options.envPath,
     "--config-path",

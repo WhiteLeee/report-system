@@ -5,7 +5,7 @@ import { normalizePublishedReport } from "../backend/report/report-publish-norma
 import { reportPublishSchema } from "../backend/report/report.schema";
 import type { ReportPublishPayload } from "../backend/report/report.types";
 
-function createPayload(): ReportPublishPayload {
+function createPayload(): any {
   return {
     source_system: "vision-agent",
     payload_version: 2,

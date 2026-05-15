@@ -12,7 +12,9 @@ type BootstrapOptions = {
   primaryColorStrong: string;
   defaultTimezone: string;
   dataDir: string;
-  dbPath: string;
+  dbUrl: string;
+  dbMigrationsSchema: string;
+  dbMigrationsTable: string;
   envPath: string;
   configPath: string;
   adminUsername: string;
@@ -24,24 +26,26 @@ type BootstrapOptions = {
   resetDb: boolean;
 };
 
-function readArg(flag: string): string {
+function readArg(flag: string): any {
   const index = process.argv.indexOf(flag);
   if (index < 0) return "";
   return String(process.argv[index + 1] || "").trim();
 }
 
-function hasFlag(flag: string): boolean {
+function hasFlag(flag: string): any {
   return process.argv.includes(flag);
 }
 
-function resolvePath(raw: string, fallback: string): string {
+function resolvePath(raw: string, fallback: string): any {
   const value = raw.trim() || fallback;
   return path.isAbsolute(value) ? value : path.resolve(process.cwd(), value);
 }
 
-function buildOptions(): BootstrapOptions {
+function buildOptions(): any {
   const dataDir = resolvePath(readArg("--data-dir"), "data");
-  const dbPath = resolvePath(readArg("--db-path"), path.join(dataDir, "report-system.sqlite"));
+  const dbUrl = readArg("--db-url") || "postgres://postgres:postgres@127.0.0.1:5432/report_system";
+  const dbMigrationsSchema = readArg("--db-migrations-schema") || "public";
+  const dbMigrationsTable = readArg("--db-migrations-table") || "__drizzle_migrations";
   return {
     tenantId: readArg("--tenant-id") || "default-tenant",
     tenantName: readArg("--tenant-name") || "默认客户",
@@ -52,7 +56,9 @@ function buildOptions(): BootstrapOptions {
     primaryColorStrong: readArg("--primary-color-strong") || "#6b421d",
     defaultTimezone: readArg("--default-timezone") || "Asia/Shanghai",
     dataDir,
-    dbPath,
+    dbUrl,
+    dbMigrationsSchema,
+    dbMigrationsTable,
     envPath: resolvePath(readArg("--env-path"), ".env.local"),
     configPath: resolvePath(readArg("--config-path"), "config/tenant.json"),
     adminUsername: readArg("--admin-username") || "admin",
@@ -65,13 +71,13 @@ function buildOptions(): BootstrapOptions {
   };
 }
 
-function ensureWritable(pathname: string, force: boolean): void {
+function ensureWritable(pathname: string, force: boolean): any {
   if (fs.existsSync(pathname) && !force) {
     throw new Error(`${pathname} 已存在，如需覆盖请追加 --force`);
   }
 }
 
-function buildEnvContent(options: BootstrapOptions): string {
+function buildEnvContent(options: BootstrapOptions): any {
   return [
     `REPORT_SYSTEM_TENANT_ID=${options.tenantId}`,
     `REPORT_SYSTEM_TENANT_NAME=${options.tenantName}`,
@@ -82,7 +88,9 @@ function buildEnvContent(options: BootstrapOptions): string {
     `REPORT_SYSTEM_PRIMARY_COLOR_STRONG=${options.primaryColorStrong}`,
     `REPORT_SYSTEM_DEFAULT_TIMEZONE=${options.defaultTimezone}`,
     `REPORT_SYSTEM_DATA_DIR=${options.dataDir}`,
-    `REPORT_SYSTEM_DB_PATH=${options.dbPath}`,
+    `REPORT_SYSTEM_DB_URL=${options.dbUrl}`,
+    `REPORT_SYSTEM_DB_MIGRATIONS_SCHEMA=${options.dbMigrationsSchema}`,
+    `REPORT_SYSTEM_DB_MIGRATIONS_TABLE=${options.dbMigrationsTable}`,
     `REPORT_SYSTEM_TENANT_CONFIG_PATH=${options.configPath}`,
     `REPORT_SYSTEM_ADMIN_USERNAME=${options.adminUsername}`,
     `REPORT_SYSTEM_ADMIN_PASSWORD=${options.adminPassword}`,
@@ -91,7 +99,7 @@ function buildEnvContent(options: BootstrapOptions): string {
   ].join("\n") + "\n";
 }
 
-function buildTenantConfig(options: BootstrapOptions): Record<string, string | string[] | number[]> {
+function buildTenantConfig(options: BootstrapOptions): any {
   return {
     tenantId: options.tenantId,
     tenantName: options.tenantName,
@@ -102,7 +110,9 @@ function buildTenantConfig(options: BootstrapOptions): Record<string, string | s
     primaryColorStrong: options.primaryColorStrong,
     defaultTimezone: options.defaultTimezone,
     dataDir: options.dataDir,
-    dbPath: options.dbPath,
+    dbUrl: options.dbUrl,
+    dbMigrationsSchema: options.dbMigrationsSchema,
+    dbMigrationsTable: options.dbMigrationsTable,
     adminUsername: options.adminUsername,
     adminPassword: options.adminPassword,
     adminDisplayName: options.adminDisplayName,
@@ -113,12 +123,12 @@ function buildTenantConfig(options: BootstrapOptions): Record<string, string | s
   };
 }
 
-function writeFile(pathname: string, content: string): void {
+function writeFile(pathname: string, content: string): any {
   fs.mkdirSync(path.dirname(pathname), { recursive: true });
   fs.writeFileSync(pathname, content, "utf-8");
 }
 
-function buildRuntimeEnv(options: BootstrapOptions): NodeJS.ProcessEnv {
+function buildRuntimeEnv(options: BootstrapOptions): any {
   return {
     ...process.env,
     REPORT_SYSTEM_TENANT_ID: options.tenantId,
@@ -130,7 +140,9 @@ function buildRuntimeEnv(options: BootstrapOptions): NodeJS.ProcessEnv {
     REPORT_SYSTEM_PRIMARY_COLOR_STRONG: options.primaryColorStrong,
     REPORT_SYSTEM_DEFAULT_TIMEZONE: options.defaultTimezone,
     REPORT_SYSTEM_DATA_DIR: options.dataDir,
-    REPORT_SYSTEM_DB_PATH: options.dbPath,
+    REPORT_SYSTEM_DB_URL: options.dbUrl,
+    REPORT_SYSTEM_DB_MIGRATIONS_SCHEMA: options.dbMigrationsSchema,
+    REPORT_SYSTEM_DB_MIGRATIONS_TABLE: options.dbMigrationsTable,
     REPORT_SYSTEM_TENANT_CONFIG_PATH: options.configPath,
     REPORT_SYSTEM_ADMIN_USERNAME: options.adminUsername,
     REPORT_SYSTEM_ADMIN_PASSWORD: options.adminPassword,
@@ -139,7 +151,7 @@ function buildRuntimeEnv(options: BootstrapOptions): NodeJS.ProcessEnv {
   };
 }
 
-function runMigrate(options: BootstrapOptions): void {
+function runMigrate(options: BootstrapOptions): any {
   const result = spawnSync("npm", ["run", "db:migrate"], {
     cwd: process.cwd(),
     stdio: "inherit",
@@ -151,7 +163,7 @@ function runMigrate(options: BootstrapOptions): void {
   }
 }
 
-function runAuthSeed(options: BootstrapOptions): void {
+function runAuthSeed(options: BootstrapOptions): any {
   const result = spawnSync("npm", ["run", "auth:seed"], {
     cwd: process.cwd(),
     stdio: "inherit",
@@ -163,7 +175,7 @@ function runAuthSeed(options: BootstrapOptions): void {
   }
 }
 
-function main(): void {
+function main(): any {
   const options = buildOptions();
   const envContent = buildEnvContent(options);
   const configContent = `${JSON.stringify(buildTenantConfig(options), null, 2)}\n`;
@@ -184,7 +196,6 @@ function main(): void {
   }
 
   fs.mkdirSync(options.dataDir, { recursive: true });
-  fs.mkdirSync(path.dirname(options.dbPath), { recursive: true });
   writeFile(options.envPath, envContent);
   writeFile(options.configPath, configContent);
   runMigrate(options);
@@ -193,7 +204,7 @@ function main(): void {
   console.log("Single-tenant bootstrap completed.");
   console.log(`env: ${options.envPath}`);
   console.log(`tenant-config: ${options.configPath}`);
-  console.log(`database: ${options.dbPath}`);
+  console.log(`database url: ${options.dbUrl}`);
   console.log(`admin: ${options.adminUsername}`);
 }
 

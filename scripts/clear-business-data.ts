@@ -1,4 +1,6 @@
-import { sqlite, dbPath } from "../backend/database/client";
+import { sql } from "drizzle-orm";
+
+import { db, dbUrl } from "../backend/database/client";
 
 type TableTarget = {
   name: string;
@@ -17,45 +19,48 @@ const BUSINESS_TABLES: TableTarget[] = [
   { name: "report", resetSequence: true }
 ];
 
-function hasFlag(flag: string): boolean {
+function hasFlag(flag: string): any {
   return process.argv.includes(flag);
 }
 
-function countRows(tableName: string): number {
-  const row = sqlite.prepare(`select count(*) as count from ${tableName}`).get() as { count?: number };
-  return Number(row.count || 0);
+async function countRows(tableName: string): Promise<any> {
+  const rows = await db.execute<{ count: number }>(sql.raw(`select count(*)::int as count from ${tableName}`));
+  return Number(rows.rows[0]?.count || 0);
 }
 
-function clearBusinessData(): Array<{ table: string; deleted: number }> {
-  const beforeCounts = BUSINESS_TABLES.map((table) => ({
-    table: table.name,
-    deleted: countRows(table.name)
-  }));
+async function clearBusinessData(): Promise<any> {
+  const beforeCounts = await Promise.all(
+    BUSINESS_TABLES.map(async (table): Promise<any> => ({
+      table: table.name,
+      deleted: await countRows(table.name)
+    }))
+  );
 
-  const cleanup = sqlite.transaction(() => {
+  await db.transaction(async (tx): Promise<any> => {
     for (const table of BUSINESS_TABLES) {
-      sqlite.prepare(`delete from ${table.name}`).run();
       if (table.resetSequence) {
-        sqlite.prepare("delete from sqlite_sequence where name = ?").run(table.name);
+        await tx.execute(sql.raw(`truncate table ${table.name} restart identity cascade`));
+      } else {
+        await tx.execute(sql.raw(`delete from ${table.name}`));
       }
     }
   });
 
-  cleanup();
-
   return beforeCounts;
 }
 
-function main(): void {
+async function main(): Promise<any> {
   const dryRun = hasFlag("--dry-run");
 
-  const existing = BUSINESS_TABLES.map((table) => ({
-    table: table.name,
-    count: countRows(table.name)
-  }));
+  const existing = await Promise.all(
+    BUSINESS_TABLES.map(async (table): Promise<any> => ({
+      table: table.name,
+      count: await countRows(table.name)
+    }))
+  );
   const total = existing.reduce((sum, item) => sum + item.count, 0);
 
-  console.log(`Business data database: ${dbPath}`);
+  console.log(`Business data database: ${dbUrl}`);
   console.log("Business tables:");
   for (const item of existing) {
     console.log(`- ${item.table}: ${item.count}`);
@@ -67,11 +72,11 @@ function main(): void {
     return;
   }
 
-  const deleted = clearBusinessData();
+  const deleted = await clearBusinessData();
   console.log("Business data cleared.");
   for (const item of deleted) {
     console.log(`- ${item.table}: deleted ${item.deleted}`);
   }
 }
 
-main();
+await main();

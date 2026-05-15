@@ -1,6 +1,6 @@
 import type { AuthSecurityPolicy } from "@/backend/system-settings/system-settings.types";
 
-export function validatePasswordWithPolicy(password: string, policy: AuthSecurityPolicy): string[] {
+export function validatePasswordWithPolicy(password: string, policy: AuthSecurityPolicy): any {
   const reasons: string[] = [];
   if (password.length < policy.passwordMinLength) {
     reasons.push(`密码长度至少 ${policy.passwordMinLength} 位`);
@@ -20,7 +20,7 @@ export function validatePasswordWithPolicy(password: string, policy: AuthSecurit
   return reasons;
 }
 
-export function assertPasswordWithPolicy(password: string, policy: AuthSecurityPolicy): void {
+export function assertPasswordWithPolicy(password: string, policy: AuthSecurityPolicy): any {
   const reasons = validatePasswordWithPolicy(password, policy);
   if (reasons.length > 0) {
     throw new Error(`密码不符合安全策略：${reasons.join("，")}`);

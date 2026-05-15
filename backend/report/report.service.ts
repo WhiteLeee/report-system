@@ -23,14 +23,14 @@ export class ReportService {
     this.supportedPayloadVersions = normalizeSupportedPayloadVersions(options.supportedPayloadVersions || [2]);
   }
 
-  publishReport(payload: ReportPublishPayload, context: RequestContext = {}): PublishReceipt {
+  async publishReport(payload: ReportPublishPayload, context: RequestContext = {}): Promise<any> {
     if (!this.supportedPayloadVersions.includes(payload.payload_version)) {
       throw new UnsupportedPayloadVersionError(payload.payload_version, this.supportedPayloadVersions);
     }
-    return this.repository.publishReport(payload, context);
+    return await this.repository.publishReport(payload, context);
   }
 
-  getPublishStatus(publishId: string, context: RequestContext = {}): PublishStatusReceipt {
+  async getPublishStatus(publishId: string, context: RequestContext = {}): Promise<any> {
     const normalizedPublishId = publishId.trim();
     if (!normalizedPublishId) {
       return {
@@ -41,11 +41,11 @@ export class ReportService {
         receivedAt: new Date().toISOString()
       };
     }
-    return this.repository.getPublishStatus(normalizedPublishId, context);
+    return await this.repository.getPublishStatus(normalizedPublishId, context);
   }
 
-  listReports(filters: ReportFilters = {}, context: RequestContext = {}): ReportSummary[] {
-    return this.repository.listReports(
+  async listReports(filters: ReportFilters = {}, context: RequestContext = {}): Promise<any> {
+    return await this.repository.listReports(
       {
         enterprise: filters.enterprise?.trim() ?? "",
         publishId: filters.publishId?.trim() ?? "",
@@ -58,11 +58,11 @@ export class ReportService {
     );
   }
 
-  getReportDetail(reportId: number, context: RequestContext = {}): ReportDetail | null {
+  async getReportDetail(reportId: number, context: RequestContext = {}): Promise<any> {
     if (!Number.isInteger(reportId) || reportId <= 0) {
       return null;
     }
 
-    return this.repository.getReportDetail(reportId, context);
+    return await this.repository.getReportDetail(reportId, context);
   }
 }

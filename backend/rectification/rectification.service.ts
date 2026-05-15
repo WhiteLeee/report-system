@@ -70,7 +70,7 @@ const RECTIFICATION_LIST_MAX_PAGES = 10;
 
 const OSS_SIGNATURE_QUERY_KEYS = ["OSSAccessKeyId", "Signature", "Expires"] as const;
 
-export function normalizeRectificationImageUrl(rawUrl: string): string {
+export function normalizeRectificationImageUrl(rawUrl: string): any {
   const value = String(rawUrl || "").trim();
   if (!value) {
     return "";
@@ -89,7 +89,7 @@ export function normalizeRectificationImageUrl(rawUrl: string): string {
   }
 }
 
-function formatDateOnly(value: string | Date): string {
+function formatDateOnly(value: string | Date): any {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
     return "";
@@ -97,7 +97,7 @@ function formatDateOnly(value: string | Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function extractRemoteOrderId(remoteResponse: unknown): string {
+function extractRemoteOrderId(remoteResponse: unknown): any {
   if (!remoteResponse || typeof remoteResponse !== "object" || Array.isArray(remoteResponse)) {
     return "";
   }
@@ -109,7 +109,7 @@ function extractRemoteOrderId(remoteResponse: unknown): string {
   return String(candidate || "").trim();
 }
 
-function buildDispatchErrorPayload(error: unknown): JsonValue {
+function buildDispatchErrorPayload(error: unknown): any {
   const errorMessage = error instanceof Error ? error.message : "未知下发异常";
   const errorType =
     error instanceof Error && error.name ? error.name : typeof error === "string" ? "Error" : "UnknownError";
@@ -123,7 +123,7 @@ function buildDispatchErrorPayload(error: unknown): JsonValue {
 export class RectificationService {
   constructor(private readonly repository: RectificationOrderRepository) {}
 
-  private buildSyncRequest(order: RectificationOrderRecord, pageNumber = 1): HuiYunYingListRectificationInput {
+  private buildSyncRequest(order: RectificationOrderRecord, pageNumber = 1): any {
     const today = formatDateOnly(new Date());
     const createdDate = formatDateOnly(order.created_at) || today;
     return {
@@ -137,11 +137,8 @@ export class RectificationService {
     };
   }
 
-  private async listRemoteOrders(order: RectificationOrderRecord): Promise<{
-    items: HuiYunYingRectificationOrderItem[];
-    requestPayload: HuiYunYingListRectificationInput;
-  }> {
-    const huiYunYingService = createHuiYunYingRectificationService();
+  private async listRemoteOrders(order: RectificationOrderRecord): Promise<any> {
+    const huiYunYingService = await createHuiYunYingRectificationService();
     const allItems: HuiYunYingRectificationOrderItem[] = [];
     const seenKeys = new Set<string>();
     let lastRequestPayload = this.buildSyncRequest(order, 1);
@@ -179,7 +176,7 @@ export class RectificationService {
   private findMatchedRemoteOrder(
     order: RectificationOrderRecord,
     items: HuiYunYingRectificationOrderItem[]
-  ): HuiYunYingRectificationOrderItem | null {
+  ): any {
     return (
       items.find((item) => String(item.disqualifiedId || "").trim() === String(order.huiyunying_order_id || "").trim()) ||
       items.find(
@@ -191,7 +188,7 @@ export class RectificationService {
     );
   }
 
-  private async executeSyncAttempt(order: RectificationOrderRecord): Promise<SyncExecutionResult> {
+  private async executeSyncAttempt(order: RectificationOrderRecord): Promise<any> {
     const startedAt = Date.now();
     const { items, requestPayload } = await this.listRemoteOrders(order);
     const responseTimeMs = Math.max(0, Date.now() - startedAt);
@@ -199,7 +196,7 @@ export class RectificationService {
     const syncedAt = new Date().toISOString();
 
     if (!matched) {
-      this.repository.updateSyncState(order.id, {
+      await this.repository.updateSyncState(order.id, {
         last_synced_at: syncedAt,
         response_payload: {
           status: "not_found",
@@ -229,7 +226,7 @@ export class RectificationService {
     const nextSyncedAt = new Date().toISOString();
     const unchanged = isRemoteRectificationSnapshotUnchanged(order, matched);
 
-    this.repository.updateSyncState(order.id, {
+    await this.repository.updateSyncState(order.id, {
       ...(unchanged ? {} : patch),
       last_synced_at: nextSyncedAt
     });
@@ -252,7 +249,7 @@ export class RectificationService {
   private async syncOrderWithRetry(
     order: RectificationOrderRecord,
     retryCount: number
-  ): Promise<SyncExecutionResult> {
+  ): Promise<any> {
     let lastError: unknown = null;
     let lastResponseTimeMs: number | null = null;
 
@@ -277,7 +274,7 @@ export class RectificationService {
     const errorType =
       lastError instanceof Error && lastError.name ? lastError.name : typeof lastError === "string" ? "Error" : "UnknownError";
 
-    this.repository.updateSyncState(order.id, {
+    await this.repository.updateSyncState(order.id, {
       status: "sync_failed",
       last_synced_at: syncedAt
     });
@@ -300,19 +297,19 @@ export class RectificationService {
     };
   }
 
-  private logSyncBatchStart(batchId: string, triggerSource: SyncTriggerSource, scannedCount: number): void {
+  private logSyncBatchStart(batchId: string, triggerSource: SyncTriggerSource, scannedCount: number): any {
     void batchId;
     void triggerSource;
     void scannedCount;
   }
 
-  private logSyncBatchResult(batch: RectificationSyncBatchRecord): void {
+  private logSyncBatchResult(batch: RectificationSyncBatchRecord): any {
     void batch;
   }
 
-  async createOrdersForReview(input: CreateOrdersInput): Promise<RectificationOrderRecord[]> {
-    const settings = createSystemSettingsService().getHuiYunYingApiSettings();
-    const huiYunYingService = createHuiYunYingRectificationService();
+  async createOrdersForReview(input: CreateOrdersInput): Promise<any> {
+    const settings = await createSystemSettingsService().getHuiYunYingApiSettings();
+    const huiYunYingService = await createHuiYunYingRectificationService();
     const normalizedImageUrls = Array.from(
       new Set(input.imageUrls.map((url) => normalizeRectificationImageUrl(String(url || ""))).filter(Boolean))
     );
@@ -347,7 +344,7 @@ export class RectificationService {
         remotePayload.storeId = Number(input.storeId);
       }
 
-      const plannedOrder = this.repository.create({
+      const plannedOrder = await this.repository.create({
         report_id: input.reportId,
         result_id: input.resultId,
         store_id: input.storeId ?? null,
@@ -377,7 +374,7 @@ export class RectificationService {
         const remoteResponse = await huiYunYingService.createRectificationOrder(remotePayload);
         const remoteOrderId = extractRemoteOrderId(remoteResponse);
         const lastSyncedAt = new Date().toISOString();
-        this.repository.updateSyncState(plannedOrder.id, {
+        await this.repository.updateSyncState(plannedOrder.id, {
           huiyunying_order_id: remoteOrderId || null,
           status: "created",
           response_payload: {
@@ -400,7 +397,7 @@ export class RectificationService {
       } catch (error) {
         const lastSyncedAt = new Date().toISOString();
         const responsePayload = buildDispatchErrorPayload(error);
-        this.repository.updateSyncState(plannedOrder.id, {
+        await this.repository.updateSyncState(plannedOrder.id, {
           status: "sync_failed",
           response_payload: responsePayload,
           last_synced_at: lastSyncedAt
@@ -418,46 +415,47 @@ export class RectificationService {
     return createdOrders;
   }
 
-  attachReviewLog(orderIds: number[], reviewLogId: number): void {
-    this.repository.attachSourceReviewLog(orderIds, reviewLogId);
+  async attachReviewLog(orderIds: number[], reviewLogId: number): Promise<any> {
+    await this.repository.attachSourceReviewLog(orderIds, reviewLogId);
   }
 
-  listOrders(filters: RectificationOrderFilters, context?: RequestContext): RectificationOrderRecord[] {
-    return this.repository.listAll(filters, context);
+  async listOrders(filters: RectificationOrderFilters, context?: RequestContext): Promise<any> {
+    return await this.repository.listAll(filters, context);
   }
 
-  listByResultId(resultId: number): RectificationOrderRecord[] {
-    return this.repository.listByResultId(resultId);
+  async listByResultId(resultId: number): Promise<any> {
+    return await this.repository.listByResultId(resultId);
   }
 
-  getSyncDashboard(days = 7, recentBatchLimit = 10): RectificationSyncDashboard {
+  async getSyncDashboard(days = 7, recentBatchLimit = 10): Promise<any> {
     return {
-      recent_batches: this.repository.listRecentSyncBatches(recentBatchLimit),
-      daily_stats: this.repository.listDailySyncStats(days)
+      recent_batches: await this.repository.listRecentSyncBatches(recentBatchLimit),
+      daily_stats: await this.repository.listDailySyncStats(days)
     };
   }
 
-  async syncOrderStatus(order: RectificationOrderRecord): Promise<RectificationOrderRecord> {
-    const settings = createSystemSettingsService().getHuiYunYingApiSettings();
+  async syncOrderStatus(order: RectificationOrderRecord): Promise<any> {
+    const settings = await createSystemSettingsService().getHuiYunYingApiSettings();
     await this.syncOrderWithRetry(order, settings.rectificationSyncRetryCount);
-    return this.repository.listByResultId(order.result_id).find((item) => item.id === order.id) || order;
+    const latestOrders = await this.repository.listByResultId(order.result_id);
+    return latestOrders.find((item) => item.id === order.id) || order;
   }
 
-  async syncOrdersByResultId(resultId: number): Promise<RectificationOrderRecord[]> {
-    const orders = this.repository.listByResultId(resultId);
+  async syncOrdersByResultId(resultId: number): Promise<any> {
+    const orders = await this.repository.listByResultId(resultId);
     for (const order of orders) {
       if (order.status === "corrected") {
         continue;
       }
       await this.syncOrderStatus(order);
     }
-    return this.repository.listByResultId(resultId);
+    return await this.repository.listByResultId(resultId);
   }
 
-  async syncPendingOrders(limit?: number, triggerSource: SyncTriggerSource = "scheduler"): Promise<RectificationSyncBatchRecord> {
-    const settings = createSystemSettingsService().getHuiYunYingApiSettings();
+  async syncPendingOrders(limit?: number, triggerSource: SyncTriggerSource = "scheduler"): Promise<any> {
+    const settings = await createSystemSettingsService().getHuiYunYingApiSettings();
     const batchLimit = limit ?? settings.rectificationSyncBatchSize;
-    const orders = this.repository.listPendingSync(batchLimit);
+    const orders = await this.repository.listPendingSync(batchLimit);
     if (orders.length === 0) {
       const now = new Date().toISOString();
       return {
@@ -494,7 +492,7 @@ export class RectificationService {
     const syncBatchId = `rectification-sync-${Date.now()}-${randomUUID().slice(0, 8)}`;
     const startedAt = new Date().toISOString();
     this.logSyncBatchStart(syncBatchId, triggerSource, orders.length);
-    const batch = this.repository.createSyncBatch({
+    const batch = await this.repository.createSyncBatch({
       sync_batch_id: syncBatchId,
       trigger_source: triggerSource,
       status: "running",
@@ -518,7 +516,7 @@ export class RectificationService {
 
     for (const order of orders) {
       const result = await this.syncOrderWithRetry(order, settings.rectificationSyncRetryCount);
-      this.repository.createSyncLog({
+      await this.repository.createSyncLog({
         sync_batch_id: syncBatchId,
         order_id: result.orderId,
         huiyunying_order_id: result.huiYunYingOrderId,
@@ -552,7 +550,7 @@ export class RectificationService {
     }
 
     const finishedAt = new Date().toISOString();
-    this.repository.finalizeSyncBatch(syncBatchId, {
+    await this.repository.finalizeSyncBatch(syncBatchId, {
       status: failedCount > 0 ? "completed_with_errors" : "completed",
       success_count: successCount,
       failed_count: failedCount,
@@ -571,7 +569,7 @@ export class RectificationService {
     });
 
     const completedBatch =
-      this.repository.listRecentSyncBatches(1).find((item) => item.sync_batch_id === syncBatchId) || batch;
+      (await this.repository.listRecentSyncBatches(1)).find((item) => item.sync_batch_id === syncBatchId) || batch;
     this.logSyncBatchResult(completedBatch);
     return completedBatch;
   }

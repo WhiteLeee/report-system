@@ -16,31 +16,31 @@ const reportService = createReportService();
 const rectificationService = createRectificationService();
 const systemSettingsService = createSystemSettingsService();
 
-function normalizeReviewStatus(value: string): ReviewFilterState {
+function normalizeReviewStatus(value: string): any {
   return value === "pending" || value === "in_progress" || value === "completed" ? value : "";
 }
 
-function normalizePage(value: string | string[] | undefined): number {
+function normalizePage(value: string | string[] | undefined): any {
   const page = typeof value === "string" ? Number(value) : NaN;
   return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
-function normalizeSemanticState(value: string): ReportResultSemanticState | "" {
+function normalizeSemanticState(value: string): any {
   return value === "issue_found" || value === "pass" || value === "inconclusive" || value === "inspection_failed"
     ? value
     : "";
 }
 
-function normalizePageSize(value: string | string[] | undefined): DetailFilters["pageSize"] {
+function normalizePageSize(value: string | string[] | undefined): any {
   const pageSize = typeof value === "string" ? Number(value) : NaN;
   return DETAIL_PAGE_SIZE_OPTIONS.includes(pageSize as DetailFilters["pageSize"]) ? (pageSize as DetailFilters["pageSize"]) : 30;
 }
 
-function normalizeImageMode(value: string | string[] | undefined): ReportImageMode {
+function normalizeImageMode(value: string | string[] | undefined): any {
   return value === "original" ? "original" : "evidence";
 }
 
-function normalizeImageFallback(value: string | string[] | undefined): "load_failed" | "" {
+function normalizeImageFallback(value: string | string[] | undefined): any {
   return value === "load_failed" ? "load_failed" : "";
 }
 
@@ -50,7 +50,7 @@ export default async function ReportResultDetailPage({
 }: {
   params: Promise<{ reportId: string; resultId: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("report:read");
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
@@ -61,7 +61,7 @@ export default async function ReportResultDetailPage({
     notFound();
   }
 
-  const report = reportService.getReportDetail(reportId, buildRequestContext(currentUser));
+  const report = await reportService.getReportDetail(reportId, buildRequestContext(currentUser));
 
   if (!report) {
     notFound();
@@ -87,7 +87,7 @@ export default async function ReportResultDetailPage({
   const failedInspectionId = typeof resolvedSearchParams.failedInspectionId === "string" ? resolvedSearchParams.failedInspectionId : "";
   const previewImage = typeof resolvedSearchParams.preview === "string" && resolvedSearchParams.preview === "1";
   const rectificationOrders = await rectificationService.syncOrdersByResultId(resultId);
-  const huiYunYingApiSettings = systemSettingsService.getHuiYunYingApiSettings();
+  const huiYunYingApiSettings = await systemSettingsService.getHuiYunYingApiSettings();
 
   return (
     <ReportResultDetailView

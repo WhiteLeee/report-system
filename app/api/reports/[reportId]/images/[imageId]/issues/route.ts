@@ -9,7 +9,7 @@ type ManualIssuePayload = {
   inspection_id: string;
 };
 
-async function readPayload(request: Request): Promise<ManualIssuePayload> {
+async function readPayload(request: Request): Promise<any> {
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     const json = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -30,8 +30,8 @@ async function readPayload(request: Request): Promise<ManualIssuePayload> {
 export async function POST(
   request: Request,
   context: { params: Promise<{ reportId: string; imageId: string }> }
-): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "review:write")) {
     return Response.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
@@ -58,7 +58,7 @@ export async function POST(
   }
 
   const operatorName = currentUser?.displayName || "report-system";
-  const issue = reviewService.createManualIssue(
+  const issue = await reviewService.createManualIssue(
     {
       report_id: reportId,
       result_id: imageId,

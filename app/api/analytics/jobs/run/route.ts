@@ -6,8 +6,8 @@ import { buildRequestUrl } from "@/backend/http/request-url";
 
 const analyticsJobService = createAnalyticsJobService();
 
-export async function POST(request: Request): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+export async function POST(request: Request): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "analytics:job:manage")) {
     return Response.json({ success: false, error: "Forbidden" }, { status: 403 });
   }

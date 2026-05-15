@@ -14,7 +14,7 @@ export class HuiYunYingRateLimiter {
     private readonly windowMs: number
   ) {}
 
-  async acquire(): Promise<void> {
+  async acquire(): Promise<any> {
     const now = Date.now();
     if (!this.bucket.startedAt || now - this.bucket.startedAt >= this.windowMs) {
       this.bucket = { startedAt: now, count: 1 };

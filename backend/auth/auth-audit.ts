@@ -6,7 +6,7 @@ export interface AuditRequestMeta {
   userAgent: string;
 }
 
-export function readAuditRequestMeta(request: Request): AuditRequestMeta {
+export function readAuditRequestMeta(request: Request): any {
   const forwardedFor = request.headers.get("x-forwarded-for") || "";
   const ipAddress = forwardedFor
     .split(",")
@@ -20,7 +20,7 @@ export function readAuditRequestMeta(request: Request): AuditRequestMeta {
   };
 }
 
-export function toUserAuditSnapshot(user: UserAccount | null | undefined): Record<string, unknown> {
+export function toUserAuditSnapshot(user: UserAccount | null | undefined): any {
   if (!user) {
     return {};
   }
@@ -38,7 +38,7 @@ export function toUserAuditSnapshot(user: UserAccount | null | undefined): Recor
   };
 }
 
-export function toAuditActor(user: SessionUser | null): { operatorUserId: number | null; operatorUsername: string } {
+export function toAuditActor(user: SessionUser | null): any {
   if (!user) {
     return { operatorUserId: null, operatorUsername: "" };
   }
@@ -48,7 +48,7 @@ export function toAuditActor(user: SessionUser | null): { operatorUserId: number
   };
 }
 
-export function stringifyAuditPayload(value: unknown): string {
+export function stringifyAuditPayload(value: unknown): any {
   try {
     return JSON.stringify(value ?? {});
   } catch {

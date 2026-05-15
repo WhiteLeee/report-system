@@ -6,7 +6,7 @@ import { reportPublishSchema } from "@/backend/report/report.schema";
 const reportService = createReportService();
 const reportSystemConfig = getReportSystemConfig();
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: Request): Promise<any> {
   let payload: unknown;
 
   try {
@@ -35,7 +35,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const result = reportService.publishReport(parsed.data);
+    const result = await reportService.publishReport(parsed.data);
 
     return Response.json(
       {

@@ -6,11 +6,11 @@ import type { AnalyticsRepository } from "@/backend/analytics/queries/analytics.
 export class AnalyticsService {
   constructor(private readonly repository: AnalyticsRepository) {}
 
-  getDashboard(filters: AnalyticsFilters = {}, context: RequestContext = {}, issueTypeLimit?: number): AnalyticsDashboard {
-    return this.repository.getDashboard(normalizeAnalyticsFilters(filters), context, issueTypeLimit);
+  async getDashboard(filters: AnalyticsFilters = {}, context: RequestContext = {}, issueTypeLimit?: number): Promise<any> {
+    return await this.repository.getDashboard(normalizeAnalyticsFilters(filters), context, issueTypeLimit);
   }
 
-  getFilterOptions(filters: AnalyticsFilters = {}, context: RequestContext = {}): AnalyticsFilterOptions {
-    return this.repository.getFilterOptions(normalizeAnalyticsFilters(filters), context);
+  async getFilterOptions(filters: AnalyticsFilters = {}, context: RequestContext = {}): Promise<any> {
+    return await this.repository.getFilterOptions(normalizeAnalyticsFilters(filters), context);
   }
 }

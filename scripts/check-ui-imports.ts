@@ -35,7 +35,7 @@ const forbiddenImports: ForbiddenImport[] = [
   }
 ];
 
-function collectSourceFiles(directory: string): string[] {
+function collectSourceFiles(directory: string): any {
   if (!fs.existsSync(directory)) {
     return [];
   }
@@ -61,7 +61,7 @@ function collectSourceFiles(directory: string): string[] {
   return files;
 }
 
-function findViolations(filePath: string): Violation[] {
+function findViolations(filePath: string): any {
   const content = fs.readFileSync(filePath, "utf-8");
   const rows = content.split("\n");
   const violations: Violation[] = [];

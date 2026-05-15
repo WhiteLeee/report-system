@@ -21,7 +21,7 @@ npm run tenant:init -- \
   --base-url https://report-dlb.example.com \
   --logo-url https://cdn.example.com/dlb-logo.png \
   --data-dir ./data \
-  --db-path ./data/report-system.sqlite \
+  --db-url postgres://postgres:postgres@127.0.0.1:5432/report_system \
   --force
 ```
 
@@ -29,8 +29,8 @@ npm run tenant:init -- \
 
 1. `.env.local`
 2. `config/tenant.json`
-3. SQLite 目录
-4. 已迁移的数据库文件
+3. 数据目录
+4. 已迁移的 PostgreSQL 表结构
 
 ### 2.3 构建并启动
 
@@ -67,18 +67,18 @@ PORT=3000 npm run start
 7. `REPORT_SYSTEM_PRIMARY_COLOR_STRONG`
 8. `REPORT_SYSTEM_DEFAULT_TIMEZONE`
 9. `REPORT_SYSTEM_DATA_DIR`
-10. `REPORT_SYSTEM_DB_PATH`
+10. `REPORT_SYSTEM_DB_URL`
 11. `REPORT_SYSTEM_TENANT_CONFIG_PATH`
 
 ## 5. 部署建议
 
 1. 一个客户一套代码实例目录或一套容器实例。
-2. 一个客户一个独立数据库文件。
+2. 一个客户一个独立数据库（或独立 schema）。
 3. 一个客户一个独立环境文件。
 4. VisionAgent 发布目标应指向该客户实例自己的域名。
 
 ## 6. 已知边界
 
 1. 当前客户品牌主要体现在标题、品牌名、Logo 和主题色。
-2. 当前仍使用 SQLite，适合单机低并发。
+2. 当前为 PostgreSQL 单库模式，需按负载规划连接池与索引策略。
 3. 当前未启用 API 鉴权，适合同机或内网联调，后续可再补。

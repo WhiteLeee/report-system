@@ -111,24 +111,24 @@ export interface NormalizedPublishedReport extends ReviewProgressSummary {
   inspections: NormalizedInspectionRecord[];
 }
 
-function safeString(value: unknown): string {
+function safeString(value: unknown): any {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function safeNumber(value: unknown): number {
+function safeNumber(value: unknown): any {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function normalizeIncomingReviewState(value: unknown): ResultReviewState {
+function normalizeIncomingReviewState(value: unknown): any {
   return value === "completed" || value === "reviewed" ? "completed" : "pending";
 }
 
-function readReportType(payload: ReportPublishPayload): string {
+function readReportType(payload: ReportPublishPayload): any {
   const meta = payload.report.report_meta;
   return safeString(meta.report_type) || "daily";
 }
 
-function buildReportVersion(payload: ReportPublishPayload): string {
+function buildReportVersion(payload: ReportPublishPayload): any {
   const meta = payload.report.report_meta;
   const reportType = readReportType(payload);
   const planId = safeString(meta.plan_id) || "all-plans";
@@ -139,7 +139,7 @@ function buildReportVersion(payload: ReportPublishPayload): string {
 
 const IMAGE_URL_PATTERN = /^(.+?\.(?:jpg|jpeg|png|webp|bmp|gif|avif|heic|heif))(?:$|\/)/i;
 
-function normalizeDisplayImageUrl(value: unknown): string {
+function normalizeDisplayImageUrl(value: unknown): any {
   const rawUrl = safeString(value);
   if (!rawUrl) {
     return "";
@@ -154,11 +154,11 @@ function normalizeDisplayImageUrl(value: unknown): string {
   return withoutQuery;
 }
 
-function normalizePayloadImageUrl(value: unknown): string {
+function normalizePayloadImageUrl(value: unknown): any {
   return safeString(value);
 }
 
-function resolveDisplayUrl(capture: ReportCaptureFact | undefined): string {
+function resolveDisplayUrl(capture: ReportCaptureFact | undefined): any {
   const previewUrl = normalizeDisplayImageUrl(capture?.preview_url);
   if (previewUrl) {
     return previewUrl;
@@ -170,11 +170,11 @@ function resolveDisplayUrl(capture: ReportCaptureFact | undefined): string {
   return "about:blank";
 }
 
-function emptyAboutBlank(value: string): string {
+function emptyAboutBlank(value: string): any {
   return value === "about:blank" ? "" : value;
 }
 
-function resolveOriginalImageUrl(capture: ReportCaptureFact | undefined, override: unknown): string {
+function resolveOriginalImageUrl(capture: ReportCaptureFact | undefined, override: unknown): any {
   return normalizePayloadImageUrl(override) || emptyAboutBlank(resolveDisplayUrl(capture));
 }
 
@@ -183,7 +183,7 @@ function resolveEvidenceImage(input: {
   evidenceImageUrl: unknown;
   evidenceImageSource: unknown;
   originalImageUrl: unknown;
-}): ResolvedEvidenceImage {
+}): any {
   const payloadEvidenceUrl = normalizePayloadImageUrl(input.evidenceImageUrl);
   const originalImageUrl = resolveOriginalImageUrl(input.capture, input.originalImageUrl);
   const displayImageUrl = payloadEvidenceUrl || originalImageUrl || emptyAboutBlank(resolveDisplayUrl(input.capture));
@@ -196,11 +196,11 @@ function resolveEvidenceImage(input: {
   };
 }
 
-function buildCaptureSkillKey(captureId: string, skillId: string): string {
+function buildCaptureSkillKey(captureId: string, skillId: string): any {
   return `${captureId}\u0000${skillId}`;
 }
 
-function buildProgressSummary(total: number, completed: number): ReviewProgressSummary {
+function buildProgressSummary(total: number, completed: number): any {
   const normalizedTotal = Math.max(0, total);
   const normalizedCompleted = Math.max(0, Math.min(completed, normalizedTotal));
   const pending = Math.max(0, normalizedTotal - normalizedCompleted);
@@ -221,7 +221,7 @@ function buildProgressSummary(total: number, completed: number): ReviewProgressS
   };
 }
 
-export function normalizePublishedReport(payload: ReportPublishPayload): NormalizedPublishedReport {
+export function normalizePublishedReport(payload: ReportPublishPayload): any {
   const meta = payload.report.report_meta;
   const summaryMetrics = (payload.report.summary.metrics ?? {}) as Record<string, JsonValue>;
   const facts = payload.report.facts;

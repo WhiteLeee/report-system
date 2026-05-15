@@ -16,7 +16,7 @@ import {
 } from "@/backend/analytics/adapters/report-analytics.adapter";
 import type { AnalyticsFactRepository } from "@/backend/analytics/facts/analytics-fact.repository";
 
-function safeParseRecord(json: string): Record<string, unknown> {
+function safeParseRecord(json: string): any {
   try {
     const parsed = JSON.parse(json) as unknown;
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
@@ -25,7 +25,7 @@ function safeParseRecord(json: string): Record<string, unknown> {
   }
 }
 
-function readString(record: Record<string, unknown>, key: string): string | null {
+function readString(record: Record<string, unknown>, key: string): any {
   const value = record[key];
   if (typeof value !== "string") {
     return null;
@@ -37,19 +37,14 @@ function readString(record: Record<string, unknown>, key: string): string | null
 export class AnalyticsFactService {
   constructor(private readonly repository: AnalyticsFactRepository) {}
 
-  rebuildAllFacts(): {
-    result_row_count: number;
-    issue_row_count: number;
-    review_row_count: number;
-    rectification_row_count: number;
-  } {
-    const reportRows = db.select().from(reportTable).all();
-    const storeRows = db.select().from(reportStoreTable).all();
-    const resultRows = db.select().from(reportImageTable).all();
-    const issueRows = db.select().from(reportIssueTable).all();
-    const inspectionRows = db.select().from(reportInspectionTable).all();
-    const reviewLogRows = db.select().from(reportReviewLogTable).all();
-    const rectificationRows = db.select().from(reportRectificationOrderTable).all();
+  async rebuildAllFacts(): Promise<any> {
+    const reportRows = await db.select().from(reportTable);
+    const storeRows = await db.select().from(reportStoreTable);
+    const resultRows = await db.select().from(reportImageTable);
+    const issueRows = await db.select().from(reportIssueTable);
+    const inspectionRows = await db.select().from(reportInspectionTable);
+    const reviewLogRows = await db.select().from(reportReviewLogTable);
+    const rectificationRows = await db.select().from(reportRectificationOrderTable);
 
     const reportMap = new Map<number, (typeof reportTable.$inferSelect)>(reportRows.map((row) => [row.id, row] as const));
     const storeMap = new Map<
@@ -113,7 +108,7 @@ export class AnalyticsFactService {
           inspectionRows: inspectionMap.get(resultRow.id) || []
         });
       })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+      .filter((row): any => Boolean(row));
 
     const issueFactRows = issueRows
       .map((issueRow) => {
@@ -128,7 +123,7 @@ export class AnalyticsFactService {
           storeRow: issueRow.storeId ? storeMap.get(storeKey) || null : null
         });
       })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+      .filter((row): any => Boolean(row));
 
     const reviewFactRows = reviewLogRows
       .map((reviewLogRow) => {
@@ -143,7 +138,7 @@ export class AnalyticsFactService {
           storeRow: reviewLogRow.storeId ? storeMap.get(storeKey) || null : null
         });
       })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+      .filter((row): any => Boolean(row));
 
     const rectificationFactRows = rectificationRows
       .map((rectificationRow) => {
@@ -158,22 +153,17 @@ export class AnalyticsFactService {
           storeRow: rectificationRow.storeId ? storeMap.get(storeKey) || null : null
         });
       })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+      .filter((row): any => Boolean(row));
 
     return {
-      result_row_count: this.repository.replaceResultFacts(resultFactRows),
-      issue_row_count: this.repository.replaceIssueFacts(issueFactRows),
-      review_row_count: this.repository.replaceReviewFacts(reviewFactRows),
-      rectification_row_count: this.repository.replaceRectificationFacts(rectificationFactRows)
+      result_row_count: await this.repository.replaceResultFacts(resultFactRows),
+      issue_row_count: await this.repository.replaceIssueFacts(issueFactRows),
+      review_row_count: await this.repository.replaceReviewFacts(reviewFactRows),
+      rectification_row_count: await this.repository.replaceRectificationFacts(rectificationFactRows)
     };
   }
 
-  rebuildAllResultFacts(): {
-    result_row_count: number;
-    issue_row_count: number;
-    review_row_count: number;
-    rectification_row_count: number;
-  } {
+  rebuildAllResultFacts(): any {
     return this.rebuildAllFacts();
   }
 }

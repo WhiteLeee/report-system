@@ -16,21 +16,21 @@ import type {
 } from "@/backend/report/report.types";
 
 export interface ReportRepository {
-  publishReport(payload: ReportPublishPayload, context?: RequestContext): PublishReceipt;
-  getPublishStatus(publishId: string, context?: RequestContext): PublishStatusReceipt;
-  listReports(filters?: ReportFilters, context?: RequestContext): ReportSummary[];
-  getReportDetail(reportId: number, context?: RequestContext): ReportDetail | null;
+  publishReport(payload: ReportPublishPayload, context?: RequestContext): Promise<any>;
+  getPublishStatus(publishId: string, context?: RequestContext): Promise<any>;
+  listReports(filters?: ReportFilters, context?: RequestContext): Promise<any>;
+  getReportDetail(reportId: number, context?: RequestContext): Promise<any>;
   updateImageReviewStatus(
     reportId: number,
     imageId: number,
     input: ReviewStatusUpdateInput,
     context?: RequestContext
-  ): ReviewResultUpdateResult | null;
-  createManualIssue(input: CreateManualReportIssueInput, context?: RequestContext): ReportIssue | null;
+  ): Promise<any>;
+  createManualIssue(input: CreateManualReportIssueInput, context?: RequestContext): Promise<any>;
   listReviewLogs(
     reportId: number,
     limit?: number,
     imageId?: number,
     context?: RequestContext
-  ): ReportReviewLog[];
+  ): Promise<any>;
 }

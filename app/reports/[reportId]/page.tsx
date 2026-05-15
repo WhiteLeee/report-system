@@ -11,22 +11,22 @@ export const dynamic = "force-dynamic";
 
 const reportService = createReportService();
 
-function normalizeReviewStatus(value: string): ReviewFilterState {
+function normalizeReviewStatus(value: string): any {
   return value === "pending" || value === "in_progress" || value === "completed" ? value : "";
 }
 
-function normalizePage(value: string | string[] | undefined): number {
+function normalizePage(value: string | string[] | undefined): any {
   const page = typeof value === "string" ? Number(value) : NaN;
   return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
-function normalizeSemanticState(value: string): ReportResultSemanticState | "" {
+function normalizeSemanticState(value: string): any {
   return value === "issue_found" || value === "pass" || value === "inconclusive" || value === "inspection_failed"
     ? value
     : "";
 }
 
-function normalizePageSize(value: string | string[] | undefined): DetailFilters["pageSize"] {
+function normalizePageSize(value: string | string[] | undefined): any {
   const pageSize = typeof value === "string" ? Number(value) : NaN;
   return DETAIL_PAGE_SIZE_OPTIONS.includes(pageSize as DetailFilters["pageSize"]) ? (pageSize as DetailFilters["pageSize"]) : 30;
 }
@@ -37,7 +37,7 @@ export default async function ReportDetailPage({
 }: {
   params: Promise<{ reportId: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("report:read");
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
@@ -47,7 +47,7 @@ export default async function ReportDetailPage({
     notFound();
   }
 
-  const report = reportService.getReportDetail(reportId, buildRequestContext(currentUser));
+  const report = await reportService.getReportDetail(reportId, buildRequestContext(currentUser));
 
   if (!report) {
     notFound();

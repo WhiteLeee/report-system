@@ -34,7 +34,7 @@ function parsePositiveInt(value: string | string[] | undefined, fallback: number
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function buildFilters(searchParams: Record<string, string | string[] | undefined>): ReportFilters {
+function buildFilters(searchParams: Record<string, string | string[] | undefined>): any {
   return {
     enterprise: "",
     reportType: typeof searchParams.reportType === "string" ? searchParams.reportType : "",
@@ -51,20 +51,26 @@ export default async function ReportsPage({
   searchParams
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("report:read", "/reports");
   const resolvedSearchParams = await searchParams;
   const filters = buildFilters(resolvedSearchParams);
   const requestContext = buildRequestContext(currentUser);
-  const allReports = reportService.listReports({}, requestContext);
-  const filteredReports = reportService.listReports(filters, requestContext);
+  const allReports = await reportService.listReports({}, requestContext);
+  const filteredReports = await reportService.listReports(filters, requestContext);
   const pageSize = parsePositiveInt(resolvedSearchParams.pageSize, PAGE_SIZE_OPTIONS[0]);
   const totalReports = filteredReports.length;
   const totalPages = Math.max(1, Math.ceil(totalReports / pageSize));
   const page = Math.min(parsePositiveInt(resolvedSearchParams.page, 1), totalPages);
   const startIndex = (page - 1) * pageSize;
   const reports = filteredReports.slice(startIndex, startIndex + pageSize);
-  const reportTypeOptions = Array.from(new Set(allReports.map((report) => report.report_type).filter(Boolean))).sort();
+  const reportTypeOptions: string[] = Array.from(
+    new Set<string>(
+      allReports
+        .map((report) => report.report_type)
+        .filter((reportType): reportType is string => typeof reportType === "string" && reportType.length > 0)
+    )
+  ).sort();
   const pendingReports = allReports.filter((report) => report.pending_result_count > 0).length;
   const totalIssues = allReports.reduce((sum, report) => sum + report.issue_count, 0);
   const totalImages = allReports.reduce((sum, report) => sum + report.total_result_count, 0);

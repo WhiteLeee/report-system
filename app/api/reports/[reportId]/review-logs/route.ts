@@ -6,8 +6,8 @@ const reviewService = createReportReviewService();
 export async function GET(
   request: Request,
   context: { params: Promise<{ reportId: string }> }
-): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "report:read")) {
     return Response.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
@@ -21,7 +21,7 @@ export async function GET(
   const url = new URL(request.url);
   const limit = Number(url.searchParams.get("limit") || "20");
   const imageId = Number(url.searchParams.get("imageId") || "0");
-  const logs = reviewService.listRecentReviewLogs(reportId, limit, imageId, buildRequestContext(currentUser));
+  const logs = await reviewService.listRecentReviewLogs(reportId, limit, imageId, buildRequestContext(currentUser));
 
   return Response.json({
     success: true,

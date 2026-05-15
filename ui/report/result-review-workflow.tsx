@@ -175,7 +175,7 @@ export function ResultReviewWorkflow({
     }
   }
 
-  async function submitReview(reviewStatus: "pending" | "completed") {
+  async function submitReview(reviewStatus: "pending" | "completed"): Promise<any> {
     setErrorMessage("");
     try {
       const response = await fetch(actionUrl, {
@@ -273,7 +273,7 @@ export function ResultReviewWorkflow({
     }
   }
 
-  async function handleAddManualIssue() {
+  async function handleAddManualIssue(): Promise<any> {
     setErrorMessage("");
     const title = manualIssueTitle.trim();
     const description = manualIssueDescription.trim();

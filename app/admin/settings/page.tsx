@@ -48,28 +48,28 @@ const tabs = [
 
 type SettingsTab = (typeof tabs)[number]["key"];
 
-function formatDateTime(value: string | null): string {
+function formatDateTime(value: string | null): any {
   if (!value) {
     return "-";
   }
   return value.includes("T") ? value.replace("T", " ").slice(0, 16) : value.slice(0, 16);
 }
 
-function analyticsJobLabel(jobType: AnalyticsPipelineHealthItem["job_type"]): string {
+function analyticsJobLabel(jobType: AnalyticsPipelineHealthItem["job_type"]): any {
   if (jobType === "result_fact_rebuild") {
     return "分析事实刷新";
   }
   return "日快照刷新";
 }
 
-function analyticsJobDescription(jobType: AnalyticsPipelineHealthItem["job_type"]): string {
+function analyticsJobDescription(jobType: AnalyticsPipelineHealthItem["job_type"]): any {
   if (jobType === "result_fact_rebuild") {
     return "把巡检结果、问题项、复核和整改单同步成分析事实数据。";
   }
   return "把分析事实汇总成按天统计的概览与趋势快照。";
 }
 
-function healthTone(status: AnalyticsPipelineHealthItem["status"]): "default" | "secondary" | "outline" {
+function healthTone(status: AnalyticsPipelineHealthItem["status"]): any {
   if (status === "healthy") {
     return "secondary";
   }
@@ -79,7 +79,7 @@ function healthTone(status: AnalyticsPipelineHealthItem["status"]): "default" | 
   return "outline";
 }
 
-function resolveTab(raw: string | string[] | undefined): SettingsTab {
+function resolveTab(raw: string | string[] | undefined): any {
   const value = typeof raw === "string" ? raw.trim() : "";
   return tabs.some((item) => item.key === value) ? (value as SettingsTab) : "api";
 }
@@ -343,8 +343,8 @@ function RectificationSettingsForm({ settings }: { settings: HuiYunYingApiSettin
   );
 }
 
-function RectificationSyncDashboardSection() {
-  const syncDashboard = rectificationService.getSyncDashboard();
+async function RectificationSyncDashboardSection(): Promise<any> {
+  const syncDashboard = await rectificationService.getSyncDashboard();
   const latestBatch = syncDashboard.recent_batches[0] || null;
 
   return (
@@ -757,22 +757,22 @@ export default async function AdminSettingsPage({
   searchParams
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("system:settings:read", "/admin/settings");
   if (!currentUser.roles.includes("admin")) {
     redirect("/reports");
   }
 
-  const settings = systemSettingsService.getHuiYunYingApiSettings();
-  const brandingSettings = systemSettingsService.getEnterpriseBrandingSettings();
+  const settings = await systemSettingsService.getHuiYunYingApiSettings();
+  const brandingSettings = await systemSettingsService.getEnterpriseBrandingSettings();
   const resolvedSearchParams = await searchParams;
   const activeTab = resolveTab(resolvedSearchParams.tab);
   const errorMessage =
     typeof resolvedSearchParams.error === "string" ? decodeURIComponent(resolvedSearchParams.error) : "";
-  const deliveryMode = systemSettingsService.getDeliveryMode();
-  const securityPolicy = systemSettingsService.getAuthSecurityPolicy();
-  const navigationMenus = authService.listManagedNavigationMenus();
-  const analyticsHealthItems = analyticsJobService.getHealthSummary({
+  const deliveryMode = await systemSettingsService.getDeliveryMode();
+  const securityPolicy = await systemSettingsService.getAuthSecurityPolicy();
+  const navigationMenus = await authService.listManagedNavigationMenus();
+  const analyticsHealthItems = await analyticsJobService.getHealthSummary({
     result_fact_rebuild: settings.analyticsFactRefreshIntervalMs,
     daily_snapshot_rebuild: settings.analyticsSnapshotRefreshIntervalMs
   });

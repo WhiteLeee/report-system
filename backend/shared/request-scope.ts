@@ -6,11 +6,11 @@ import { organizationMasterTable, storeMasterProfileTable } from "@/backend/data
 
 export type ScopeValues = Pick<RequestContext, "enterpriseScopeIds" | "organizationScopeIds" | "storeScopeIds">;
 
-export function normalizeScopeIds(values: string[] | undefined): string[] {
+export function normalizeScopeIds(values: string[] | undefined): any {
   return Array.from(new Set((values || []).map((item) => item.trim()).filter(Boolean)));
 }
 
-export function canAccessEnterprise(scope: ScopeValues, enterpriseId: string): boolean {
+export function canAccessEnterprise(scope: ScopeValues, enterpriseId: string): any {
   const enterpriseScopeIds = normalizeScopeIds(scope.enterpriseScopeIds);
   if (enterpriseScopeIds.length === 0) {
     return true;
@@ -18,7 +18,7 @@ export function canAccessEnterprise(scope: ScopeValues, enterpriseId: string): b
   return enterpriseScopeIds.includes(enterpriseId);
 }
 
-export function resolveStoreIdsFromScope(scope: ScopeValues, enterpriseId?: string): string[] | null {
+export async function resolveStoreIdsFromScope(scope: ScopeValues, enterpriseId?: string): Promise<any> {
   const storeScopeIds = normalizeScopeIds(scope.storeScopeIds);
   if (storeScopeIds.length > 0) {
     return storeScopeIds;
@@ -33,15 +33,14 @@ export function resolveStoreIdsFromScope(scope: ScopeValues, enterpriseId?: stri
   if (enterpriseId) {
     organizationWhere.push(eq(organizationMasterTable.enterpriseId, enterpriseId));
   }
-  const organizationRows = db
-    .select({
-      enterpriseId: organizationMasterTable.enterpriseId,
-      organizeCode: organizationMasterTable.organizeCode,
-      parentCode: organizationMasterTable.parentCode
-    })
-    .from(organizationMasterTable)
-    .where(and(...organizationWhere))
-    .all()
+  const organizationRows = (await db
+      .select({
+        enterpriseId: organizationMasterTable.enterpriseId,
+        organizeCode: organizationMasterTable.organizeCode,
+        parentCode: organizationMasterTable.parentCode
+      })
+      .from(organizationMasterTable)
+      .where(and(...organizationWhere)))
     .filter((row) => canAccessEnterprise(scope, row.enterpriseId));
 
   const childrenMap = new Map<string, string[]>();
@@ -75,15 +74,14 @@ export function resolveStoreIdsFromScope(scope: ScopeValues, enterpriseId?: stri
 
   return Array.from(
     new Set(
-      db
-        .select({
-          enterpriseId: storeMasterProfileTable.enterpriseId,
-          storeId: storeMasterProfileTable.storeId,
-          organizeCode: storeMasterProfileTable.organizeCode
-        })
-        .from(storeMasterProfileTable)
-        .where(and(...storeWhere))
-        .all()
+      (await db
+                .select({
+                  enterpriseId: storeMasterProfileTable.enterpriseId,
+                  storeId: storeMasterProfileTable.storeId,
+                  organizeCode: storeMasterProfileTable.organizeCode
+                })
+                .from(storeMasterProfileTable)
+                .where(and(...storeWhere)))
         .filter(
           (row) =>
             canAccessEnterprise(scope, row.enterpriseId) &&
@@ -94,11 +92,11 @@ export function resolveStoreIdsFromScope(scope: ScopeValues, enterpriseId?: stri
   );
 }
 
-export function resolveScopedStoreIds(context: RequestContext, enterpriseId?: string): string[] | null {
-  return resolveStoreIdsFromScope(context, enterpriseId);
+export async function resolveScopedStoreIds(context: RequestContext, enterpriseId?: string): Promise<any> {
+  return await resolveStoreIdsFromScope(context, enterpriseId);
 }
 
-export function intersectScopedIds(left: string[] | null, right: string[] | null): string[] | null {
+export function intersectScopedIds(left: string[] | null, right: string[] | null): any {
   if (left === null) {
     return right;
   }

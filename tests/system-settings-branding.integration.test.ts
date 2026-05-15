@@ -1,20 +1,25 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
+import { Client } from "pg";
+import { resolveTestAdminDbUrl, resolveTestDbUrl, shouldManageIsolatedDatabase } from "./postgres-test-env";
 
 const require = createRequire(import.meta.url);
 require.extensions[".css"] = () => ({});
 
 const tempRoot = mkdtempSync(join(tmpdir(), "report-settings-branding-"));
 const dataDir = join(tempRoot, "data");
-const dbPath = join(dataDir, "report-system.sqlite");
+const isolatedDbName = `report_test_settings_${randomUUID().replace(/-/g, "_")}`;
+const dbUrl = resolveTestDbUrl(isolatedDbName);
+const adminDbUrl = resolveTestAdminDbUrl();
 mkdirSync(dataDir, { recursive: true });
 
 process.env.REPORT_SYSTEM_DATA_DIR = dataDir;
-process.env.REPORT_SYSTEM_DB_PATH = dbPath;
+process.env.REPORT_SYSTEM_DB_URL = dbUrl;
 process.env.REPORT_SYSTEM_TENANT_ID = "demo";
 process.env.REPORT_SYSTEM_TENANT_NAME = "示例客户";
 process.env.REPORT_SYSTEM_BRAND_NAME = "示例报告系统";
@@ -32,7 +37,34 @@ let layoutModule: typeof import("../app/layout");
 
 const uploadedFilePaths = new Set<string>();
 
-function cookieHeader(sessionToken: string): string {
+async function createIsolatedDatabase(): Promise<void> {
+  if (!shouldManageIsolatedDatabase()) {
+    return;
+  }
+  const client = new Client({ connectionString: adminDbUrl });
+  await client.connect();
+  try {
+    await client.query(`create database "${isolatedDbName}"`);
+  } finally {
+    await client.end();
+  }
+}
+
+async function dropIsolatedDatabase(): Promise<void> {
+  if (!shouldManageIsolatedDatabase()) {
+    return;
+  }
+  const client = new Client({ connectionString: adminDbUrl });
+  await client.connect();
+  try {
+    await client.query("select pg_terminate_backend(pid) from pg_stat_activity where datname = $1 and pid <> pg_backend_pid()", [isolatedDbName]);
+    await client.query(`drop database if exists "${isolatedDbName}"`);
+  } finally {
+    await client.end();
+  }
+}
+
+function cookieHeader(sessionToken: string): any {
   return `${sessionModule.SESSION_COOKIE_NAME}=${encodeURIComponent(sessionToken)}`;
 }
 
@@ -40,11 +72,11 @@ function assertOkAuthResult(
   authResult:
     | { ok: true; sessionToken: string; expiresAt: string }
     | { ok: false; reason: string; lockedUntil?: string }
-): asserts authResult is { ok: true; sessionToken: string; expiresAt: string } {
+): any {
   assert.equal(authResult.ok, true);
 }
 
-function trackPublicAsset(publicUrl: string): void {
+function trackPublicAsset(publicUrl: string): any {
   const trimmed = publicUrl.trim();
   if (!trimmed.startsWith("/")) {
     return;
@@ -52,8 +84,10 @@ function trackPublicAsset(publicUrl: string): void {
   uploadedFilePaths.add(join(process.cwd(), "public", trimmed.slice(1)));
 }
 
-before(async () => {
-  await import("../backend/database/migrate");
+before(async (): Promise<any> => {
+  await createIsolatedDatabase();
+  const migrateModule = await import("../backend/database/migrate");
+  await migrateModule.runMigrations();
   [authModule, sessionModule, systemSettingsModule, layoutModule, settingsSaveRoute] = await Promise.all([
     import("../backend/auth/auth.module"),
     import("../backend/auth/session"),
@@ -62,20 +96,23 @@ before(async () => {
     import("../app/admin/settings/save/route")
   ]);
 
-  authModule.createAuthService().ensureBootstrap();
+  await authModule.createAuthService().ensureBootstrap();
 });
 
-after(() => {
+after(async (): Promise<any> => {
   for (const filePath of uploadedFilePaths) {
     rmSync(filePath, { force: true });
   }
+  const { closeDatabasePool } = await import("../backend/database/client");
+  await closeDatabasePool();
+  await dropIsolatedDatabase();
   rmSync(tempRoot, { recursive: true, force: true });
 });
 
-test("settings save route rejects non-admin user for branding updates", async () => {
+test("settings save route rejects non-admin user for branding updates", async (): Promise<any> => {
   const authService = authModule.createAuthService();
   const username = `viewer_${Date.now()}`;
-  authService.createUser({
+  await authService.createUser({
     username,
     password: "ViewerPassword123",
     displayName: "普通查看者",
@@ -85,7 +122,7 @@ test("settings save route rejects non-admin user for branding updates", async ()
     storeScopeIds: []
   });
 
-  const authResult = authService.authenticate(username, "ViewerPassword123");
+  const authResult = await authService.authenticate(username, "ViewerPassword123");
   assertOkAuthResult(authResult);
 
   const formData = new FormData();
@@ -104,9 +141,9 @@ test("settings save route rejects non-admin user for branding updates", async ()
   assert.equal(response.status, 403);
 });
 
-test("branding upload rejects fake png content by signature check", async () => {
+test("branding upload rejects fake png content by signature check", async (): Promise<any> => {
   const authService = authModule.createAuthService();
-  const authResult = authService.authenticate("admin", "ChangeMe123!");
+  const authResult = await authService.authenticate("admin", "ChangeMe123!");
   assertOkAuthResult(authResult);
 
   const formData = new FormData();
@@ -132,9 +169,9 @@ test("branding upload rejects fake png content by signature check", async () => 
   assert.ok(errorMessage.includes("Logo 文件内容校验失败"));
 });
 
-test("branding upload persists urls and audit fields for admin", async () => {
+test("branding upload persists urls and audit fields for admin", async (): Promise<any> => {
   const authService = authModule.createAuthService();
-  const authResult = authService.authenticate("admin", "ChangeMe123!");
+  const authResult = await authService.authenticate("admin", "ChangeMe123!");
   assertOkAuthResult(authResult);
 
   const pngSignature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
@@ -160,7 +197,7 @@ test("branding upload persists urls and audit fields for admin", async () => {
   assert.ok(location.includes("/admin/settings?tab=branding"));
   assert.ok(!location.includes("error="));
 
-  const settings = systemSettingsModule.createSystemSettingsService().getEnterpriseBrandingSettings();
+  const settings = await systemSettingsModule.createSystemSettingsService().getEnterpriseBrandingSettings();
   assert.equal(settings.enterpriseName, "品牌配置测试企业");
   assert.equal(settings.primaryColor, "#123456");
   assert.equal(settings.primaryColorStrong, "#102030");
@@ -173,9 +210,9 @@ test("branding upload persists urls and audit fields for admin", async () => {
   trackPublicAsset(settings.faviconUrl);
 });
 
-test("metadata appends favicon version query by branding updatedAt", () => {
+test("metadata appends favicon version query by branding updatedAt", async (): Promise<any> => {
   const systemSettingsService = systemSettingsModule.createSystemSettingsService();
-  systemSettingsService.saveEnterpriseBrandingSettings({
+  await systemSettingsService.saveEnterpriseBrandingSettings({
     enterpriseName: "版本参数测试企业",
     logoUrl: "/uploads/branding/logo-v2.png",
     faviconUrl: "/uploads/branding/favicon-v2.png",
@@ -185,7 +222,7 @@ test("metadata appends favicon version query by branding updatedAt", () => {
     updatedAt: "2026-04-10T10:20:30.000Z"
   });
 
-  const metadata = layoutModule.generateMetadata();
+  const metadata = await layoutModule.generateMetadata();
   const icons = metadata.icons as { icon?: string; apple?: string } | undefined;
   assert.ok(icons);
   assert.equal(typeof icons?.icon, "string");
