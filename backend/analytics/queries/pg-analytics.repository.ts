@@ -14,6 +14,7 @@ import {
 import type { AnalyticsFilters } from "@/backend/analytics/contracts/analytics.filters";
 import type {
   AnalyticsDashboard,
+  AnalyticsDashboardPageData,
   AnalyticsFilterOption,
   AnalyticsFilterOptions,
   AnalyticsStoreFilterOption
@@ -187,6 +188,25 @@ function buildFilterOptions(
     stores: sortOptions(Array.from(storeMap.values())),
     topics: sortOptions(Array.from(topicMap.values())),
     plans: sortOptions(Array.from(planMap.values()))
+  };
+}
+
+function deriveFilterOptionRows(
+  dataset: LoadedAnalyticsDataset,
+  filters: Pick<AnalyticsFilters, "organizationId" | "storeId" | "franchiseeName">
+): { reportRows: AnalyticsReportRow[]; resultRows: AnalyticsResultFactRow[] } {
+  const filteredResultRows = dataset.resultFactRows
+    .filter((row) => !filters.franchiseeName || row.franchiseeName === filters.franchiseeName)
+    .filter((row) => !filters.organizationId || row.organizationCode === filters.organizationId)
+    .filter((row) => !filters.storeId || row.storeId === filters.storeId);
+
+  if (filteredResultRows.length === 0) {
+    return { reportRows: [], resultRows: [] };
+  }
+  const visibleReportIds = new Set(filteredResultRows.map((row) => row.reportId));
+  return {
+    reportRows: dataset.reportRows.filter((row) => visibleReportIds.has(row.id)),
+    resultRows: filteredResultRows
   };
 }
 
@@ -1700,6 +1720,97 @@ export class PgAnalyticsRepository implements AnalyticsRepository {
       rectification_overdue_ranking: buildRectificationOverdueRanking(dataset.rectificationFactRows, 10),
       overdue_franchisees: buildOverdueFranchisees(dataset.rectificationFactRows, 10),
       rectification_overview: buildRectificationOverview(dataset.rectificationFactRows)
+    };
+  }
+
+  async getDashboardPageData(
+    filters: AnalyticsFilters,
+    context: RequestContext,
+    issueTypeLimit = 10
+  ): Promise<any> {
+    const normalizedIssueTypeLimit = Math.max(1, issueTypeLimit);
+    const [snapshotDataset, dashboardDataset, baseFilterDataset] = await Promise.all([
+      this.loadSnapshotDataset(filters, context),
+      this.loadDataset(filters, context),
+      this.loadDataset(
+        {
+          ...filters,
+          organizationId: "",
+          storeId: "",
+          topic: "",
+          planId: ""
+        },
+        context
+      )
+    ]);
+
+    const advancedFilterRows = deriveFilterOptionRows(baseFilterDataset, {
+      organizationId: filters.organizationId,
+      storeId: filters.storeId,
+      franchiseeName: filters.franchiseeName
+    });
+
+    return {
+      dashboard: {
+        overview: buildOverview(
+          dashboardDataset.reportRows,
+          dashboardDataset.resultFactRows,
+          dashboardDataset.issueFactRows,
+          dashboardDataset.rectificationFactRows
+        ),
+        semantic_distribution:
+          snapshotDataset.semanticRows.length > 0
+            ? buildSemanticDistributionFromSnapshots(snapshotDataset.semanticRows)
+            : buildSemanticDistribution(dashboardDataset.resultFactRows),
+        daily_trend:
+          snapshotDataset.overviewRows.length > 0
+            ? buildDailyTrendFromSnapshots(snapshotDataset.overviewRows, 14)
+            : buildDailyTrendFromFacts(
+                dashboardDataset.reportRows,
+                dashboardDataset.resultFactRows,
+                dashboardDataset.rectificationFactRows,
+                14
+              ),
+        issue_type_ranking: buildIssueTypeRanking(dashboardDataset.issueFactRows, normalizedIssueTypeLimit),
+        skill_distribution: buildSkillDistribution(dashboardDataset.issueFactRows, normalizedIssueTypeLimit),
+        severity_distribution: buildSeverityDistribution(dashboardDataset.issueFactRows),
+        organization_ranking: buildOrganizationRanking(
+          dashboardDataset.resultFactRows,
+          dashboardDataset.issueFactRows,
+          10
+        ),
+        organization_governance_ranking: buildOrganizationGovernanceRanking(
+          dashboardDataset.resultFactRows,
+          dashboardDataset.rectificationFactRows,
+          10
+        ),
+        franchisee_ranking: buildFranchiseeRanking(dashboardDataset.resultFactRows, dashboardDataset.issueFactRows, 10),
+        franchisee_close_rate_ranking: buildFranchiseeCloseRateRanking(
+          dashboardDataset.resultFactRows,
+          dashboardDataset.rectificationFactRows,
+          10
+        ),
+        high_risk_franchisees: buildHighRiskFranchisees(
+          dashboardDataset.resultFactRows,
+          dashboardDataset.issueFactRows,
+          dashboardDataset.rectificationFactRows,
+          10
+        ),
+        recurring_stores: buildRecurringStores(dashboardDataset.resultFactRows, 10),
+        recurring_franchisees: buildRecurringFranchisees(
+          dashboardDataset.resultFactRows,
+          dashboardDataset.rectificationFactRows,
+          10
+        ),
+        store_ranking: buildStoreRanking(dashboardDataset.resultFactRows, dashboardDataset.issueFactRows, 10),
+        review_efficiency: buildReviewEfficiency(dashboardDataset.reviewFactRows),
+        review_status_distribution: buildReviewStatusDistribution(dashboardDataset.resultFactRows),
+        rectification_overdue_ranking: buildRectificationOverdueRanking(dashboardDataset.rectificationFactRows, 10),
+        overdue_franchisees: buildOverdueFranchisees(dashboardDataset.rectificationFactRows, 10),
+        rectification_overview: buildRectificationOverview(dashboardDataset.rectificationFactRows)
+      },
+      base_filter_options: buildFilterOptions(baseFilterDataset.reportRows, baseFilterDataset.resultFactRows),
+      advanced_filter_options: buildFilterOptions(advancedFilterRows.reportRows, advancedFilterRows.resultRows)
     };
   }
 }

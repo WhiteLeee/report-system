@@ -1,6 +1,10 @@
 import type { RequestContext } from "@/backend/auth/request-context";
 import type { AnalyticsFilters } from "@/backend/analytics/contracts/analytics.filters";
-import type { AnalyticsDashboard, AnalyticsFilterOptions } from "@/backend/analytics/contracts/analytics.types";
+import type {
+  AnalyticsDashboard,
+  AnalyticsDashboardPageData,
+  AnalyticsFilterOptions
+} from "@/backend/analytics/contracts/analytics.types";
 import type {
   AnalyticsDailyTrendItem,
   AnalyticsFranchiseeCloseRateItem,
@@ -57,4 +61,5 @@ export interface AnalyticsRepository {
   getRectificationOverview(filters: AnalyticsFilters, context: RequestContext): any;
   getDashboard(filters: AnalyticsFilters, context: RequestContext, issueTypeLimit?: number): any;
   getFilterOptions(filters: AnalyticsFilters, context: RequestContext): any;
+  getDashboardPageData(filters: AnalyticsFilters, context: RequestContext, issueTypeLimit?: number): any;
 }

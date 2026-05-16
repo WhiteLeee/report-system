@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 
 import type { RequestContext } from "@/backend/auth/request-context";
 import { db } from "@/backend/database/client";
@@ -286,6 +286,113 @@ export class PgRectificationOrderRepository implements RectificationOrderReposit
       }
       return true;
     });
+  }
+
+  async queryPage(
+    filters: RectificationOrderFilters = {},
+    page: number,
+    pageSize: number,
+    context: RequestContext = {}
+  ): Promise<any> {
+    const normalizedPageSize = Math.max(1, Math.min(200, Math.trunc(pageSize || 20)));
+    const enterpriseScopeIds = normalizeScopeIds(context.enterpriseScopeIds);
+    const scopedStoreIds = await resolveScopedStoreIds(context);
+    if (scopedStoreIds && scopedStoreIds.length === 0) {
+      return {
+        page: 1,
+        page_size: normalizedPageSize,
+        total: 0,
+        items: [],
+        metrics: {
+          corrected_count: 0,
+          pending_review_count: 0,
+          issued_count: 0
+        }
+      };
+    }
+
+    const whereClauses = [];
+    if (enterpriseScopeIds.length > 0) {
+      whereClauses.push(inArray(reportTable.sourceEnterpriseId, enterpriseScopeIds));
+    }
+    if (scopedStoreIds) {
+      whereClauses.push(inArray(reportRectificationOrderTable.storeId, scopedStoreIds));
+    }
+    if (filters.status) {
+      whereClauses.push(eq(reportRectificationOrderTable.status, filters.status));
+    }
+    if (filters.ifCorrected) {
+      whereClauses.push(eq(reportRectificationOrderTable.ifCorrected, filters.ifCorrected));
+    }
+    if (filters.startDate) {
+      whereClauses.push(sql`left(${reportRectificationOrderTable.createdAt}, 10) >= ${filters.startDate}`);
+    }
+    if (filters.endDate) {
+      whereClauses.push(sql`left(${reportRectificationOrderTable.createdAt}, 10) <= ${filters.endDate}`);
+    }
+    if (filters.keyword) {
+      const keywordPattern = `%${filters.keyword.toLowerCase()}%`;
+      whereClauses.push(
+        or(
+          ilike(reportRectificationOrderTable.huiYunYingOrderId, keywordPattern),
+          ilike(reportRectificationOrderTable.storeCode, keywordPattern),
+          ilike(reportRectificationOrderTable.storeName, keywordPattern),
+          ilike(reportRectificationOrderTable.storeId, keywordPattern),
+          ilike(reportTable.enterpriseName, keywordPattern),
+          ilike(reportTable.reportType, keywordPattern),
+          ilike(reportTable.reportVersion, keywordPattern),
+          ilike(reportRectificationOrderTable.createdBy, keywordPattern),
+          sql`${reportRectificationOrderTable.reportId}::text ilike ${keywordPattern}`,
+          sql`${reportRectificationOrderTable.resultId}::text ilike ${keywordPattern}`
+        )
+      );
+    }
+
+    const where = whereClauses.length > 0 ? and(...whereClauses) : undefined;
+
+    const totalRow = (await db
+      .select({ count: sql<number>`count(*)` })
+      .from(reportRectificationOrderTable)
+      .leftJoin(reportTable, eq(reportRectificationOrderTable.reportId, reportTable.id))
+      .where(where))[0];
+    const total = Number(totalRow?.count || 0);
+    const totalPages = Math.max(1, Math.ceil(total / normalizedPageSize));
+    const currentPage = Math.min(Math.max(1, Math.trunc(page || 1)), totalPages);
+    const offset = (currentPage - 1) * normalizedPageSize;
+
+    const rows = await db
+      .select({
+        rectification: reportRectificationOrderTable,
+        report: reportTable
+      })
+      .from(reportRectificationOrderTable)
+      .leftJoin(reportTable, eq(reportRectificationOrderTable.reportId, reportTable.id))
+      .where(where)
+      .orderBy(desc(reportRectificationOrderTable.createdAt), desc(reportRectificationOrderTable.id))
+      .limit(normalizedPageSize)
+      .offset(offset);
+
+    const metricsRow = (await db
+      .select({
+        correctedCount: sql<number>`sum(case when (coalesce(${reportRectificationOrderTable.ifCorrected}, '') = '1' or ${reportRectificationOrderTable.status} = 'corrected') then 1 else 0 end)`,
+        pendingReviewCount: sql<number>`sum(case when (coalesce(${reportRectificationOrderTable.ifCorrected}, '') = '2' or ${reportRectificationOrderTable.status} = 'pending_review') then 1 else 0 end)`,
+        issuedCount: sql<number>`sum(case when (coalesce(${reportRectificationOrderTable.ifCorrected}, '') not in ('1', '2') and ${reportRectificationOrderTable.status} <> 'sync_failed') then 1 else 0 end)`
+      })
+      .from(reportRectificationOrderTable)
+      .leftJoin(reportTable, eq(reportRectificationOrderTable.reportId, reportTable.id))
+      .where(where))[0];
+
+    return {
+      page: currentPage,
+      page_size: normalizedPageSize,
+      total,
+      items: rows.map(({ rectification, report }) => toRectificationOrderRecord(rectification, report)),
+      metrics: {
+        corrected_count: Number(metricsRow?.correctedCount || 0),
+        pending_review_count: Number(metricsRow?.pendingReviewCount || 0),
+        issued_count: Number(metricsRow?.issuedCount || 0)
+      }
+    };
   }
 
   async listByResultId(resultId: number): Promise<any> {

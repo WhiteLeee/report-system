@@ -144,25 +144,10 @@ export default async function AnalyticsPage({
             left.value.localeCompare(right.value, "en")
         )
     : [];
-  const dashboard = await analyticsService.getDashboard(filters, requestContext, 10);
-  const baseFilterOptions = await analyticsService.getFilterOptions(
-    {
-      ...filters,
-      organizationId: "",
-      storeId: "",
-      topic: "",
-      planId: ""
-    },
-    requestContext
-  );
-  const advancedFilterOptions = await analyticsService.getFilterOptions(
-    {
-      ...filters,
-      topic: "",
-      planId: ""
-    },
-    requestContext
-  );
+  const pageData = await analyticsService.getDashboardPageData(filters, requestContext, 10);
+  const dashboard = pageData.dashboard;
+  const baseFilterOptions = pageData.base_filter_options;
+  const advancedFilterOptions = pageData.advanced_filter_options;
   const queryString = buildQueryString(filters);
   const canManageUsers = currentUser.permissions.includes("system:settings:write");
 

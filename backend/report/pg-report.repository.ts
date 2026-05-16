@@ -13,6 +13,7 @@ import {
   reportStoreTable,
   reportTable
 } from "@/backend/database/schema";
+import { classifyReportResultSemantics } from "@/backend/report/result-semantics";
 import { normalizePublishedReport } from "@/backend/report/report-publish-normalizer";
 import type { ReportRepository } from "@/backend/report/report.repository";
 import type {
@@ -161,6 +162,41 @@ function toReportResult(row: typeof reportImageTable.$inferSelect): any {
     review_disposition: row.reviewDisposition,
     review_payload: safeParse(row.reviewPayloadJson, {}),
     metadata: safeParse(row.metadataJson, {}),
+    display_order: row.displayOrder,
+    created_at: row.createdAt
+  };
+}
+
+function toReportResultNavigation(row: {
+  id: number;
+  reportId: number;
+  storeId: string | null;
+  storeName: string | null;
+  capturedAt: string | null;
+  reviewState: string;
+  displayOrder: number;
+  createdAt: string;
+}): ReportResult {
+  return {
+    id: row.id,
+    report_id: row.reportId,
+    store_id: row.storeId,
+    store_name: row.storeName,
+    object_key: null,
+    bucket: null,
+    region: null,
+    url: "",
+    width: null,
+    height: null,
+    captured_at: row.capturedAt,
+    review_state: normalizeResultReviewState(row.reviewState),
+    reviewed_by: null,
+    reviewed_at: null,
+    review_note: null,
+    review_action: "",
+    review_disposition: "",
+    review_payload: {},
+    metadata: {},
     display_order: row.displayOrder,
     created_at: row.createdAt
   };
@@ -318,7 +354,170 @@ function summarizeStores(stores: ReportStore[]): any {
   };
 }
 
+function combineWhere(...conditions: Array<any | undefined>): any {
+  const active = conditions.filter(Boolean) as any[];
+  if (active.length === 0) {
+    return undefined;
+  }
+  if (active.length === 1) {
+    return active[0];
+  }
+  return and(...active);
+}
+
+function normalizeDetailReviewStatus(value: string): "pending" | "in_progress" | "completed" | "" {
+  if (value === "pending" || value === "in_progress" || value === "completed") {
+    return value;
+  }
+  return "";
+}
+
+function normalizeDetailSemanticState(value: string): "issue_found" | "pass" | "inconclusive" | "inspection_failed" | "" {
+  if (value === "issue_found" || value === "pass" || value === "inconclusive" || value === "inspection_failed") {
+    return value;
+  }
+  return "";
+}
+
+function storeMatchesDetailFilters(
+  store: ReportStore,
+  filters: { organization: string; storeId: string; reviewStatus: string }
+): boolean {
+  if (filters.organization && store.organization_name !== filters.organization) {
+    return false;
+  }
+  if (filters.storeId && store.store_id !== filters.storeId) {
+    return false;
+  }
+  if (filters.reviewStatus && store.progress_state !== filters.reviewStatus) {
+    return false;
+  }
+  return true;
+}
+
+function resultMatchesDetailFilters(
+  result: ReportResult,
+  scopedStoreIds: Set<string>,
+  filters: { organization: string; storeId: string; reviewStatus: string }
+): boolean {
+  if (filters.storeId && result.store_id !== filters.storeId) {
+    return false;
+  }
+  if (filters.organization || filters.storeId || filters.reviewStatus) {
+    if (result.store_id && scopedStoreIds.size > 0 && !scopedStoreIds.has(result.store_id)) {
+      return false;
+    }
+    if ((filters.organization || filters.storeId) && result.store_id && scopedStoreIds.size === 0) {
+      return false;
+    }
+  }
+  if (filters.reviewStatus && filters.reviewStatus !== "in_progress" && result.review_state !== filters.reviewStatus) {
+    return false;
+  }
+  return true;
+}
+
+function issueMatchesDetailFilters(
+  issue: Pick<ReportIssue, "store_id" | "review_state">,
+  scopedStoreIds: Set<string>,
+  filters: { organization: string; storeId: string; reviewStatus: string }
+): boolean {
+  if (filters.storeId && issue.store_id !== filters.storeId) {
+    return false;
+  }
+  if (filters.organization || filters.storeId || filters.reviewStatus) {
+    if (issue.store_id && scopedStoreIds.size > 0 && !scopedStoreIds.has(issue.store_id)) {
+      return false;
+    }
+    if ((filters.organization || filters.storeId) && issue.store_id && scopedStoreIds.size === 0) {
+      return false;
+    }
+  }
+  if (filters.reviewStatus && filters.reviewStatus !== "in_progress" && issue.review_state !== filters.reviewStatus) {
+    return false;
+  }
+  return true;
+}
+
+function inspectionMatchesDetailFilters(
+  inspection: Pick<ReportInspection, "store_id">,
+  scopedStoreIds: Set<string>,
+  filters: { organization: string; storeId: string; reviewStatus: string }
+): boolean {
+  if (filters.storeId && inspection.store_id !== filters.storeId) {
+    return false;
+  }
+  if (filters.organization || filters.storeId || filters.reviewStatus) {
+    if (inspection.store_id && scopedStoreIds.size > 0 && !scopedStoreIds.has(inspection.store_id)) {
+      return false;
+    }
+    if ((filters.organization || filters.storeId) && inspection.store_id && scopedStoreIds.size === 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export class PgReportRepository implements ReportRepository {
+  private buildReportWhere(filters: ReportFilters): any {
+    const whereClauses = [];
+    if (filters.enterprise) {
+      whereClauses.push(
+        or(
+          ilike(reportTable.enterpriseName, `%${filters.enterprise}%`),
+          ilike(reportTable.sourceEnterpriseId, `%${filters.enterprise}%`)
+        )
+      );
+    }
+    if (filters.publishId) {
+      whereClauses.push(ilike(reportTable.publishId, `%${filters.publishId}%`));
+    }
+    if (filters.reportType) {
+      whereClauses.push(eq(reportTable.reportType, filters.reportType));
+    }
+    if (filters.reviewStatus) {
+      whereClauses.push(eq(reportTable.progressState, filters.reviewStatus));
+    }
+    if (filters.startDate) {
+      whereClauses.push(gte(reportTable.periodStart, filters.startDate));
+    }
+    if (filters.endDate) {
+      whereClauses.push(lte(reportTable.periodEnd, filters.endDate));
+    }
+    return whereClauses.length > 0 ? and(...whereClauses) : undefined;
+  }
+
+  private async resolveVisibleReportIds(filters: ReportFilters, context: RequestContext): Promise<number[]> {
+    const whereCondition = this.buildReportWhere(filters);
+    const candidates = await db
+      .select({
+        id: reportTable.id,
+        sourceEnterpriseId: reportTable.sourceEnterpriseId
+      })
+      .from(reportTable)
+      .where(whereCondition)
+      .orderBy(desc(reportTable.publishedAt), desc(reportTable.id));
+
+    const enterpriseScoped = candidates.filter((row) => canAccessEnterprise(context, row.sourceEnterpriseId));
+    const scopedStoreIds = await resolveScopedStoreIds(context);
+    if (!scopedStoreIds) {
+      return enterpriseScoped.map((row) => row.id);
+    }
+    if (scopedStoreIds.length === 0 || enterpriseScoped.length === 0) {
+      return [];
+    }
+    const reportIds = enterpriseScoped.map((row) => row.id);
+    const visibleReportIds = new Set(
+      (await db
+        .select({ reportId: reportStoreTable.reportId })
+        .from(reportStoreTable)
+        .where(and(inArray(reportStoreTable.reportId, reportIds), inArray(reportStoreTable.storeId, scopedStoreIds)))).map(
+        (row) => row.reportId
+      )
+    );
+    return enterpriseScoped.map((row) => row.id).filter((id) => visibleReportIds.has(id));
+  }
+
   async publishReport(payload: ReportPublishPayload, _context: RequestContext = {}): Promise<any> {
     const receivedAt = new Date().toISOString();
     const normalized = normalizePublishedReport(payload);
@@ -562,62 +761,75 @@ export class PgReportRepository implements ReportRepository {
   }
 
   async listReports(filters: ReportFilters = {}, context: RequestContext = {}): Promise<any> {
-    const whereClauses = [];
-    if (filters.enterprise) {
-      whereClauses.push(
-        or(
-          ilike(reportTable.enterpriseName, `%${filters.enterprise}%`),
-          ilike(reportTable.sourceEnterpriseId, `%${filters.enterprise}%`)
-        )
-      );
-    }
-    if (filters.publishId) {
-      whereClauses.push(ilike(reportTable.publishId, `%${filters.publishId}%`));
-    }
-    if (filters.reportType) {
-      whereClauses.push(eq(reportTable.reportType, filters.reportType));
-    }
-    if (filters.reviewStatus) {
-      whereClauses.push(eq(reportTable.progressState, filters.reviewStatus));
-    }
-    if (filters.startDate) {
-      whereClauses.push(gte(reportTable.periodStart, filters.startDate));
-    }
-    if (filters.endDate) {
-      whereClauses.push(lte(reportTable.periodEnd, filters.endDate));
-    }
-
-    const whereCondition = whereClauses.length > 0 ? and(...whereClauses) : undefined;
-
-    const summaries = (await db
-          .select()
-          .from(reportTable)
-          .where(whereCondition)
-          .orderBy(desc(reportTable.publishedAt), desc(reportTable.id)))
-      .map(toReportSummary);
-
-    const enterpriseScoped = summaries.filter((summary) => canAccessEnterprise(context, summary.source_enterprise_id));
-    const scopedStoreIds = await resolveScopedStoreIds(context);
-    if (!scopedStoreIds) {
-      return enterpriseScoped;
-    }
-    if (scopedStoreIds.length === 0) {
+    const visibleIds = await this.resolveVisibleReportIds(filters, context);
+    if (visibleIds.length === 0) {
       return [];
     }
+    const rows = await db.select().from(reportTable).where(inArray(reportTable.id, visibleIds));
+    const rowById = new Map(rows.map((row) => [row.id, row] as const));
+    return visibleIds.map((id) => rowById.get(id)).filter(Boolean).map((row) => toReportSummary(row));
+  }
 
-    const reportIds = enterpriseScoped.map((summary) => summary.id);
-    if (reportIds.length === 0) {
-      return [];
+  async queryReportsPage(filters: ReportFilters, page: number, pageSize: number, context: RequestContext = {}): Promise<any> {
+    const normalizedPageSize = Math.max(1, Math.min(200, Math.trunc(pageSize || 20)));
+    const visibleIds = await this.resolveVisibleReportIds(filters, context);
+    const total = visibleIds.length;
+    const totalPages = Math.max(1, Math.ceil(total / normalizedPageSize));
+    const currentPage = Math.min(Math.max(1, Math.trunc(page || 1)), totalPages);
+    const offset = (currentPage - 1) * normalizedPageSize;
+    const pageIds = visibleIds.slice(offset, offset + normalizedPageSize);
+
+    if (pageIds.length === 0) {
+      return {
+        page: currentPage,
+        page_size: normalizedPageSize,
+        total,
+        items: []
+      };
     }
-    const visibleReportIds = new Set(
-      (await db
-                .select({ reportId: reportStoreTable.reportId })
-                .from(reportStoreTable)
-                .where(and(inArray(reportStoreTable.reportId, reportIds), inArray(reportStoreTable.storeId, scopedStoreIds))))
-        .map((row) => row.reportId)
-    );
 
-    return enterpriseScoped.filter((summary) => visibleReportIds.has(summary.id));
+    const rows = await db.select().from(reportTable).where(inArray(reportTable.id, pageIds));
+    const rowById = new Map(rows.map((row) => [row.id, row] as const));
+    const items = pageIds.map((id) => rowById.get(id)).filter(Boolean).map((row) => toReportSummary(row));
+    return {
+      page: currentPage,
+      page_size: normalizedPageSize,
+      total,
+      items
+    };
+  }
+
+  async getReportListOverview(context: RequestContext = {}): Promise<any> {
+    const visibleIds = await this.resolveVisibleReportIds({}, context);
+    if (visibleIds.length === 0) {
+      return {
+        total_reports: 0,
+        pending_reports: 0,
+        total_issues: 0,
+        total_images: 0,
+        report_types: []
+      };
+    }
+
+    const rows = await db
+      .select({
+        reportType: reportTable.reportType,
+        pendingResultCount: reportTable.pendingResultCount,
+        issueCount: reportTable.issueCount,
+        totalResultCount: reportTable.totalResultCount
+      })
+      .from(reportTable)
+      .where(inArray(reportTable.id, visibleIds));
+
+    return {
+      total_reports: rows.length,
+      pending_reports: rows.filter((row) => Number(row.pendingResultCount || 0) > 0).length,
+      total_issues: rows.reduce((sum, row) => sum + Number(row.issueCount || 0), 0),
+      total_images: rows.reduce((sum, row) => sum + Number(row.totalResultCount || 0), 0),
+      report_types: Array.from(
+        new Set(rows.map((row) => String(row.reportType || "").trim()).filter(Boolean))
+      ).sort((left, right) => left.localeCompare(right, "zh-Hans-CN"))
+    };
   }
 
   async getReportDetail(reportId: number, context: RequestContext = {}): Promise<any> {
@@ -631,63 +843,50 @@ export class PgReportRepository implements ReportRepository {
       return null;
     }
 
-    const stores = (await db
-          .select()
-          .from(reportStoreTable)
-          .where(eq(reportStoreTable.reportId, reportId))
-          .orderBy(reportStoreTable.displayOrder, reportStoreTable.id))
-      .map(toReportStore);
-
-    const results = (await db
-          .select()
-          .from(reportImageTable)
-          .where(eq(reportImageTable.reportId, reportId))
-          .orderBy(reportImageTable.displayOrder, reportImageTable.id))
-      .map(toReportResult);
-
-    const issues = (await db
-          .select()
-          .from(reportIssueTable)
-          .where(eq(reportIssueTable.reportId, reportId))
-          .orderBy(reportIssueTable.displayOrder, reportIssueTable.id))
-      .map(toReportIssue);
-
-    const inspections = (await db
-          .select()
-          .from(reportInspectionTable)
-          .where(eq(reportInspectionTable.reportId, reportId))
-          .orderBy(reportInspectionTable.displayOrder, reportInspectionTable.id))
-      .map(toReportInspection);
-
-    const reviewLogs = (await db
-          .select()
-          .from(reportReviewLogTable)
-          .where(eq(reportReviewLogTable.reportId, reportId))
-          .orderBy(desc(reportReviewLogTable.createdAt), desc(reportReviewLogTable.id))
-          .limit(20))
-      .map(toReportReviewLog);
-
-    const snapshotRow = (await db
-          .select()
-          .from(reportSourceSnapshotTable)
-          .where(eq(reportSourceSnapshotTable.reportId, reportId)))[0];
-
     const scopedStoreIds = await resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
-    const visibleStores = filterStoresByScope(stores, scopedStoreIds);
-    const visibleResults = filterResultsByScope(results, scopedStoreIds);
-    const visibleIssues = filterIssuesByScope(issues, scopedStoreIds);
-    const visibleInspections = filterInspectionsByScope(inspections, scopedStoreIds);
-    const visibleLogs = filterLogsByScope(reviewLogs, scopedStoreIds);
-
-    if (
-      scopedStoreIds &&
-      visibleStores.length === 0 &&
-      visibleResults.length === 0 &&
-      visibleIssues.length === 0 &&
-      visibleInspections.length === 0
-    ) {
+    if (scopedStoreIds && scopedStoreIds.length === 0) {
       return null;
     }
+    const storeScope = scopedStoreIds ? inArray(reportStoreTable.storeId, scopedStoreIds) : undefined;
+    const resultScope = scopedStoreIds ? inArray(reportImageTable.storeId, scopedStoreIds) : undefined;
+    const issueScope = scopedStoreIds ? inArray(reportIssueTable.storeId, scopedStoreIds) : undefined;
+    const inspectionScope = scopedStoreIds ? inArray(reportInspectionTable.storeId, scopedStoreIds) : undefined;
+    const logScope = scopedStoreIds ? inArray(reportReviewLogTable.storeId, scopedStoreIds) : undefined;
+
+    const [stores, results, issues, inspections, reviewLogs] = await Promise.all([
+      db
+        .select()
+        .from(reportStoreTable)
+        .where(combineWhere(eq(reportStoreTable.reportId, reportId), storeScope))
+        .orderBy(reportStoreTable.displayOrder, reportStoreTable.id),
+      db
+        .select()
+        .from(reportImageTable)
+        .where(combineWhere(eq(reportImageTable.reportId, reportId), resultScope))
+        .orderBy(reportImageTable.displayOrder, reportImageTable.id),
+      db
+        .select()
+        .from(reportIssueTable)
+        .where(combineWhere(eq(reportIssueTable.reportId, reportId), issueScope))
+        .orderBy(reportIssueTable.displayOrder, reportIssueTable.id),
+      db
+        .select()
+        .from(reportInspectionTable)
+        .where(combineWhere(eq(reportInspectionTable.reportId, reportId), inspectionScope))
+        .orderBy(reportInspectionTable.displayOrder, reportInspectionTable.id),
+      db
+        .select()
+        .from(reportReviewLogTable)
+        .where(combineWhere(eq(reportReviewLogTable.reportId, reportId), logScope))
+        .orderBy(desc(reportReviewLogTable.createdAt), desc(reportReviewLogTable.id))
+        .limit(20)
+    ]);
+
+    const visibleStores = stores.map(toReportStore);
+    const visibleResults = results.map(toReportResult);
+    const visibleIssues = issues.map(toReportIssue);
+    const visibleInspections = inspections.map(toReportInspection);
+    const visibleLogs = reviewLogs.map(toReportReviewLog);
 
     const scopedStoreSummary = summarizeStores(visibleStores);
     const scopedResultProgress = buildProgressSummary(
@@ -713,8 +912,391 @@ export class PgReportRepository implements ReportRepository {
       images: visibleResults,
       issues: visibleIssues,
       inspections: visibleInspections,
-      review_logs: visibleLogs,
-      raw_payload: safeParse(snapshotRow?.payloadJson || "{}", {}) as unknown as ReportPublishPayload
+      review_logs: visibleLogs
+    };
+  }
+
+  async getReportDetailPage(
+    reportId: number,
+    input: {
+      organization?: string;
+      storeId?: string;
+      reviewStatus?: string;
+      semanticState?: string;
+      page?: number;
+      pageSize?: number;
+    },
+    context: RequestContext = {}
+  ): Promise<any> {
+    const reportRow = (await db.select().from(reportTable).where(eq(reportTable.id, reportId)))[0];
+    if (!reportRow) {
+      return null;
+    }
+    if (!canAccessEnterprise(context, reportRow.sourceEnterpriseId)) {
+      return null;
+    }
+
+    const normalizedReviewStatus = normalizeDetailReviewStatus(String(input.reviewStatus || ""));
+    const normalizedSemanticState = normalizeDetailSemanticState(String(input.semanticState || ""));
+    const filters = {
+      organization: String(input.organization || "").trim(),
+      storeId: String(input.storeId || "").trim(),
+      reviewStatus: normalizedReviewStatus
+    };
+    const pageSize = Math.max(1, Math.min(200, Math.trunc(input.pageSize || 30)));
+    const requestedPage = Math.max(1, Math.trunc(input.page || 1));
+
+    const scopedStoreIds = await resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
+    if (scopedStoreIds && scopedStoreIds.length === 0) {
+      return null;
+    }
+    const storeScope = scopedStoreIds ? inArray(reportStoreTable.storeId, scopedStoreIds) : undefined;
+    const resultScope = scopedStoreIds ? inArray(reportImageTable.storeId, scopedStoreIds) : undefined;
+    const issueScope = scopedStoreIds ? inArray(reportIssueTable.storeId, scopedStoreIds) : undefined;
+    const inspectionScope = scopedStoreIds ? inArray(reportInspectionTable.storeId, scopedStoreIds) : undefined;
+    const logScope = scopedStoreIds ? inArray(reportReviewLogTable.storeId, scopedStoreIds) : undefined;
+
+    const [storeRows, resultRows, issueRows, inspectionRows, reviewLogRows] = await Promise.all([
+      db
+        .select()
+        .from(reportStoreTable)
+        .where(combineWhere(eq(reportStoreTable.reportId, reportId), storeScope))
+        .orderBy(reportStoreTable.displayOrder, reportStoreTable.id),
+      db
+        .select()
+        .from(reportImageTable)
+        .where(combineWhere(eq(reportImageTable.reportId, reportId), resultScope))
+        .orderBy(reportImageTable.displayOrder, reportImageTable.id),
+      db
+        .select({
+          id: reportIssueTable.id,
+          resultId: reportIssueTable.resultId,
+          storeId: reportIssueTable.storeId,
+          reviewState: reportIssueTable.reviewState,
+          metadataJson: reportIssueTable.metadataJson
+        })
+        .from(reportIssueTable)
+        .where(combineWhere(eq(reportIssueTable.reportId, reportId), issueScope)),
+      db
+        .select({
+          id: reportInspectionTable.id,
+          resultId: reportInspectionTable.resultId,
+          storeId: reportInspectionTable.storeId,
+          status: reportInspectionTable.status,
+          errorMessage: reportInspectionTable.errorMessage,
+          metadataJson: reportInspectionTable.metadataJson,
+          rawResult: sql<string>`left(coalesce(${reportInspectionTable.rawResult}, ''), 512)`
+        })
+        .from(reportInspectionTable)
+        .where(combineWhere(eq(reportInspectionTable.reportId, reportId), inspectionScope)),
+      db
+        .select()
+        .from(reportReviewLogTable)
+        .where(combineWhere(eq(reportReviewLogTable.reportId, reportId), logScope))
+        .orderBy(desc(reportReviewLogTable.createdAt), desc(reportReviewLogTable.id))
+        .limit(20)
+    ]);
+
+    const visibleStores = storeRows.map(toReportStore);
+    const storeScopedByFilters = new Set(
+      visibleStores.filter((store) => storeMatchesDetailFilters(store, filters)).map((store) => store.store_id)
+    );
+
+    const allScopedResults = resultRows
+      .map(toReportResult)
+      .filter((result) => resultMatchesDetailFilters(result, storeScopedByFilters, filters));
+
+    const imageIdsByCaptureId = new Map<string, number[]>();
+    const imageIdsByStoreId = new Map<string, number[]>();
+    const resultIds = new Set<number>();
+    allScopedResults.forEach((result) => {
+      resultIds.add(result.id);
+      const captureId = readMetadataString(result.metadata, "capture_id");
+      if (captureId) {
+        const bucket = imageIdsByCaptureId.get(captureId);
+        if (bucket) {
+          bucket.push(result.id);
+        } else {
+          imageIdsByCaptureId.set(captureId, [result.id]);
+        }
+      }
+      if (result.store_id) {
+        const bucket = imageIdsByStoreId.get(result.store_id);
+        if (bucket) {
+          bucket.push(result.id);
+        } else {
+          imageIdsByStoreId.set(result.store_id, [result.id]);
+        }
+      }
+    });
+
+    const scopedIssues = issueRows
+      .map((row) => ({
+        result_id: row.resultId,
+        store_id: row.storeId,
+        review_state: row.reviewState as ResultReviewState,
+        metadata: safeParse(row.metadataJson, {})
+      }))
+      .filter((issue) => issueMatchesDetailFilters(issue, storeScopedByFilters, filters));
+
+    const scopedInspections = inspectionRows
+      .map((row) => ({
+        result_id: row.resultId,
+        store_id: row.storeId,
+        status: row.status,
+        raw_result: row.rawResult || null,
+        error_message: row.errorMessage,
+        metadata: safeParse(row.metadataJson, {})
+      }))
+      .filter((inspection) => inspectionMatchesDetailFilters(inspection, storeScopedByFilters, filters));
+
+    const issueCountByImageId = new Map<number, number>();
+    scopedIssues.forEach((issue) => {
+      const matchedImageIds = new Set<number>();
+      if (issue.result_id && resultIds.has(issue.result_id)) {
+        matchedImageIds.add(issue.result_id);
+      }
+      const captureId = readMetadataString(issue.metadata, "capture_id");
+      if (captureId) {
+        (imageIdsByCaptureId.get(captureId) || []).forEach((id) => matchedImageIds.add(id));
+      }
+      if (matchedImageIds.size === 0 && issue.store_id) {
+        (imageIdsByStoreId.get(issue.store_id) || []).forEach((id) => matchedImageIds.add(id));
+      }
+      matchedImageIds.forEach((id) => {
+        issueCountByImageId.set(id, Number(issueCountByImageId.get(id) || 0) + 1);
+      });
+    });
+
+    const inspectionsByImageId = new Map<number, Array<{ status: string | null; raw_result: string | null; error_message: string | null }>>();
+    scopedInspections.forEach((inspection) => {
+      const matchedImageIds = new Set<number>();
+      if (inspection.result_id && resultIds.has(inspection.result_id)) {
+        matchedImageIds.add(inspection.result_id);
+      }
+      const captureId = readMetadataString(inspection.metadata, "capture_id");
+      if (captureId) {
+        (imageIdsByCaptureId.get(captureId) || []).forEach((id) => matchedImageIds.add(id));
+      }
+      if (matchedImageIds.size === 0 && inspection.store_id) {
+        (imageIdsByStoreId.get(inspection.store_id) || []).forEach((id) => matchedImageIds.add(id));
+      }
+      matchedImageIds.forEach((id) => {
+        const bucket = inspectionsByImageId.get(id);
+        const normalized = {
+          status: inspection.status,
+          raw_result: inspection.raw_result,
+          error_message: inspection.error_message
+        };
+        if (bucket) {
+          bucket.push(normalized);
+        } else {
+          inspectionsByImageId.set(id, [normalized]);
+        }
+      });
+    });
+
+    const semanticCounts = {
+      issue_found: 0,
+      pass: 0,
+      inconclusive: 0,
+      inspection_failed: 0
+    };
+    const semanticDecoratedResults = allScopedResults.map((result) => {
+      const issueCount = Number(issueCountByImageId.get(result.id) || 0);
+      const semanticState = classifyReportResultSemantics(
+        issueCount,
+        inspectionsByImageId.get(result.id) || []
+      );
+      semanticCounts[semanticState] += 1;
+      return {
+        ...result,
+        semantic_state: semanticState,
+        semantic_issue_count: issueCount
+      };
+    });
+
+    const filteredBySemantic = normalizedSemanticState
+      ? semanticDecoratedResults.filter((result) => result.semantic_state === normalizedSemanticState)
+      : semanticDecoratedResults;
+    const filteredResultCount = filteredBySemantic.length;
+    const filteredPendingCount = filteredBySemantic.filter((result) => result.review_state === "pending").length;
+    const filteredReviewedCount = filteredResultCount - filteredPendingCount;
+    const totalPages = Math.max(1, Math.ceil(filteredResultCount / pageSize));
+    const currentPage = Math.min(requestedPage, totalPages);
+    const pageStart = (currentPage - 1) * pageSize;
+    const pagedResults = filteredBySemantic.slice(pageStart, pageStart + pageSize);
+
+    const scopedStoreSummary = summarizeStores(visibleStores.filter((store) => storeMatchesDetailFilters(store, filters)));
+    const scopedResultProgress = buildProgressSummary(
+      semanticDecoratedResults.length,
+      semanticDecoratedResults.filter((result) => result.review_state === "completed").length
+    );
+
+    return {
+      ...toReportSummary(reportRow),
+      progress_state: scopedStoreIds ? scopedResultProgress.progress_state : (reportRow.progressState as ProgressState),
+      store_count: visibleStores.length,
+      image_count: semanticDecoratedResults.length,
+      issue_count: Array.from(issueCountByImageId.values()).reduce((sum, count) => sum + count, 0),
+      completed_store_count: scopedStoreIds ? scopedStoreSummary.completed_store_count : reportRow.completedStoreCount,
+      pending_store_count: scopedStoreIds ? scopedStoreSummary.pending_store_count : reportRow.pendingStoreCount,
+      in_progress_store_count: scopedStoreIds ? scopedStoreSummary.in_progress_store_count : reportRow.inProgressStoreCount,
+      total_result_count: scopedStoreIds ? scopedResultProgress.total_result_count : reportRow.totalResultCount,
+      completed_result_count: scopedStoreIds ? scopedResultProgress.completed_result_count : reportRow.completedResultCount,
+      pending_result_count: scopedStoreIds ? scopedResultProgress.pending_result_count : reportRow.pendingResultCount,
+      progress_percent: scopedStoreIds ? scopedResultProgress.progress_percent : reportRow.progressPercent,
+      stores: visibleStores,
+      results: pagedResults,
+      images: pagedResults,
+      issues: [],
+      inspections: [],
+      review_logs: reviewLogRows.map(toReportReviewLog),
+      semantic_counts: semanticCounts,
+      filtered_result_count: filteredResultCount,
+      filtered_pending_result_count: filteredPendingCount,
+      filtered_reviewed_result_count: filteredReviewedCount,
+      current_page: currentPage,
+      page_size: pageSize,
+      total_pages: totalPages
+    };
+  }
+
+  async getReportResultDetail(reportId: number, resultId: number, context: RequestContext = {}): Promise<any> {
+    const reportRow = (await db.select().from(reportTable).where(eq(reportTable.id, reportId)))[0];
+    if (!reportRow) {
+      return null;
+    }
+    if (!canAccessEnterprise(context, reportRow.sourceEnterpriseId)) {
+      return null;
+    }
+
+    const scopedStoreIds = await resolveScopedStoreIds(context, reportRow.sourceEnterpriseId);
+    if (scopedStoreIds && scopedStoreIds.length === 0) {
+      return null;
+    }
+    const resultScope = scopedStoreIds ? inArray(reportImageTable.storeId, scopedStoreIds) : undefined;
+    const selectedResultRow = (await db
+      .select()
+      .from(reportImageTable)
+      .where(combineWhere(eq(reportImageTable.reportId, reportId), eq(reportImageTable.id, resultId), resultScope)))[0];
+    if (!selectedResultRow) {
+      return null;
+    }
+
+    const selectedResult = toReportResult(selectedResultRow);
+    const selectedCaptureId = readMetadataString(selectedResult.metadata, "capture_id");
+    const selectedStoreId = selectedResult.store_id || "";
+
+    const issueMatchConditions = [eq(reportIssueTable.resultId, resultId)];
+    const inspectionMatchConditions = [eq(reportInspectionTable.resultId, resultId)];
+    if (selectedCaptureId) {
+      issueMatchConditions.push(sql`${reportIssueTable.metadataJson}::jsonb ->> 'capture_id' = ${selectedCaptureId}`);
+      inspectionMatchConditions.push(sql`${reportInspectionTable.metadataJson}::jsonb ->> 'capture_id' = ${selectedCaptureId}`);
+    }
+    if (selectedStoreId) {
+      if (selectedCaptureId) {
+        issueMatchConditions.push(
+          and(
+            eq(reportIssueTable.storeId, selectedStoreId),
+            sql`coalesce(${reportIssueTable.metadataJson}::jsonb ->> 'capture_id', '') = ''`
+          )
+        );
+        inspectionMatchConditions.push(
+          and(
+            eq(reportInspectionTable.storeId, selectedStoreId),
+            sql`coalesce(${reportInspectionTable.metadataJson}::jsonb ->> 'capture_id', '') = ''`
+          )
+        );
+      } else {
+        issueMatchConditions.push(eq(reportIssueTable.storeId, selectedStoreId));
+        inspectionMatchConditions.push(eq(reportInspectionTable.storeId, selectedStoreId));
+      }
+    }
+
+    const storeScope = scopedStoreIds ? inArray(reportStoreTable.storeId, scopedStoreIds) : undefined;
+    const allResultScope = scopedStoreIds ? inArray(reportImageTable.storeId, scopedStoreIds) : undefined;
+    const issueScope = scopedStoreIds ? inArray(reportIssueTable.storeId, scopedStoreIds) : undefined;
+    const inspectionScope = scopedStoreIds ? inArray(reportInspectionTable.storeId, scopedStoreIds) : undefined;
+    const logScope = scopedStoreIds ? inArray(reportReviewLogTable.storeId, scopedStoreIds) : undefined;
+
+    const [stores, navigationResults, issues, inspections, reviewLogs] = await Promise.all([
+      db
+        .select()
+        .from(reportStoreTable)
+        .where(combineWhere(eq(reportStoreTable.reportId, reportId), storeScope))
+        .orderBy(reportStoreTable.displayOrder, reportStoreTable.id),
+      db
+        .select({
+          id: reportImageTable.id,
+          reportId: reportImageTable.reportId,
+          storeId: reportImageTable.storeId,
+          storeName: reportImageTable.storeName,
+          capturedAt: reportImageTable.capturedAt,
+          reviewState: reportImageTable.reviewState,
+          displayOrder: reportImageTable.displayOrder,
+          createdAt: reportImageTable.createdAt
+        })
+        .from(reportImageTable)
+        .where(combineWhere(eq(reportImageTable.reportId, reportId), allResultScope))
+        .orderBy(reportImageTable.displayOrder, reportImageTable.id),
+      db
+        .select()
+        .from(reportIssueTable)
+        .where(
+          combineWhere(eq(reportIssueTable.reportId, reportId), issueScope, or(...issueMatchConditions))
+        )
+        .orderBy(reportIssueTable.displayOrder, reportIssueTable.id),
+      db
+        .select()
+        .from(reportInspectionTable)
+        .where(
+          combineWhere(eq(reportInspectionTable.reportId, reportId), inspectionScope, or(...inspectionMatchConditions))
+        )
+        .orderBy(reportInspectionTable.displayOrder, reportInspectionTable.id),
+      db
+        .select()
+        .from(reportReviewLogTable)
+        .where(combineWhere(eq(reportReviewLogTable.reportId, reportId), eq(reportReviewLogTable.resultId, resultId), logScope))
+        .orderBy(desc(reportReviewLogTable.createdAt), desc(reportReviewLogTable.id))
+        .limit(20)
+    ]);
+
+    const visibleStores = stores.map(toReportStore);
+    const visibleResults = navigationResults.map(toReportResultNavigation);
+    const selectedIndex = visibleResults.findIndex((result) => result.id === selectedResult.id);
+    if (selectedIndex >= 0) {
+      visibleResults[selectedIndex] = selectedResult;
+    }
+    const visibleIssues = issues.map(toReportIssue);
+    const visibleInspections = inspections.map(toReportInspection);
+    const visibleLogs = reviewLogs.map(toReportReviewLog);
+
+    const scopedStoreSummary = summarizeStores(visibleStores);
+    const scopedResultProgress = buildProgressSummary(
+      visibleResults.length,
+      visibleResults.filter((result) => result.review_state === "completed").length
+    );
+
+    return {
+      ...toReportSummary(reportRow),
+      progress_state: scopedStoreIds ? scopedResultProgress.progress_state : (reportRow.progressState as ProgressState),
+      store_count: visibleStores.length,
+      image_count: visibleResults.length,
+      issue_count: visibleIssues.length,
+      completed_store_count: scopedStoreIds ? scopedStoreSummary.completed_store_count : reportRow.completedStoreCount,
+      pending_store_count: scopedStoreIds ? scopedStoreSummary.pending_store_count : reportRow.pendingStoreCount,
+      in_progress_store_count: scopedStoreIds ? scopedStoreSummary.in_progress_store_count : reportRow.inProgressStoreCount,
+      total_result_count: scopedStoreIds ? scopedResultProgress.total_result_count : reportRow.totalResultCount,
+      completed_result_count: scopedStoreIds ? scopedResultProgress.completed_result_count : reportRow.completedResultCount,
+      pending_result_count: scopedStoreIds ? scopedResultProgress.pending_result_count : reportRow.pendingResultCount,
+      progress_percent: scopedStoreIds ? scopedResultProgress.progress_percent : reportRow.progressPercent,
+      stores: visibleStores,
+      results: visibleResults,
+      images: visibleResults,
+      issues: visibleIssues,
+      inspections: visibleInspections,
+      review_logs: visibleLogs
     };
   }
 

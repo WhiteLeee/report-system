@@ -7,6 +7,8 @@ import type {
   ReportFilters,
   ReportIssue,
   ReportPublishPayload,
+  ReportListOverview,
+  ReportListPage,
   ReportReviewLog,
   ReportSummary,
   ReviewSelectedIssue,
@@ -19,7 +21,22 @@ export interface ReportRepository {
   publishReport(payload: ReportPublishPayload, context?: RequestContext): Promise<any>;
   getPublishStatus(publishId: string, context?: RequestContext): Promise<any>;
   listReports(filters?: ReportFilters, context?: RequestContext): Promise<any>;
+  queryReportsPage(filters: ReportFilters, page: number, pageSize: number, context?: RequestContext): Promise<any>;
+  getReportListOverview(context?: RequestContext): Promise<any>;
   getReportDetail(reportId: number, context?: RequestContext): Promise<any>;
+  getReportDetailPage(
+    reportId: number,
+    input: {
+      organization?: string;
+      storeId?: string;
+      reviewStatus?: string;
+      semanticState?: string;
+      page?: number;
+      pageSize?: number;
+    },
+    context?: RequestContext
+  ): Promise<any>;
+  getReportResultDetail(reportId: number, resultId: number, context?: RequestContext): Promise<any>;
   updateImageReviewStatus(
     reportId: number,
     imageId: number,

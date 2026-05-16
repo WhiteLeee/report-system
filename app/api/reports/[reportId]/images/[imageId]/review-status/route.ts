@@ -214,7 +214,7 @@ export async function POST(
 
   let createdRectificationOrders: Array<{ id: number; huiyunying_order_id: string | null; status: string }> = [];
 
-  const report = await reportService.getReportDetail(reportId, requestContext);
+  const report = await reportService.getReportResultDetail(reportId, imageId, requestContext);
   const resultDetail = report?.results.find((result) => result.id === imageId) ?? null;
   if (!report || !resultDetail) {
     return Response.json({ success: false, error: "Review target not found." }, { status: 404 });

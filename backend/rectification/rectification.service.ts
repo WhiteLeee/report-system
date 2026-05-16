@@ -423,6 +423,28 @@ export class RectificationService {
     return await this.repository.listAll(filters, context);
   }
 
+  async queryOrdersPage(
+    filters: RectificationOrderFilters = {},
+    page = 1,
+    pageSize = 20,
+    context?: RequestContext
+  ): Promise<any> {
+    const normalizedPage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+    const normalizedPageSize = Number.isFinite(pageSize) ? Math.max(1, Math.min(200, Math.floor(pageSize))) : 20;
+    return await this.repository.queryPage(
+      {
+        keyword: String(filters.keyword || "").trim(),
+        status: String(filters.status || "").trim(),
+        ifCorrected: String(filters.ifCorrected || "").trim(),
+        startDate: String(filters.startDate || "").trim(),
+        endDate: String(filters.endDate || "").trim()
+      },
+      normalizedPage,
+      normalizedPageSize,
+      context
+    );
+  }
+
   async listByResultId(resultId: number): Promise<any> {
     return await this.repository.listByResultId(resultId);
   }

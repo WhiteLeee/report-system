@@ -59,3 +59,9 @@ export interface AnalyticsFilterOptions {
   topics: AnalyticsFilterOption[];
   plans: AnalyticsFilterOption[];
 }
+
+export interface AnalyticsDashboardPageData {
+  dashboard: AnalyticsDashboard;
+  base_filter_options: AnalyticsFilterOptions;
+  advanced_filter_options: AnalyticsFilterOptions;
+}

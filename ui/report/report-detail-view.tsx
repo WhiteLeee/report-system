@@ -18,8 +18,6 @@ import {
   filterImages,
   filterIssues,
   filterStores,
-  matchesInspectionToImage,
-  matchesIssueToImage,
   readMetadataString,
   type DetailFilters
 } from "@/ui/report/report-detail-helpers";
@@ -60,43 +58,178 @@ export function ReportDetailView({
   filters: DetailFilters;
   showCollaboration: boolean;
 }) {
+  function appendByImageId<T>(map: Map<number, T[]>, imageId: number, value: T): void {
+    const bucket = map.get(imageId);
+    if (bucket) {
+      bucket.push(value);
+      return;
+    }
+    map.set(imageId, [value]);
+  }
+
   const canReview = currentUser.permissions.includes("review:write");
   const organizationOptions = Array.from(new Set(report.stores.map((store) => store.organization_name || "").filter(Boolean))).sort();
-  const scopedStoreIds = buildScopeStoreIds(report.stores, filters);
-  const scopedImages = filterImages(report.results, scopedStoreIds, filters);
-  const issues = filterIssues(report.issues, scopedStoreIds, filters);
   const storeById = new Map(report.stores.map((store) => [store.store_id, store]));
-  const imageSemanticMap = new Map(
-    scopedImages.map((image) => {
-      const imageIssues = issues.filter((issue) => matchesIssueToImage(issue, image));
-      const imageInspections = report.inspections.filter((inspection) => matchesInspectionToImage(inspection, image));
-      return [image.id, classifyReportResultSemantics(imageIssues, imageInspections)];
-    })
-  );
-  const semanticCounts = {
+  const hasPreparedDetail =
+    report.issues.length === 0 &&
+    report.inspections.length === 0 &&
+    typeof report.filtered_result_count === "number" &&
+    typeof report.current_page === "number" &&
+    typeof report.total_pages === "number" &&
+    report.results.every((image) => typeof image.semantic_state === "string");
+
+  const issuesByImageId = new Map<number, Array<{ id: number }>>();
+  const imageSemanticMap = new Map<number, "issue_found" | "pass" | "inconclusive" | "inspection_failed">();
+  let semanticCounts = {
     issue_found: 0,
     pass: 0,
     inconclusive: 0,
     inspection_failed: 0
   };
-  imageSemanticMap.forEach((state) => {
-    semanticCounts[state] += 1;
-  });
-  const images = filters.semanticState
-    ? scopedImages.filter((image) => imageSemanticMap.get(image.id) === filters.semanticState)
-    : scopedImages;
-  const pendingImages = images.filter((image) => image.review_state === "pending").length;
-  const reviewedImages = images.length - pendingImages;
+  let scopedImages = report.results;
+  let images = report.results;
+  let pendingImages = 0;
+  let reviewedImages = 0;
+  let currentPage = 1;
+  let totalPages = 1;
+  let pagedImages = report.results;
+  let scopedResultCount = report.results.length;
+  let filteredResultCount = report.results.length;
+
+  if (hasPreparedDetail) {
+    report.results.forEach((image) => {
+      const issueCount = Number(image.semantic_issue_count || 0);
+      const semanticState = (image.semantic_state || "inconclusive") as "issue_found" | "pass" | "inconclusive" | "inspection_failed";
+      imageSemanticMap.set(image.id, semanticState);
+      for (let index = 0; index < issueCount; index += 1) {
+        appendByImageId(issuesByImageId, image.id, { id: index + 1 });
+      }
+    });
+    semanticCounts = {
+      issue_found: report.semantic_counts?.issue_found || 0,
+      pass: report.semantic_counts?.pass || 0,
+      inconclusive: report.semantic_counts?.inconclusive || 0,
+      inspection_failed: report.semantic_counts?.inspection_failed || 0
+    };
+    pendingImages = Number(report.filtered_pending_result_count || 0);
+    reviewedImages = Number(report.filtered_reviewed_result_count || 0);
+    currentPage = Number(report.current_page || 1);
+    totalPages = Number(report.total_pages || 1);
+    scopedResultCount = Number(report.image_count || report.results.length);
+    filteredResultCount = Number(report.filtered_result_count || report.results.length);
+    pagedImages = report.results;
+    images = report.results;
+    scopedImages = report.results;
+  } else {
+    const scopedStoreIds = buildScopeStoreIds(report.stores, filters);
+    scopedImages = filterImages(report.results, scopedStoreIds, filters);
+    const issues = filterIssues(report.issues, scopedStoreIds, filters);
+    const scopedImageIds = new Set(scopedImages.map((image) => image.id));
+    const imageIdsByCaptureId = new Map<string, number[]>();
+    const imageIdsByStoreId = new Map<string, number[]>();
+
+    for (const image of scopedImages) {
+      const captureId = readMetadataString(image.metadata, "capture_id");
+      if (captureId) {
+        const captureBucket = imageIdsByCaptureId.get(captureId);
+        if (captureBucket) {
+          captureBucket.push(image.id);
+        } else {
+          imageIdsByCaptureId.set(captureId, [image.id]);
+        }
+      }
+      if (image.store_id) {
+        const storeBucket = imageIdsByStoreId.get(image.store_id);
+        if (storeBucket) {
+          storeBucket.push(image.id);
+        } else {
+          imageIdsByStoreId.set(image.store_id, [image.id]);
+        }
+      }
+    }
+
+    for (const issue of issues) {
+      const matchedImageIds = new Set<number>();
+      if (issue.result_id && scopedImageIds.has(issue.result_id)) {
+        matchedImageIds.add(issue.result_id);
+      }
+      const issueCaptureId = readMetadataString(issue.metadata, "capture_id");
+      if (issueCaptureId) {
+        for (const imageId of imageIdsByCaptureId.get(issueCaptureId) || []) {
+          matchedImageIds.add(imageId);
+        }
+      }
+      if (matchedImageIds.size === 0 && issue.store_id) {
+        for (const imageId of imageIdsByStoreId.get(issue.store_id) || []) {
+          matchedImageIds.add(imageId);
+        }
+      }
+      for (const imageId of matchedImageIds) {
+        appendByImageId(issuesByImageId, imageId, issue);
+      }
+    }
+
+    const inspectionsByImageId = new Map<number, typeof report.inspections>();
+    for (const inspection of report.inspections) {
+      const matchedImageIds = new Set<number>();
+      if (inspection.result_id && scopedImageIds.has(inspection.result_id)) {
+        matchedImageIds.add(inspection.result_id);
+      }
+      const inspectionCaptureId = readMetadataString(inspection.metadata, "capture_id");
+      if (inspectionCaptureId) {
+        for (const imageId of imageIdsByCaptureId.get(inspectionCaptureId) || []) {
+          matchedImageIds.add(imageId);
+        }
+      }
+      if (matchedImageIds.size === 0 && inspection.store_id) {
+        for (const imageId of imageIdsByStoreId.get(inspection.store_id) || []) {
+          matchedImageIds.add(imageId);
+        }
+      }
+      for (const imageId of matchedImageIds) {
+        appendByImageId(inspectionsByImageId, imageId, inspection);
+      }
+    }
+
+    imageSemanticMap.clear();
+    scopedImages.forEach((image) => {
+      const imageIssues = issuesByImageId.get(image.id) || [];
+      const imageInspections = inspectionsByImageId.get(image.id) || [];
+      imageSemanticMap.set(image.id, classifyReportResultSemantics(imageIssues, imageInspections));
+    });
+    semanticCounts = {
+      issue_found: 0,
+      pass: 0,
+      inconclusive: 0,
+      inspection_failed: 0
+    };
+    imageSemanticMap.forEach((state) => {
+      semanticCounts[state] += 1;
+    });
+    images = filters.semanticState
+      ? scopedImages.filter((image) => imageSemanticMap.get(image.id) === filters.semanticState)
+      : scopedImages;
+    pendingImages = images.filter((image) => image.review_state === "pending").length;
+    reviewedImages = images.length - pendingImages;
+    totalPages = Math.max(1, Math.ceil(images.length / filters.pageSize));
+    currentPage = Math.min(filters.page, totalPages);
+    const pageStart = (currentPage - 1) * filters.pageSize;
+    pagedImages = images.slice(pageStart, pageStart + filters.pageSize);
+    scopedResultCount = scopedImages.length;
+    filteredResultCount = images.length;
+  }
+
+  const effectivePageSize =
+    hasPreparedDetail && Number(report.page_size || 0) > 0
+      ? Number(report.page_size)
+      : filters.pageSize;
+
   const stores = filterStores(report.stores, filters);
   const completedStores = stores.filter((store) => store.progress_state === "completed").length;
   const reviewers = Array.from(new Set(report.review_logs.map((log) => log.operator_name).filter(Boolean)));
   const listTitle = filters.reviewStatus === "completed" ? "已复核结果" : filters.reviewStatus === "pending" ? "待复核结果" : "巡检结果";
-  const totalPages = Math.max(1, Math.ceil(images.length / filters.pageSize));
-  const currentPage = Math.min(filters.page, totalPages);
-  const pageStart = (currentPage - 1) * filters.pageSize;
-  const pagedImages = images.slice(pageStart, pageStart + filters.pageSize);
 
-  function buildPageHref(page: number, pageSize: DetailFilters["pageSize"] = filters.pageSize) {
+  function buildPageHref(page: number, pageSize: number = effectivePageSize) {
     const searchParams = new URLSearchParams();
     if (filters.organization) {
       searchParams.set("organization", filters.organization);
@@ -120,7 +253,7 @@ export function ReportDetailView({
     return search ? `/reports/${report.id}?${search}` : `/reports/${report.id}`;
   }
 
-  const collaborationHref = `${buildPageHref(currentPage, filters.pageSize)}${buildPageHref(currentPage, filters.pageSize).includes("?") ? "&" : "?"}collaboration=1`;
+  const collaborationHref = `${buildPageHref(currentPage, effectivePageSize)}${buildPageHref(currentPage, effectivePageSize).includes("?") ? "&" : "?"}collaboration=1`;
 
   return (
     <main className="page-shell">
@@ -168,7 +301,7 @@ export function ReportDetailView({
               <Card className={styles.heroStatCard}>
                 <CardContent className={styles.heroStatCardInner}>
                   <span className={styles.summaryLabel}>巡检结果</span>
-                  <strong className={styles.summaryValue}>{scopedImages.length}</strong>
+                  <strong className={styles.summaryValue}>{scopedResultCount}</strong>
                 </CardContent>
               </Card>
             <Card className={styles.heroStatCard}>
@@ -198,10 +331,10 @@ export function ReportDetailView({
         <div className={styles.progressStrip}>
           <div className={styles.progressLabel}>
             <span>复核进度</span>
-            <strong>{getCompletionRatio(reviewedImages, images.length)}%</strong>
+            <strong>{getCompletionRatio(reviewedImages, filteredResultCount)}%</strong>
           </div>
           <div className={styles.progressTrack}>
-            <span style={{ width: `${getCompletionRatio(reviewedImages, images.length)}%` }} />
+            <span style={{ width: `${getCompletionRatio(reviewedImages, filteredResultCount)}%` }} />
           </div>
         </div>
       </section>
@@ -215,7 +348,7 @@ export function ReportDetailView({
                 <p className={styles.workbenchCopy}>先按组织、门店、复核状态和巡检结论缩小当前批次范围，再逐条进入结果详情处理复核动作。</p>
               </div>
               <Badge className={styles.workbenchMetaBadge} variant="outline">
-                {images.length} 条
+                {filteredResultCount} 条
               </Badge>
             </div>
 
@@ -263,7 +396,7 @@ export function ReportDetailView({
                     <p className="section-copy">按组织、门店、复核状态和巡检结论聚焦当前批次，点击巡检结果后进入单独页面处理。</p>
                     <form className={styles.filterForm} method="get">
                       <input name="page" type="hidden" value="1" />
-                      <input name="pageSize" type="hidden" value={String(filters.pageSize)} />
+                        <input name="pageSize" type="hidden" value={String(effectivePageSize)} />
                       <div className={styles.filterFieldsRow}>
                         <div className={`field ${styles.filterField}`}>
                           <label htmlFor="organization">组织</label>
@@ -352,7 +485,7 @@ export function ReportDetailView({
                         </thead>
                         <tbody>
                           {pagedImages.map((image) => {
-                            const imageIssues = issues.filter((issue) => matchesIssueToImage(issue, image));
+                            const imageIssues = issuesByImageId.get(image.id) || [];
                             const imageSemanticState = imageSemanticMap.get(image.id) ?? "inconclusive";
                             const organizationName = image.store_id
                               ? storeById.get(image.store_id)?.organization_name || "未分组组织"
@@ -422,7 +555,7 @@ export function ReportDetailView({
                         </label>
                         <NativeSelect
                           className={styles.pageSizeSelect}
-                          defaultValue={String(filters.pageSize)}
+                          defaultValue={String(effectivePageSize)}
                           id="pageSize"
                           name="pageSize"
                         >
@@ -437,7 +570,7 @@ export function ReportDetailView({
                         </Button>
                       </form>
                       <div className={styles.paginationSummary}>
-                        第 {currentPage} / {totalPages} 页，共 {images.length} 条
+                        第 {currentPage} / {totalPages} 页，共 {filteredResultCount} 条
                       </div>
                       <div className={styles.paginationActions}>
                         {currentPage > 1 ? (
@@ -471,8 +604,8 @@ export function ReportDetailView({
       </section>
       {showCollaboration ? (
         <div className={styles.modalOverlay}>
-          <Link aria-label="关闭协作记录弹窗" className={styles.modalBackdrop} href={buildPageHref(currentPage, filters.pageSize)} />
-          <Link aria-label="关闭协作记录弹窗" className={styles.modalCloseArea} href={buildPageHref(currentPage, filters.pageSize)} />
+          <Link aria-label="关闭协作记录弹窗" className={styles.modalBackdrop} href={buildPageHref(currentPage, effectivePageSize)} />
+          <Link aria-label="关闭协作记录弹窗" className={styles.modalCloseArea} href={buildPageHref(currentPage, effectivePageSize)} />
           <Card className={styles.modalCard}>
             <CardContent className={styles.panelBody}>
               <div className={styles.modalHeader}>
@@ -485,7 +618,7 @@ export function ReportDetailView({
                     {report.review_logs.length} 条
                   </Badge>
                   <Button asChild size="sm" variant="secondary">
-                    <Link href={buildPageHref(currentPage, filters.pageSize)}>关闭</Link>
+                    <Link href={buildPageHref(currentPage, effectivePageSize)}>关闭</Link>
                   </Button>
                 </div>
               </div>

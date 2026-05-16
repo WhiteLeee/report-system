@@ -17,6 +17,7 @@
     "business:clear": "tsx scripts/clear-business-data.ts",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:migrate": "tsx backend/database/migrate.ts",
+    "db:migrate:sqlite": "tsx scripts/migrate-sqlite-to-postgres.ts",
     "db:studio": "drizzle-kit studio --config drizzle.config.ts",
     "db:reset:local": "tsx scripts/db-reset-local.ts",
     "reinit:local": "tsx scripts/reinit-local.ts"

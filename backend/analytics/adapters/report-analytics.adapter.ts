@@ -152,7 +152,7 @@ export function buildAnalyticsResultFact(input: {
   const extensions = safeParseRecord(input.reportRow.extensionsJson);
   const metadata = safeParseRecord(input.resultRow.metadataJson);
   const semanticState = classifyReportResultSemantics(
-    input.issueRows,
+    input.issueRows.length,
     input.inspectionRows.map((inspection) => ({
       status: inspection.status,
       raw_result: inspection.rawResult,

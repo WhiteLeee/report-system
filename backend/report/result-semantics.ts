@@ -62,10 +62,15 @@ function inspectionIsInconclusive(inspection: Pick<ReportInspection, "status" | 
 }
 
 export function classifyReportResultSemantics(
-  issues: ReadonlyArray<unknown>,
+  issuesOrCount: ReadonlyArray<unknown> | number,
   inspections: Array<Pick<ReportInspection, "status" | "raw_result" | "error_message">>
 ): any {
-  if (issues.length > 0) {
+  const issueCount = Array.isArray(issuesOrCount)
+    ? issuesOrCount.length
+    : Number.isFinite(Number(issuesOrCount))
+      ? Math.max(0, Math.trunc(Number(issuesOrCount)))
+      : 0;
+  if (issueCount > 0) {
     return "issue_found";
   }
   if (inspections.some(inspectionHasFailure)) {

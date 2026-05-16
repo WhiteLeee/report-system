@@ -47,12 +47,6 @@ export default async function ReportDetailPage({
     notFound();
   }
 
-  const report = await reportService.getReportDetail(reportId, buildRequestContext(currentUser));
-
-  if (!report) {
-    notFound();
-  }
-
   const filters: DetailFilters = {
     organization: typeof resolvedSearchParams.organization === "string" ? resolvedSearchParams.organization : "",
     storeId: typeof resolvedSearchParams.storeId === "string" ? resolvedSearchParams.storeId : "",
@@ -65,6 +59,22 @@ export default async function ReportDetailPage({
     page: normalizePage(resolvedSearchParams.page),
     pageSize: normalizePageSize(resolvedSearchParams.pageSize)
   };
+  const report = await reportService.getReportDetailPage(
+    reportId,
+    {
+      organization: filters.organization,
+      storeId: filters.storeId,
+      reviewStatus: filters.reviewStatus,
+      semanticState: filters.semanticState,
+      page: filters.page,
+      pageSize: filters.pageSize
+    },
+    buildRequestContext(currentUser)
+  );
+
+  if (!report) {
+    notFound();
+  }
   const showCollaboration = typeof resolvedSearchParams.collaboration === "string" && resolvedSearchParams.collaboration === "1";
 
   return <ReportDetailView currentUser={currentUser} filters={filters} report={report} showCollaboration={showCollaboration} />;

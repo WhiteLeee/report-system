@@ -61,7 +61,7 @@ export default async function ReportResultDetailPage({
     notFound();
   }
 
-  const report = await reportService.getReportDetail(reportId, buildRequestContext(currentUser));
+  const report = await reportService.getReportResultDetail(reportId, resultId, buildRequestContext(currentUser));
 
   if (!report) {
     notFound();
@@ -86,7 +86,7 @@ export default async function ReportResultDetailPage({
   const imageFallback = normalizeImageFallback(resolvedSearchParams.imageFallback);
   const failedInspectionId = typeof resolvedSearchParams.failedInspectionId === "string" ? resolvedSearchParams.failedInspectionId : "";
   const previewImage = typeof resolvedSearchParams.preview === "string" && resolvedSearchParams.preview === "1";
-  const rectificationOrders = await rectificationService.syncOrdersByResultId(resultId);
+  const rectificationOrders = await rectificationService.listByResultId(resultId);
   const huiYunYingApiSettings = await systemSettingsService.getHuiYunYingApiSettings();
 
   return (

@@ -253,8 +253,9 @@ export function normalizePublishedReport(payload: ReportPublishPayload): any {
 
   const captureSemanticMap = new Map<string, CaptureSemanticSnapshot>();
   facts.captures.forEach((capture) => {
+    const captureIssues = issuesByCaptureId.get(capture.capture_id) ?? [];
     const semanticState = classifyReportResultSemantics(
-      (issuesByCaptureId.get(capture.capture_id) ?? []).map((issue) => ({ id: issue.issue_id })),
+      captureIssues.length,
       (inspectionsByCaptureId.get(capture.capture_id) ?? []).map((inspection) => ({
         status: inspection.status ?? null,
         raw_result: inspection.raw_result ?? null,

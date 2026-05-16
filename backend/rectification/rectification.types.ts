@@ -43,6 +43,20 @@ export interface RectificationOrderFilters {
   endDate?: string;
 }
 
+export interface RectificationOrderPageMetrics {
+  corrected_count: number;
+  pending_review_count: number;
+  issued_count: number;
+}
+
+export interface RectificationOrderPage {
+  page: number;
+  page_size: number;
+  total: number;
+  items: RectificationOrderRecord[];
+  metrics: RectificationOrderPageMetrics;
+}
+
 export interface CreateRectificationOrderInput {
   report_id: number;
   result_id: number;

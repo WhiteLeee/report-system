@@ -56,24 +56,21 @@ export default async function ReportsPage({
   const resolvedSearchParams = await searchParams;
   const filters = buildFilters(resolvedSearchParams);
   const requestContext = buildRequestContext(currentUser);
-  const allReports = await reportService.listReports({}, requestContext);
-  const filteredReports = await reportService.listReports(filters, requestContext);
   const pageSize = parsePositiveInt(resolvedSearchParams.pageSize, PAGE_SIZE_OPTIONS[0]);
-  const totalReports = filteredReports.length;
-  const totalPages = Math.max(1, Math.ceil(totalReports / pageSize));
-  const page = Math.min(parsePositiveInt(resolvedSearchParams.page, 1), totalPages);
-  const startIndex = (page - 1) * pageSize;
-  const reports = filteredReports.slice(startIndex, startIndex + pageSize);
-  const reportTypeOptions: string[] = Array.from(
-    new Set<string>(
-      allReports
-        .map((report) => report.report_type)
-        .filter((reportType): reportType is string => typeof reportType === "string" && reportType.length > 0)
-    )
-  ).sort();
-  const pendingReports = allReports.filter((report) => report.pending_result_count > 0).length;
-  const totalIssues = allReports.reduce((sum, report) => sum + report.issue_count, 0);
-  const totalImages = allReports.reduce((sum, report) => sum + report.total_result_count, 0);
+  const requestedPage = parsePositiveInt(resolvedSearchParams.page, 1);
+  const [overview, reportPage] = await Promise.all([
+    reportService.getReportListOverview(requestContext),
+    reportService.queryReportsPage(filters, requestedPage, pageSize, requestContext)
+  ]);
+  const effectivePageSize = reportPage.page_size;
+  const totalReports = reportPage.total;
+  const totalPages = Math.max(1, Math.ceil(totalReports / effectivePageSize));
+  const page = reportPage.page;
+  const reports = reportPage.items;
+  const reportTypeOptions = overview.report_types;
+  const pendingReports = overview.pending_reports;
+  const totalIssues = overview.total_issues;
+  const totalImages = overview.total_images;
 
   return (
     <main className="page-shell">
@@ -89,7 +86,7 @@ export default async function ReportsPage({
           <Card className={styles.statCard}>
             <CardContent className={styles.statCardInner}>
               <span className={styles.statLabel}>报告批次</span>
-              <strong className={styles.statValue}>{allReports.length}</strong>
+              <strong className={styles.statValue}>{overview.total_reports}</strong>
               <span className={styles.statNote}>当前可查看范围</span>
             </CardContent>
           </Card>
@@ -280,7 +277,7 @@ export default async function ReportsPage({
                 className={styles.pager}
                 leftClassName={styles.pagerLeft}
                 page={page}
-                pageSize={pageSize}
+                pageSize={effectivePageSize}
                 pageSizeOptions={PAGE_SIZE_OPTIONS}
                 rightClassName={styles.pagerRight}
                 selectClassName={styles.pageSizeSelect}

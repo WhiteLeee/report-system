@@ -54,14 +54,90 @@ async function readLastAppliedMillis(schema: string, table: string): Promise<num
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+async function hasAppliedMigrationHash(schema: string, table: string, hash: string): Promise<boolean> {
+  const tableName = qualifiedTableName(schema, table);
+  const result = await pool.query<{ exists: boolean }>(
+    `select exists(select 1 from ${tableName} where hash = $1) as exists`,
+    [hash]
+  );
+  return Boolean(result.rows[0]?.exists);
+}
+
+function extractCreatedTables(migrationSql: string[]): string[] {
+  const created = new Set<string>();
+  for (const statement of migrationSql) {
+    const sql = statement.trim();
+    if (!sql) {
+      continue;
+    }
+    const match = /^create\s+table\s+"([^"]+)"/i.exec(sql);
+    if (match?.[1]) {
+      created.add(match[1]);
+    }
+  }
+  return Array.from(created);
+}
+
+async function doesTableExist(tableName: string): Promise<boolean> {
+  const result = await pool.query<{ exists: boolean }>(
+    `select exists(
+      select 1
+      from information_schema.tables
+      where table_name = $1
+        and table_schema not in ('pg_catalog', 'information_schema')
+    ) as exists`,
+    [tableName]
+  );
+  return Boolean(result.rows[0]?.exists);
+}
+
+async function resolveExistingCreatedTables(createdTables: string[]): Promise<string[]> {
+  const existing: string[] = [];
+  for (const tableName of createdTables) {
+    if (await doesTableExist(tableName)) {
+      existing.push(tableName);
+    }
+  }
+  return existing;
+}
+
 async function applyPendingMigrations(schema: string, table: string): Promise<void> {
   const tableName = qualifiedTableName(schema, table);
   const migrations = readMigrationFiles({ migrationsFolder });
   let lastAppliedMillis = await readLastAppliedMillis(schema, table);
 
   for (const migration of migrations) {
+    if (await hasAppliedMigrationHash(schema, table, migration.hash)) {
+      if (migration.folderMillis > lastAppliedMillis) {
+        lastAppliedMillis = migration.folderMillis;
+      }
+      continue;
+    }
+
     if (migration.folderMillis <= lastAppliedMillis) {
       continue;
+    }
+
+    const createdTables = extractCreatedTables(migration.sql);
+    if (createdTables.length > 0) {
+      const existingTables = await resolveExistingCreatedTables(createdTables);
+      if (existingTables.length === createdTables.length) {
+        await pool.query(`insert into ${tableName} ("hash", "created_at") values ($1, $2)`, [
+          migration.hash,
+          migration.folderMillis
+        ]);
+        lastAppliedMillis = migration.folderMillis;
+        console.warn(
+          `Migration ${migration.hash} was baseline-marked as applied because all target tables already exist.`
+        );
+        continue;
+      }
+
+      if (existingTables.length > 0) {
+        throw new Error(
+          `Migration ${migration.hash} is partially applied. Existing tables: ${existingTables.join(", ")}`
+        );
+      }
     }
 
     await pool.query("begin");

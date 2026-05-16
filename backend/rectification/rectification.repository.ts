@@ -4,6 +4,7 @@ import type {
   CreateRectificationOrderInput,
   RectificationSyncBatchRecord,
   RectificationSyncDailyStat,
+  RectificationOrderPage,
   RectificationOrderFilters,
   RectificationOrderRecord
 } from "@/backend/rectification/rectification.types";
@@ -12,6 +13,7 @@ import type { RequestContext } from "@/backend/auth/request-context";
 export interface RectificationOrderRepository {
   create(input: CreateRectificationOrderInput): Promise<any>;
   listAll(filters?: RectificationOrderFilters, context?: RequestContext): Promise<any>;
+  queryPage(filters: RectificationOrderFilters, page: number, pageSize: number, context?: RequestContext): Promise<any>;
   listByResultId(resultId: number): Promise<any>;
   listPendingSync(limit?: number): Promise<any>;
   createSyncBatch(input: CreateRectificationSyncBatchInput): Promise<any>;
