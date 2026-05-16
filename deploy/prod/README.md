@@ -7,7 +7,7 @@ Target host:
 
 1. Upload repository to `/srv/report-system`
 2. Ensure Linux user/group `report` exists
-3. Ensure commands exist: `node`, `npm`, `sqlite3`, `curl`, `systemctl`
+3. Ensure commands exist: `node`, `npm`, `psql / pg_dump / pg_restore`, `curl`, `systemctl`
 4. Ensure reverse proxy points to `127.0.0.1:3000`
 
 ## 2) First-time initialization
@@ -40,9 +40,11 @@ cd /srv/report-system
 ## 5) Operations
 
 ```bash
+./deploy/prod/start.sh
+./deploy/prod/stop.sh
 ./deploy/prod/status.sh
 ./deploy/prod/restart.sh
 ./deploy/prod/backup-db.sh
-./deploy/prod/restore-db.sh /var/backups/report-system/prod/prod-YYYYMMDD-HHMMSS.sqlite3
+./deploy/prod/restore-db.sh /var/backups/report-system/prod/prod-YYYYMMDD-HHMMSS.dump
 ./deploy/prod/healthcheck.sh
 ```

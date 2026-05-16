@@ -28,15 +28,15 @@ const INCONCLUSIVE_TEXT_KEYWORDS = [
   "未覆盖"
 ];
 
-function normalizeText(value: string | null | undefined): string {
+function normalizeText(value: string | null | undefined): any {
   return String(value || "").trim().toLowerCase();
 }
 
-function containsAnyKeyword(text: string, keywords: string[]): boolean {
+function containsAnyKeyword(text: string, keywords: string[]): any {
   return keywords.some((keyword) => text.includes(keyword));
 }
 
-function inspectionHasFailure(inspection: Pick<ReportInspection, "status" | "raw_result" | "error_message">): boolean {
+function inspectionHasFailure(inspection: Pick<ReportInspection, "status" | "raw_result" | "error_message">): any {
   const status = normalizeText(inspection.status);
   const rawResult = normalizeText(inspection.raw_result);
   const errorMessage = normalizeText(inspection.error_message);
@@ -50,7 +50,7 @@ function inspectionHasFailure(inspection: Pick<ReportInspection, "status" | "raw
   );
 }
 
-function inspectionIsInconclusive(inspection: Pick<ReportInspection, "status" | "raw_result" | "error_message">): boolean {
+function inspectionIsInconclusive(inspection: Pick<ReportInspection, "status" | "raw_result" | "error_message">): any {
   const status = normalizeText(inspection.status);
   const rawResult = normalizeText(inspection.raw_result);
   const errorMessage = normalizeText(inspection.error_message);
@@ -62,10 +62,15 @@ function inspectionIsInconclusive(inspection: Pick<ReportInspection, "status" | 
 }
 
 export function classifyReportResultSemantics(
-  issues: ReadonlyArray<unknown>,
+  issuesOrCount: ReadonlyArray<unknown> | number,
   inspections: Array<Pick<ReportInspection, "status" | "raw_result" | "error_message">>
-): ReportResultSemanticState {
-  if (issues.length > 0) {
+): any {
+  const issueCount = Array.isArray(issuesOrCount)
+    ? issuesOrCount.length
+    : Number.isFinite(Number(issuesOrCount))
+      ? Math.max(0, Math.trunc(Number(issuesOrCount)))
+      : 0;
+  if (issueCount > 0) {
     return "issue_found";
   }
   if (inspections.some(inspectionHasFailure)) {
@@ -77,7 +82,7 @@ export function classifyReportResultSemantics(
   return "pass";
 }
 
-export function getReportResultSemanticLabel(state: ReportResultSemanticState, issueCount = 0): string {
+export function getReportResultSemanticLabel(state: ReportResultSemanticState, issueCount = 0): any {
   if (state === "issue_found") {
     return `${issueCount}`;
   }
@@ -90,7 +95,7 @@ export function getReportResultSemanticLabel(state: ReportResultSemanticState, i
   return "无法判定";
 }
 
-export function getReportResultSemanticSummaryLabel(state: ReportResultSemanticState, issueCount?: number): string {
+export function getReportResultSemanticSummaryLabel(state: ReportResultSemanticState, issueCount?: number): any {
   if (state === "issue_found") {
     if (typeof issueCount === "number" && issueCount > 0) {
       return `发现 ${issueCount} 个问题`;
@@ -106,7 +111,7 @@ export function getReportResultSemanticSummaryLabel(state: ReportResultSemanticS
   return "无法判定";
 }
 
-export function getReportResultSemanticTone(state: ReportResultSemanticState): "default" | "secondary" | "outline" {
+export function getReportResultSemanticTone(state: ReportResultSemanticState): any {
   if (state === "issue_found") {
     return "default";
   }

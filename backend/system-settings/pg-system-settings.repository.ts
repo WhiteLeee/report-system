@@ -56,7 +56,7 @@ const defaultEnterpriseBrandingSettings: EnterpriseBrandingSettings = {
   updatedAt: ""
 };
 
-function safeParseSettings(value: string): HuiYunYingApiSettings {
+function safeParseSettings(value: string): any {
   try {
     const parsed = JSON.parse(value) as Partial<HuiYunYingApiSettings>;
     return {
@@ -115,7 +115,7 @@ function safeParseSettings(value: string): HuiYunYingApiSettings {
   }
 }
 
-function safeParseAuthSecurityPolicy(value: string): AuthSecurityPolicy {
+function safeParseAuthSecurityPolicy(value: string): any {
   try {
     const parsed = JSON.parse(value) as Partial<AuthSecurityPolicy>;
     return {
@@ -151,7 +151,7 @@ function safeParseAuthSecurityPolicy(value: string): AuthSecurityPolicy {
   }
 }
 
-function safeParseEnterpriseBrandingSettings(value: string): EnterpriseBrandingSettings {
+function safeParseEnterpriseBrandingSettings(value: string): any {
   try {
     const parsed = JSON.parse(value) as Partial<EnterpriseBrandingSettings>;
     return {
@@ -169,13 +169,12 @@ function safeParseEnterpriseBrandingSettings(value: string): EnterpriseBrandingS
   }
 }
 
-export class SqliteSystemSettingsRepository implements SystemSettingsRepository {
-  getHuiYunYingApiSettings(): HuiYunYingApiSettings {
-    const row = db
-      .select()
-      .from(systemSettingTable)
-      .where(eq(systemSettingTable.settingKey, HUIYUNYING_API_KEY))
-      .get();
+export class PgSystemSettingsRepository implements SystemSettingsRepository {
+  async getHuiYunYingApiSettings(): Promise<any> {
+    const row = (await db
+          .select()
+          .from(systemSettingTable)
+          .where(eq(systemSettingTable.settingKey, HUIYUNYING_API_KEY)))[0];
 
     if (!row) {
       return defaultHuiYunYingApiSettings;
@@ -184,33 +183,31 @@ export class SqliteSystemSettingsRepository implements SystemSettingsRepository 
     return safeParseSettings(row.valueJson);
   }
 
-  saveHuiYunYingApiSettings(settings: HuiYunYingApiSettings): void {
+  async saveHuiYunYingApiSettings(settings: HuiYunYingApiSettings): Promise<any> {
     const now = new Date().toISOString();
-    db.insert(systemSettingTable)
-      .values({
-        settingKey: HUIYUNYING_API_KEY,
-        category: "integration",
-        valueJson: JSON.stringify(settings),
-        createdAt: now,
-        updatedAt: now
-      })
-      .onConflictDoUpdate({
-        target: systemSettingTable.settingKey,
-        set: {
-          category: "integration",
-          valueJson: JSON.stringify(settings),
-          updatedAt: now
-        }
-      })
-      .run();
+    await db.insert(systemSettingTable)
+            .values({
+              settingKey: HUIYUNYING_API_KEY,
+              category: "integration",
+              valueJson: JSON.stringify(settings),
+              createdAt: now,
+              updatedAt: now
+            })
+            .onConflictDoUpdate({
+              target: systemSettingTable.settingKey,
+              set: {
+                category: "integration",
+                valueJson: JSON.stringify(settings),
+                updatedAt: now
+              }
+            });
   }
 
-  getDeliveryMode(): DeliveryMode {
-    const row = db
-      .select()
-      .from(systemSettingTable)
-      .where(eq(systemSettingTable.settingKey, DELIVERY_MODE_KEY))
-      .get();
+  async getDeliveryMode(): Promise<any> {
+    const row = (await db
+          .select()
+          .from(systemSettingTable)
+          .where(eq(systemSettingTable.settingKey, DELIVERY_MODE_KEY)))[0];
 
     if (!row) {
       return "internal";
@@ -224,34 +221,32 @@ export class SqliteSystemSettingsRepository implements SystemSettingsRepository 
     }
   }
 
-  saveDeliveryMode(mode: DeliveryMode): void {
+  async saveDeliveryMode(mode: DeliveryMode): Promise<any> {
     const now = new Date().toISOString();
     const normalizedMode: DeliveryMode = mode === "customer" ? "customer" : "internal";
-    db.insert(systemSettingTable)
-      .values({
-        settingKey: DELIVERY_MODE_KEY,
-        category: "auth",
-        valueJson: JSON.stringify({ mode: normalizedMode }),
-        createdAt: now,
-        updatedAt: now
-      })
-      .onConflictDoUpdate({
-        target: systemSettingTable.settingKey,
-        set: {
-          category: "auth",
-          valueJson: JSON.stringify({ mode: normalizedMode }),
-          updatedAt: now
-        }
-      })
-      .run();
+    await db.insert(systemSettingTable)
+            .values({
+              settingKey: DELIVERY_MODE_KEY,
+              category: "auth",
+              valueJson: JSON.stringify({ mode: normalizedMode }),
+              createdAt: now,
+              updatedAt: now
+            })
+            .onConflictDoUpdate({
+              target: systemSettingTable.settingKey,
+              set: {
+                category: "auth",
+                valueJson: JSON.stringify({ mode: normalizedMode }),
+                updatedAt: now
+              }
+            });
   }
 
-  getAuthSecurityPolicy(): AuthSecurityPolicy {
-    const row = db
-      .select()
-      .from(systemSettingTable)
-      .where(eq(systemSettingTable.settingKey, AUTH_SECURITY_POLICY_KEY))
-      .get();
+  async getAuthSecurityPolicy(): Promise<any> {
+    const row = (await db
+          .select()
+          .from(systemSettingTable)
+          .where(eq(systemSettingTable.settingKey, AUTH_SECURITY_POLICY_KEY)))[0];
 
     if (!row) {
       return defaultAuthSecurityPolicy;
@@ -259,33 +254,31 @@ export class SqliteSystemSettingsRepository implements SystemSettingsRepository 
     return safeParseAuthSecurityPolicy(row.valueJson);
   }
 
-  saveAuthSecurityPolicy(policy: AuthSecurityPolicy): void {
+  async saveAuthSecurityPolicy(policy: AuthSecurityPolicy): Promise<any> {
     const now = new Date().toISOString();
-    db.insert(systemSettingTable)
-      .values({
-        settingKey: AUTH_SECURITY_POLICY_KEY,
-        category: "auth",
-        valueJson: JSON.stringify(policy),
-        createdAt: now,
-        updatedAt: now
-      })
-      .onConflictDoUpdate({
-        target: systemSettingTable.settingKey,
-        set: {
-          category: "auth",
-          valueJson: JSON.stringify(policy),
-          updatedAt: now
-        }
-      })
-      .run();
+    await db.insert(systemSettingTable)
+            .values({
+              settingKey: AUTH_SECURITY_POLICY_KEY,
+              category: "auth",
+              valueJson: JSON.stringify(policy),
+              createdAt: now,
+              updatedAt: now
+            })
+            .onConflictDoUpdate({
+              target: systemSettingTable.settingKey,
+              set: {
+                category: "auth",
+                valueJson: JSON.stringify(policy),
+                updatedAt: now
+              }
+            });
   }
 
-  getEnterpriseBrandingSettings(): EnterpriseBrandingSettings {
-    const row = db
-      .select()
-      .from(systemSettingTable)
-      .where(eq(systemSettingTable.settingKey, ENTERPRISE_BRANDING_KEY))
-      .get();
+  async getEnterpriseBrandingSettings(): Promise<any> {
+    const row = (await db
+          .select()
+          .from(systemSettingTable)
+          .where(eq(systemSettingTable.settingKey, ENTERPRISE_BRANDING_KEY)))[0];
 
     if (!row) {
       return defaultEnterpriseBrandingSettings;
@@ -293,24 +286,23 @@ export class SqliteSystemSettingsRepository implements SystemSettingsRepository 
     return safeParseEnterpriseBrandingSettings(row.valueJson);
   }
 
-  saveEnterpriseBrandingSettings(settings: EnterpriseBrandingSettings): void {
+  async saveEnterpriseBrandingSettings(settings: EnterpriseBrandingSettings): Promise<any> {
     const now = new Date().toISOString();
-    db.insert(systemSettingTable)
-      .values({
-        settingKey: ENTERPRISE_BRANDING_KEY,
-        category: "branding",
-        valueJson: JSON.stringify(settings),
-        createdAt: now,
-        updatedAt: now
-      })
-      .onConflictDoUpdate({
-        target: systemSettingTable.settingKey,
-        set: {
-          category: "branding",
-          valueJson: JSON.stringify(settings),
-          updatedAt: now
-        }
-      })
-      .run();
+    await db.insert(systemSettingTable)
+            .values({
+              settingKey: ENTERPRISE_BRANDING_KEY,
+              category: "branding",
+              valueJson: JSON.stringify(settings),
+              createdAt: now,
+              updatedAt: now
+            })
+            .onConflictDoUpdate({
+              target: systemSettingTable.settingKey,
+              set: {
+                category: "branding",
+                valueJson: JSON.stringify(settings),
+                updatedAt: now
+              }
+            });
   }
 }

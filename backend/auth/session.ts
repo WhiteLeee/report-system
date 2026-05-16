@@ -9,7 +9,7 @@ export const SESSION_COOKIE_NAME = "report_system_session";
 
 const authService = createAuthService();
 
-function readTokenFromCookieHeader(cookieHeader: string): string {
+function readTokenFromCookieHeader(cookieHeader: string): any {
   const pairs = cookieHeader.split(";").map((item) => item.trim());
   const target = pairs.find((item) => item.startsWith(`${SESSION_COOKIE_NAME}=`));
   if (!target) {
@@ -18,24 +18,24 @@ function readTokenFromCookieHeader(cookieHeader: string): string {
   return decodeURIComponent(target.slice(`${SESSION_COOKIE_NAME}=`.length));
 }
 
-export async function getCurrentSessionUser(): Promise<SessionUser | null> {
+export async function getCurrentSessionUser(): Promise<any> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value ?? "";
   if (!sessionToken) {
     return null;
   }
-  return authService.getSessionUser(sessionToken);
+  return await authService.getSessionUser(sessionToken);
 }
 
-export function getSessionUserFromRequest(request: Request): SessionUser | null {
+export async function getSessionUserFromRequest(request: Request): Promise<any> {
   const sessionToken = readTokenFromCookieHeader(request.headers.get("cookie") || "");
   if (!sessionToken) {
     return null;
   }
-  return authService.getSessionUser(sessionToken);
+  return await authService.getSessionUser(sessionToken);
 }
 
-export async function requireSessionUser(nextPath = "/reports"): Promise<SessionUser> {
+export async function requireSessionUser(nextPath = "/reports"): Promise<any> {
   const user = await getCurrentSessionUser();
   if (!user) {
     redirect(`/login?next=${encodeURIComponent(nextPath)}`);
@@ -43,7 +43,7 @@ export async function requireSessionUser(nextPath = "/reports"): Promise<Session
   return user;
 }
 
-export async function requirePermission(permissionCode: PermissionCode, nextPath = "/reports"): Promise<SessionUser> {
+export async function requirePermission(permissionCode: PermissionCode, nextPath = "/reports"): Promise<any> {
   const user = await requireSessionUser(nextPath);
   if (!authService.hasPermission(user, permissionCode)) {
     redirect("/reports");
@@ -51,11 +51,11 @@ export async function requirePermission(permissionCode: PermissionCode, nextPath
   return user;
 }
 
-export function hasPermission(user: SessionUser | null, permissionCode: PermissionCode): boolean {
+export function hasPermission(user: SessionUser | null, permissionCode: PermissionCode): any {
   return authService.hasPermission(user, permissionCode);
 }
 
-export function buildRequestContext(user: SessionUser | null): RequestContext {
+export function buildRequestContext(user: SessionUser | null): any {
   if (!user) {
     return {};
   }

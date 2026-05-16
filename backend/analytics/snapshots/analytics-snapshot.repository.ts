@@ -8,8 +8,8 @@ import type {
 } from "@/backend/database/schema";
 
 export interface AnalyticsSnapshotRepository {
-  replaceDailyOverviewSnapshots(rows: Array<typeof analyticsDailyOverviewSnapshotTable.$inferInsert>): number;
-  replaceDailySemanticSnapshots(rows: Array<typeof analyticsDailySemanticSnapshotTable.$inferInsert>): number;
-  listDailyOverviewSnapshots(): AnalyticsDailyOverviewSnapshotRecord[];
-  listDailySemanticSnapshots(): AnalyticsDailySemanticSnapshotRecord[];
+  replaceDailyOverviewSnapshots(rows: Array<typeof analyticsDailyOverviewSnapshotTable.$inferInsert>): any;
+  replaceDailySemanticSnapshots(rows: Array<typeof analyticsDailySemanticSnapshotTable.$inferInsert>): any;
+  listDailyOverviewSnapshots(): any;
+  listDailySemanticSnapshots(): any;
 }

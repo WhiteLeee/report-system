@@ -8,7 +8,7 @@ import type {
 
 const HEX_COLOR_PATTERN = /^#([0-9a-fA-F]{6})$/;
 
-function normalizeHexColor(value: string, fallback: string): string {
+function normalizeHexColor(value: string, fallback: string): any {
   const normalized = value.trim();
   return HEX_COLOR_PATTERN.test(normalized) ? normalized.toLowerCase() : fallback;
 }
@@ -16,12 +16,12 @@ function normalizeHexColor(value: string, fallback: string): string {
 export class SystemSettingsService {
   constructor(private readonly repository: SystemSettingsRepository) {}
 
-  getHuiYunYingApiSettings(): HuiYunYingApiSettings {
-    return this.repository.getHuiYunYingApiSettings();
+  async getHuiYunYingApiSettings(): Promise<any> {
+    return await this.repository.getHuiYunYingApiSettings();
   }
 
-  saveHuiYunYingApiSettings(settings: HuiYunYingApiSettings): void {
-    this.repository.saveHuiYunYingApiSettings({
+  async saveHuiYunYingApiSettings(settings: HuiYunYingApiSettings): Promise<any> {
+    await this.repository.saveHuiYunYingApiSettings({
       uri: settings.uri.trim(),
       route: settings.route.trim(),
       appid: settings.appid.trim(),
@@ -41,20 +41,20 @@ export class SystemSettingsService {
     });
   }
 
-  getDeliveryMode(): DeliveryMode {
-    return this.repository.getDeliveryMode();
+  async getDeliveryMode(): Promise<any> {
+    return await this.repository.getDeliveryMode();
   }
 
-  saveDeliveryMode(mode: DeliveryMode): void {
-    this.repository.saveDeliveryMode(mode === "customer" ? "customer" : "internal");
+  async saveDeliveryMode(mode: DeliveryMode): Promise<any> {
+    await this.repository.saveDeliveryMode(mode === "customer" ? "customer" : "internal");
   }
 
-  getAuthSecurityPolicy(): AuthSecurityPolicy {
-    return this.repository.getAuthSecurityPolicy();
+  async getAuthSecurityPolicy(): Promise<any> {
+    return await this.repository.getAuthSecurityPolicy();
   }
 
-  saveAuthSecurityPolicy(policy: AuthSecurityPolicy): void {
-    this.repository.saveAuthSecurityPolicy({
+  async saveAuthSecurityPolicy(policy: AuthSecurityPolicy): Promise<any> {
+    await this.repository.saveAuthSecurityPolicy({
       passwordMinLength: Math.max(8, Math.floor(policy.passwordMinLength)),
       requireUppercase: Boolean(policy.requireUppercase),
       requireLowercase: Boolean(policy.requireLowercase),
@@ -65,13 +65,13 @@ export class SystemSettingsService {
     });
   }
 
-  getEnterpriseBrandingSettings(): EnterpriseBrandingSettings {
-    return this.repository.getEnterpriseBrandingSettings();
+  async getEnterpriseBrandingSettings(): Promise<any> {
+    return await this.repository.getEnterpriseBrandingSettings();
   }
 
-  saveEnterpriseBrandingSettings(settings: EnterpriseBrandingSettings): void {
-    const fallback = this.repository.getEnterpriseBrandingSettings();
-    this.repository.saveEnterpriseBrandingSettings({
+  async saveEnterpriseBrandingSettings(settings: EnterpriseBrandingSettings): Promise<any> {
+    const fallback = await this.repository.getEnterpriseBrandingSettings();
+    await this.repository.saveEnterpriseBrandingSettings({
       enterpriseName: settings.enterpriseName.trim() || fallback.enterpriseName,
       logoUrl: settings.logoUrl.trim(),
       faviconUrl: settings.faviconUrl.trim(),

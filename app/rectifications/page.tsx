@@ -37,7 +37,7 @@ function parsePositiveInt(value: string | string[] | undefined, fallback: number
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function buildFilters(searchParams: Record<string, string | string[] | undefined>): RectificationOrderFilters {
+function buildFilters(searchParams: Record<string, string | string[] | undefined>): any {
   return {
     keyword: typeof searchParams.keyword === "string" ? searchParams.keyword.trim() : "",
     status: typeof searchParams.status === "string" ? searchParams.status : "",
@@ -47,11 +47,11 @@ function buildFilters(searchParams: Record<string, string | string[] | undefined
   };
 }
 
-function formatRectificationState(order: RectificationOrderRecord): string {
+function formatRectificationState(order: RectificationOrderRecord): any {
   return getRectificationStateLabel(order);
 }
 
-function formatStateTone(order: RectificationOrderRecord): "default" | "secondary" | "outline" {
+function formatStateTone(order: RectificationOrderRecord): any {
   const normalized = normalizeRemoteIfCorrected(order.if_corrected);
   if (normalized === "1" || order.status === "corrected") {
     return "secondary";
@@ -66,28 +66,22 @@ export default async function RectificationsPage({
   searchParams
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("rectification:read", "/rectifications");
   const resolvedSearchParams = await searchParams;
   const filters = buildFilters(resolvedSearchParams);
   const requestContext = buildRequestContext(currentUser);
-  const filteredOrders = rectificationService.listOrders(filters, requestContext);
   const pageSize = parsePositiveInt(resolvedSearchParams.pageSize, PAGE_SIZE_OPTIONS[0]);
-  const totalOrders = filteredOrders.length;
-  const totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));
-  const page = Math.min(parsePositiveInt(resolvedSearchParams.page, 1), totalPages);
-  const startIndex = (page - 1) * pageSize;
-  const orders = filteredOrders.slice(startIndex, startIndex + pageSize);
-
-  const correctedOrders = filteredOrders.filter(
-    (order) => normalizeRemoteIfCorrected(order.if_corrected) === "1" || order.status === "corrected"
-  ).length;
-  const pendingReviewOrders = filteredOrders.filter(
-    (order) => normalizeRemoteIfCorrected(order.if_corrected) === "2" || order.status === "pending_review"
-  ).length;
-  const issuedOrders = filteredOrders.filter(
-    (order) => !["1", "2"].includes(String(normalizeRemoteIfCorrected(order.if_corrected) || "")) && order.status !== "sync_failed"
-  ).length;
+  const requestedPage = parsePositiveInt(resolvedSearchParams.page, 1);
+  const orderPage = await rectificationService.queryOrdersPage(filters, requestedPage, pageSize, requestContext);
+  const effectivePageSize = orderPage.page_size;
+  const totalOrders = orderPage.total;
+  const totalPages = Math.max(1, Math.ceil(totalOrders / effectivePageSize));
+  const page = orderPage.page;
+  const orders = orderPage.items;
+  const correctedOrders = orderPage.metrics.corrected_count;
+  const pendingReviewOrders = orderPage.metrics.pending_review_count;
+  const issuedOrders = orderPage.metrics.issued_count;
   return (
     <main className="page-shell">
       <DashboardHeader
@@ -306,7 +300,7 @@ export default async function RectificationsPage({
                 className={styles.pager}
                 leftClassName={styles.pagerLeft}
                 page={page}
-                pageSize={pageSize}
+                pageSize={effectivePageSize}
                 pageSizeOptions={PAGE_SIZE_OPTIONS}
                 rightClassName={styles.pagerRight}
                 selectClassName={styles.pageSizeSelect}

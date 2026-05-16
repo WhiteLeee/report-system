@@ -71,7 +71,9 @@ rs_npm_runtime() {
         REPORT_SYSTEM_PRIMARY_COLOR_STRONG="${PRIMARY_COLOR_STRONG:-#6b421d}" \
         REPORT_SYSTEM_DEFAULT_TIMEZONE="${DEFAULT_TIMEZONE:-Asia/Shanghai}" \
         REPORT_SYSTEM_DATA_DIR="$DATA_DIR" \
-        REPORT_SYSTEM_DB_PATH="$DB_PATH" \
+        REPORT_SYSTEM_DB_URL="$DB_URL" \
+        REPORT_SYSTEM_DB_MIGRATIONS_SCHEMA="$DB_MIGRATIONS_SCHEMA" \
+        REPORT_SYSTEM_DB_MIGRATIONS_TABLE="$DB_MIGRATIONS_TABLE" \
         REPORT_SYSTEM_TENANT_CONFIG_PATH="$TENANT_CONFIG_PATH" \
         REPORT_SYSTEM_ADMIN_USERNAME="$ADMIN_USERNAME" \
         REPORT_SYSTEM_ADMIN_PASSWORD="${ADMIN_PASSWORD_RUNTIME:-__BOOTSTRAP_ONLY__}" \
@@ -90,7 +92,9 @@ rs_npm_runtime() {
         REPORT_SYSTEM_PRIMARY_COLOR_STRONG="${PRIMARY_COLOR_STRONG:-#6b421d}" \
         REPORT_SYSTEM_DEFAULT_TIMEZONE="${DEFAULT_TIMEZONE:-Asia/Shanghai}" \
         REPORT_SYSTEM_DATA_DIR="$DATA_DIR" \
-        REPORT_SYSTEM_DB_PATH="$DB_PATH" \
+        REPORT_SYSTEM_DB_URL="$DB_URL" \
+        REPORT_SYSTEM_DB_MIGRATIONS_SCHEMA="$DB_MIGRATIONS_SCHEMA" \
+        REPORT_SYSTEM_DB_MIGRATIONS_TABLE="$DB_MIGRATIONS_TABLE" \
         REPORT_SYSTEM_TENANT_CONFIG_PATH="$TENANT_CONFIG_PATH" \
         REPORT_SYSTEM_ADMIN_USERNAME="$ADMIN_USERNAME" \
         REPORT_SYSTEM_ADMIN_PASSWORD="${ADMIN_PASSWORD_RUNTIME:-__BOOTSTRAP_ONLY__}" \
@@ -107,7 +111,9 @@ rs_check_prereqs() {
   rs_require_var SERVICE_NAME
   rs_require_var ENV_FILE
   rs_require_var DATA_DIR
-  rs_require_var DB_PATH
+  rs_require_var DB_URL
+  rs_require_var DB_MIGRATIONS_SCHEMA
+  rs_require_var DB_MIGRATIONS_TABLE
   rs_require_var BACKUP_DIR
   rs_require_var BASE_URL
   rs_require_var TENANT_ID
@@ -123,7 +129,9 @@ rs_check_prereqs() {
 
   rs_require_cmd node
   rs_require_cmd npm
-  rs_require_cmd sqlite3
+  rs_require_cmd psql
+  rs_require_cmd pg_dump
+  rs_require_cmd pg_restore
   rs_require_cmd curl
 
   [ -f "$APP_ROOT/package.json" ] || rs_die "package.json not found under APP_ROOT=${APP_ROOT}"
@@ -139,23 +147,18 @@ rs_check_prereqs() {
 
 rs_backup_db() {
   rs_check_prereqs
-  if [ ! -f "$DB_PATH" ]; then
-    rs_log "Database file not found, skip backup: ${DB_PATH}"
-    return 0
-  fi
-
   local ts backup_file
   ts="$(date '+%Y%m%d-%H%M%S')"
-  backup_file="${BACKUP_DIR}/${ENV_NAME}-${ts}.sqlite3"
+  backup_file="${BACKUP_DIR}/${ENV_NAME}-${ts}.dump"
 
   rs_log "Backing up database to ${backup_file}"
-  rs_sudo sqlite3 "$DB_PATH" ".backup '${backup_file}'"
+  rs_sudo -u "$RUN_USER" pg_dump "$DB_URL" -Fc -f "$backup_file"
   rs_sudo chown "$RUN_USER:$RUN_GROUP" "$backup_file"
   rs_sudo chmod 640 "$backup_file"
 
   local retention_days
   retention_days="${BACKUP_RETENTION_DAYS:-14}"
-  rs_sudo find "$BACKUP_DIR" -type f -name "${ENV_NAME}-*.sqlite3" -mtime +"$retention_days" -delete
+  rs_sudo find "$BACKUP_DIR" -type f -name "${ENV_NAME}-*.dump" -mtime +"$retention_days" -delete
 }
 
 rs_service_action() {
@@ -207,7 +210,9 @@ rs_first_init() {
     --primary-color-strong "${PRIMARY_COLOR_STRONG:-#6b421d}" \
     --default-timezone "${DEFAULT_TIMEZONE:-Asia/Shanghai}" \
     --data-dir "$DATA_DIR" \
-    --db-path "$DB_PATH" \
+    --db-url "$DB_URL" \
+    --db-migrations-schema "$DB_MIGRATIONS_SCHEMA" \
+    --db-migrations-table "$DB_MIGRATIONS_TABLE" \
     --env-path "$tmp_env_file" \
     --config-path "$tmp_config_file" \
     --admin-username "$ADMIN_USERNAME" \
@@ -278,7 +283,7 @@ rs_restore_db() {
   rs_service_action stop
 
   rs_log "Restoring database from ${from_file}"
-  rs_sudo install -m 640 -o "$RUN_USER" -g "$RUN_GROUP" "$from_file" "$DB_PATH"
+  rs_sudo -u "$RUN_USER" pg_restore --clean --if-exists --no-owner --no-privileges -d "$DB_URL" "$from_file"
 
   rs_log "Starting service ${SERVICE_NAME}"
   rs_service_action start

@@ -1,41 +1,41 @@
 import { AnalyticsService } from "@/backend/analytics/queries/analytics.service";
-import { SqliteAnalyticsRepository } from "@/backend/analytics/queries/sqlite-analytics.repository";
+import { PgAnalyticsRepository } from "@/backend/analytics/queries/pg-analytics.repository";
 import { AnalyticsFactService } from "@/backend/analytics/facts/analytics-fact.service";
-import { SqliteAnalyticsFactRepository } from "@/backend/analytics/facts/sqlite-analytics-fact.repository";
+import { PgAnalyticsFactRepository } from "@/backend/analytics/facts/pg-analytics-fact.repository";
 import { AnalyticsSnapshotService } from "@/backend/analytics/snapshots/analytics-snapshot.service";
-import { SqliteAnalyticsSnapshotRepository } from "@/backend/analytics/snapshots/sqlite-analytics-snapshot.repository";
+import { PgAnalyticsSnapshotRepository } from "@/backend/analytics/snapshots/pg-analytics-snapshot.repository";
 import { AnalyticsJobService } from "@/backend/analytics/jobs/analytics-job.service";
-import { SqliteAnalyticsJobRepository } from "@/backend/analytics/jobs/sqlite-analytics-job.repository";
+import { PgAnalyticsJobRepository } from "@/backend/analytics/jobs/pg-analytics-job.repository";
 
-export function createAnalyticsRepository(): SqliteAnalyticsRepository {
-  return new SqliteAnalyticsRepository();
+export function createAnalyticsRepository(): any {
+  return new PgAnalyticsRepository();
 }
 
-export function createAnalyticsService(): AnalyticsService {
+export function createAnalyticsService(): any {
   return new AnalyticsService(createAnalyticsRepository());
 }
 
-export function createAnalyticsFactRepository(): SqliteAnalyticsFactRepository {
-  return new SqliteAnalyticsFactRepository();
+export function createAnalyticsFactRepository(): any {
+  return new PgAnalyticsFactRepository();
 }
 
-export function createAnalyticsFactService(): AnalyticsFactService {
+export function createAnalyticsFactService(): any {
   return new AnalyticsFactService(createAnalyticsFactRepository());
 }
 
-export function createAnalyticsSnapshotRepository(): SqliteAnalyticsSnapshotRepository {
-  return new SqliteAnalyticsSnapshotRepository();
+export function createAnalyticsSnapshotRepository(): any {
+  return new PgAnalyticsSnapshotRepository();
 }
 
-export function createAnalyticsSnapshotService(): AnalyticsSnapshotService {
+export function createAnalyticsSnapshotService(): any {
   return new AnalyticsSnapshotService(createAnalyticsFactRepository(), createAnalyticsSnapshotRepository());
 }
 
-export function createAnalyticsJobRepository(): SqliteAnalyticsJobRepository {
-  return new SqliteAnalyticsJobRepository();
+export function createAnalyticsJobRepository(): any {
+  return new PgAnalyticsJobRepository();
 }
 
-export function createAnalyticsJobService(): AnalyticsJobService {
+export function createAnalyticsJobService(): any {
   return new AnalyticsJobService(
     createAnalyticsJobRepository(),
     createAnalyticsFactService(),

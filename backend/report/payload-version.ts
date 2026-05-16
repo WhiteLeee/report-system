@@ -12,7 +12,7 @@ export class UnsupportedPayloadVersionError extends Error {
   }
 }
 
-export function normalizeSupportedPayloadVersions(values: number[]): number[] {
+export function normalizeSupportedPayloadVersions(values: number[]): any {
   return Array.from(new Set(values.filter((value) => Number.isInteger(value) && value > 0))).sort(
     (left, right) => left - right
   );

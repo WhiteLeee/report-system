@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
+import { Client } from "pg";
+import { resolveTestAdminDbUrl, resolveTestDbUrl, shouldManageIsolatedDatabase } from "./postgres-test-env";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "report-master-data-"));
 const dataDir = join(tempRoot, "data");
-const dbPath = join(dataDir, "report-system.sqlite");
+const isolatedDbName = `report_test_master_data_${randomUUID().replace(/-/g, "_")}`;
+const dbUrl = resolveTestDbUrl(isolatedDbName);
+const adminDbUrl = resolveTestAdminDbUrl();
 mkdirSync(dataDir, { recursive: true });
 
 process.env.REPORT_SYSTEM_DATA_DIR = dataDir;
-process.env.REPORT_SYSTEM_DB_PATH = dbPath;
+process.env.REPORT_SYSTEM_DB_URL = dbUrl;
 process.env.REPORT_SYSTEM_TENANT_ID = "demo";
 process.env.REPORT_SYSTEM_TENANT_NAME = "示例客户";
 process.env.REPORT_SYSTEM_BRAND_NAME = "示例报告系统";
@@ -23,6 +28,35 @@ process.env.REPORT_SYSTEM_SUPPORTED_PAYLOAD_VERSIONS = "2";
 let publishRoute: typeof import("../app/api/master-data/publish/route");
 let masterDataModule: typeof import("../backend/master-data/master-data.module");
 let authModule: typeof import("../backend/auth/auth.module");
+
+async function createIsolatedDatabase(): Promise<void> {
+  if (!shouldManageIsolatedDatabase()) {
+    return;
+  }
+  const client = new Client({ connectionString: adminDbUrl });
+  await client.connect();
+  try {
+    await client.query(`create database "${isolatedDbName}"`);
+  } finally {
+    await client.end();
+  }
+}
+
+async function dropIsolatedDatabase(): Promise<void> {
+  if (!shouldManageIsolatedDatabase()) {
+    return;
+  }
+  const client = new Client({ connectionString: adminDbUrl });
+  await client.connect();
+  try {
+    await client.query("select pg_terminate_backend(pid) from pg_stat_activity where datname = $1 and pid <> pg_backend_pid()", [
+      isolatedDbName
+    ]);
+    await client.query(`drop database if exists "${isolatedDbName}"`);
+  } finally {
+    await client.end();
+  }
+}
 
 const payload = {
   source_system: "vision-agent",
@@ -87,21 +121,26 @@ const payload = {
   ]
 };
 
-before(async () => {
-  await import("../backend/database/migrate");
+before(async (): Promise<any> => {
+  await createIsolatedDatabase();
+  const migrateModule = await import("../backend/database/migrate");
+  await migrateModule.runMigrations();
   [publishRoute, masterDataModule, authModule] = await Promise.all([
     import("../app/api/master-data/publish/route"),
     import("../backend/master-data/master-data.module"),
     import("../backend/auth/auth.module")
   ]);
-  authModule.createAuthService().ensureBootstrap();
+  await authModule.createAuthService().ensureBootstrap();
 });
 
-after(() => {
+after(async (): Promise<any> => {
+  const { closeDatabasePool } = await import("../backend/database/client");
+  await closeDatabasePool();
+  await dropIsolatedDatabase();
   rmSync(tempRoot, { recursive: true, force: true });
 });
 
-test("master-data publish route persists snapshot and supports duplicate replay", async () => {
+test("master-data publish route persists snapshot and supports duplicate replay", async (): Promise<any> => {
   const firstResp = await publishRoute.POST(
     new Request("http://127.0.0.1:3000/api/master-data/publish", {
       method: "POST",
@@ -127,17 +166,17 @@ test("master-data publish route persists snapshot and supports duplicate replay"
   assert.equal(duplicateBody.action, "duplicate");
 
   const masterDataService = masterDataModule.createMasterDataService();
-  const enterprises = masterDataService.listEnterprises();
+  const enterprises = await masterDataService.listEnterprises();
   assert.equal(enterprises.length, 1);
   assert.equal(enterprises[0]?.enterprise_id, "demo");
 
-  const organizations = masterDataService.listOrganizations("demo");
+  const organizations = await masterDataService.listOrganizations("demo");
   assert.equal(organizations.length, 1);
   assert.equal(organizations[0]?.organize_code, "org-root");
   assert.equal(organizations[0]?.current_store_count, 1);
   assert.equal(organizations[0]?.child[0]?.organize_code, "org-child");
 
-  const stores = masterDataService.listStores({ enterpriseId: "demo", organizeCode: "org-child" });
+  const stores = await masterDataService.listStores({ enterpriseId: "demo", organizeCode: "org-child" });
   assert.equal(stores.length, 1);
   assert.equal(stores[0]?.store_id, "store-001");
   assert.equal(stores[0]?.employee_name, "王五");
@@ -145,10 +184,10 @@ test("master-data publish route persists snapshot and supports duplicate replay"
   assert.equal(stores[0]?.business_status, "zc");
 });
 
-test("auth service stores organization scopes and master-data queries honor them", () => {
+test("auth service stores organization scopes and master-data queries honor them", async (): Promise<any> => {
   const authService = authModule.createAuthService();
-  const created = authService.createUser({
-    username: "scoped-user",
+  const created = await authService.createUser({
+    username: `scoped-user-${Date.now()}`,
     displayName: "组织范围用户",
     password: "ChangeMe123!",
     roleCode: "viewer",
@@ -159,14 +198,14 @@ test("auth service stores organization scopes and master-data queries honor them
   assert.deepEqual(created.organizationScopeIds, ["org-child"]);
 
   const masterDataService = masterDataModule.createMasterDataService();
-  const scopedOrganizations = masterDataService.listOrganizations("demo", {
+  const scopedOrganizations = await masterDataService.listOrganizations("demo", {
     enterpriseScopeIds: ["demo"],
     organizationScopeIds: ["org-child"]
   });
   assert.equal(scopedOrganizations.length, 1);
   assert.equal(scopedOrganizations[0]?.organize_code, "org-child");
 
-  const scopedStores = masterDataService.listStores(
+  const scopedStores = await masterDataService.listStores(
     { enterpriseId: "demo" },
     {
       enterpriseScopeIds: ["demo"],

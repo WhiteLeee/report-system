@@ -12,7 +12,7 @@ import {
 } from "../backend/rectification/rectification-sync";
 import type { RectificationOrderRecord } from "../backend/rectification/rectification.types";
 
-function createOrder(overrides: Partial<RectificationOrderRecord> = {}): RectificationOrderRecord {
+function createOrder(overrides: Partial<RectificationOrderRecord> = {}): any {
   return {
     id: 1,
     report_id: 101,
@@ -47,7 +47,7 @@ function createOrder(overrides: Partial<RectificationOrderRecord> = {}): Rectifi
   };
 }
 
-function createRemoteItem(overrides: Partial<HuiYunYingRectificationOrderItem> = {}): HuiYunYingRectificationOrderItem {
+function createRemoteItem(overrides: Partial<HuiYunYingRectificationOrderItem> = {}): any {
   return {
     disqualifiedId: "9001",
     ifCorrected: "2",

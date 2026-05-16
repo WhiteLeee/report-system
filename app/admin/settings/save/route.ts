@@ -30,19 +30,19 @@ const MIME_BY_EXTENSION: Record<string, Set<string>> = {
 
 export const runtime = "nodejs";
 
-function readPositiveNumber(value: FormDataEntryValue | null, fallback: number): number {
+function readPositiveNumber(value: FormDataEntryValue | null, fallback: number): any {
   const parsed = Number(String(value || "").trim());
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
-function readNonNegativeNumber(value: FormDataEntryValue | null, fallback: number): number {
+function readNonNegativeNumber(value: FormDataEntryValue | null, fallback: number): any {
   const parsed = Number(String(value || "").trim());
   return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
 }
 
 function resolveSettingsTab(
   raw: FormDataEntryValue | null
-): "branding" | "api" | "rectification" | "analytics" | "navigation" | "security" {
+): any {
   const value = String(raw || "").trim();
   if (
     value === "branding" ||
@@ -56,12 +56,12 @@ function resolveSettingsTab(
   return "api";
 }
 
-function readBoolean(formData: FormData, key: string): boolean {
+function readBoolean(formData: FormData, key: string): any {
   const value = String(formData.get(key) || "").trim();
   return value === "1" || value === "on" || value === "true";
 }
 
-function parseNavigationMenus(formData: FormData, current: ManagedNavigationMenuItem[]): ManagedNavigationMenuItem[] {
+function parseNavigationMenus(formData: FormData, current: ManagedNavigationMenuItem[]): any {
   const currentMap = new Map(current.map((item) => [item.code, item]));
   const codeSet = new Set<string>();
   formData.forEach((value, key) => {
@@ -102,18 +102,18 @@ function parseNavigationMenus(formData: FormData, current: ManagedNavigationMenu
         roleCodes
       } satisfies ManagedNavigationMenuItem;
     })
-    .filter((item): item is ManagedNavigationMenuItem => Boolean(item));
+    .filter((item): any => Boolean(item));
 }
 
 function isFileEntry(entry: FormDataEntryValue | null): entry is File {
   return typeof File !== "undefined" && entry instanceof File;
 }
 
-function toHex(value: number): string {
+function toHex(value: number): any {
   return value.toString(16).padStart(2, "0");
 }
 
-function detectMimeFromBuffer(buffer: Buffer): string | null {
+function detectMimeFromBuffer(buffer: Buffer): any {
   if (buffer.length >= 8 && buffer.subarray(0, 8).toString("hex") === "89504e470d0a1a0a") {
     return "image/png";
   }
@@ -137,7 +137,7 @@ function detectMimeFromBuffer(buffer: Buffer): string | null {
 async function saveBrandingUpload(
   file: File,
   type: "logo" | "favicon"
-): Promise<string> {
+): Promise<any> {
   if (file.size <= 0) {
     throw new Error("上传文件为空");
   }
@@ -173,8 +173,8 @@ async function saveBrandingUpload(
   return `/uploads/branding/${filename}`;
 }
 
-export async function POST(request: Request): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+export async function POST(request: Request): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "system:settings:write") || !currentUser?.roles.includes("admin")) {
     return Response.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
@@ -183,11 +183,11 @@ export async function POST(request: Request): Promise<Response> {
 
   const formData = await request.formData().catch(() => new FormData());
   const tab = resolveSettingsTab(formData.get("tab"));
-  const currentSettings = systemSettingsService.getHuiYunYingApiSettings();
-  const currentBrandingSettings = systemSettingsService.getEnterpriseBrandingSettings();
-  const currentDeliveryMode = systemSettingsService.getDeliveryMode();
-  const currentSecurityPolicy = systemSettingsService.getAuthSecurityPolicy();
-  const currentNavigationMenus = authService.listManagedNavigationMenus();
+  const currentSettings = await systemSettingsService.getHuiYunYingApiSettings();
+  const currentBrandingSettings = await systemSettingsService.getEnterpriseBrandingSettings();
+  const currentDeliveryMode = await systemSettingsService.getDeliveryMode();
+  const currentSecurityPolicy = await systemSettingsService.getAuthSecurityPolicy();
+  const currentNavigationMenus = await authService.listManagedNavigationMenus();
 
   try {
     if (tab === "branding") {
@@ -214,8 +214,8 @@ export async function POST(request: Request): Promise<Response> {
         updatedBy: currentUser.username,
         updatedAt: now
       };
-      systemSettingsService.saveEnterpriseBrandingSettings(nextBrandingSettings);
-      authService.createAuditLog({
+      await systemSettingsService.saveEnterpriseBrandingSettings(nextBrandingSettings);
+      await authService.createAuditLog({
         ...actor,
         targetUserId: null,
         targetUsername: "system_setting:enterprise_branding",
@@ -236,8 +236,8 @@ export async function POST(request: Request): Promise<Response> {
       rateLimitCount: readPositiveNumber(formData.get("rateLimitCount"), currentSettings.rateLimitCount),
       rateLimitWindowMs: readPositiveNumber(formData.get("rateLimitWindowMs"), currentSettings.rateLimitWindowMs)
     };
-    systemSettingsService.saveHuiYunYingApiSettings(nextSettings);
-    authService.createAuditLog({
+    await systemSettingsService.saveHuiYunYingApiSettings(nextSettings);
+    await authService.createAuditLog({
       ...actor,
       targetUserId: null,
       targetUsername: "system_setting:huiyunying_api",
@@ -278,8 +278,8 @@ export async function POST(request: Request): Promise<Response> {
         currentSettings.rectificationSyncBatchSize
       )
     };
-    systemSettingsService.saveHuiYunYingApiSettings(nextSettings);
-    authService.createAuditLog({
+    await systemSettingsService.saveHuiYunYingApiSettings(nextSettings);
+    await authService.createAuditLog({
       ...actor,
       targetUserId: null,
       targetUsername: "system_setting:rectification",
@@ -302,8 +302,8 @@ export async function POST(request: Request): Promise<Response> {
         currentSettings.analyticsSnapshotRefreshIntervalMs
       )
     };
-    systemSettingsService.saveHuiYunYingApiSettings(nextSettings);
-    authService.createAuditLog({
+    await systemSettingsService.saveHuiYunYingApiSettings(nextSettings);
+    await authService.createAuditLog({
       ...actor,
       targetUserId: null,
       targetUsername: "system_setting:analytics",
@@ -316,8 +316,8 @@ export async function POST(request: Request): Promise<Response> {
     });
     } else if (tab === "navigation") {
     const nextNavigationMenus = parseNavigationMenus(formData, currentNavigationMenus);
-    authService.saveManagedNavigationMenus(nextNavigationMenus);
-    authService.createAuditLog({
+    await authService.saveManagedNavigationMenus(nextNavigationMenus);
+    await authService.createAuditLog({
       ...actor,
       targetUserId: null,
       targetUsername: "system_setting:navigation",
@@ -339,9 +339,9 @@ export async function POST(request: Request): Promise<Response> {
         loginMaxFailures: readPositiveNumber(formData.get("loginMaxFailures"), currentSecurityPolicy.loginMaxFailures),
         loginLockDurationMs: readPositiveNumber(formData.get("loginLockDurationMs"), currentSecurityPolicy.loginLockDurationMs)
       };
-      systemSettingsService.saveDeliveryMode(nextDeliveryMode);
-      systemSettingsService.saveAuthSecurityPolicy(nextSecurityPolicy);
-      authService.createAuditLog({
+      await systemSettingsService.saveDeliveryMode(nextDeliveryMode);
+      await systemSettingsService.saveAuthSecurityPolicy(nextSecurityPolicy);
+      await authService.createAuditLog({
         ...actor,
         targetUserId: null,
         targetUsername: "system_setting:auth_delivery_mode",
@@ -361,8 +361,8 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  ensureRectificationSyncManagerStarted();
-  ensureAnalyticsJobManagerStarted();
+  await ensureRectificationSyncManagerStarted();
+  await ensureAnalyticsJobManagerStarted();
 
   return NextResponse.redirect(buildRequestUrl(request, `/admin/settings?tab=${tab}`), 303);
 }

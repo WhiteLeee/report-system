@@ -35,15 +35,20 @@ interface OrganizationTreeGroup {
   nodes: MasterDataOrganization[];
 }
 
-function statusBadgeClass(status: string): string {
+interface EnterpriseSummaryOption {
+  value: string;
+  label: string;
+}
+
+function statusBadgeClass(status: string): any {
   return status === "active" ? styles.activeBadge : styles.disabledBadge;
 }
 
-function normalizeQueryValue(value: string | string[] | undefined): string {
+function normalizeQueryValue(value: string | string[] | undefined): any {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function decodeQueryValue(value: string): string {
+function decodeQueryValue(value: string): any {
   if (!value) {
     return "";
   }
@@ -54,7 +59,7 @@ function decodeQueryValue(value: string): string {
   }
 }
 
-function sortOrganizationTree(nodes: MasterDataOrganization[]): MasterDataOrganization[] {
+function sortOrganizationTree(nodes: MasterDataOrganization[]): any {
   return [...nodes]
     .sort((left, right) => {
       const countDiff = right.current_store_count - left.current_store_count;
@@ -72,7 +77,7 @@ function sortOrganizationTree(nodes: MasterDataOrganization[]): MasterDataOrgani
 function enterpriseSummariesFromContext(
   currentUser: Awaited<ReturnType<typeof requirePermission>>,
   enterprises: MasterDataEnterpriseSummary[]
-): Array<{ value: string; label: string }> {
+): EnterpriseSummaryOption[] {
   if (enterprises.length > 0) {
     return enterprises.map((enterprise) => ({
       value: enterprise.enterprise_id,
@@ -86,20 +91,21 @@ function enterpriseSummariesFromContext(
   }));
 }
 
-function buildOrganizationTreeGroups(
+async function buildOrganizationTreeGroups(
   currentUser: Awaited<ReturnType<typeof requirePermission>>,
   enterprises: MasterDataEnterpriseSummary[]
-): OrganizationTreeGroup[] {
-  return enterpriseSummariesFromContext(currentUser, enterprises)
-    .map((enterprise) => ({
+): Promise<OrganizationTreeGroup[]> {
+  const groups: OrganizationTreeGroup[] = await Promise.all(
+    enterpriseSummariesFromContext(currentUser, enterprises).map(async (enterprise) => ({
       enterpriseId: enterprise.value,
       enterpriseLabel: enterprise.label,
-      nodes: sortOrganizationTree(masterDataService.listOrganizations(enterprise.value, currentUser))
+      nodes: sortOrganizationTree(await masterDataService.listOrganizations(enterprise.value, currentUser))
     }))
-    .filter((item) => item.nodes.length > 0);
+  );
+  return groups.filter((item) => item.nodes.length > 0);
 }
 
-function collectOrganizationLabels(nodes: MasterDataOrganization[], bucket: Map<string, string>): void {
+function collectOrganizationLabels(nodes: MasterDataOrganization[], bucket: Map<string, string>): any {
   nodes.forEach((node) => {
     if (!bucket.has(node.organize_code)) {
       bucket.set(node.organize_code, node.organize_name);
@@ -110,7 +116,7 @@ function collectOrganizationLabels(nodes: MasterDataOrganization[], bucket: Map<
   });
 }
 
-function buildOrganizationLabelMap(groups: OrganizationTreeGroup[]): Map<string, string> {
+function buildOrganizationLabelMap(groups: OrganizationTreeGroup[]): any {
   const map = new Map<string, string>();
   groups.forEach((group) => {
     collectOrganizationLabels(group.nodes, map);
@@ -122,7 +128,7 @@ function formatScopeDisplay(
   values: string[],
   labelMap: Map<string, string>,
   fallbackWhenEmpty: string
-): { text: string; title: string } {
+): any {
   if (values.length === 0) {
     return { text: fallbackWhenEmpty, title: fallbackWhenEmpty };
   }
@@ -221,7 +227,7 @@ export default async function AdminUsersPage({
   searchParams
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("user:read", "/admin/users");
   if (!currentUser) {
     redirect("/reports");
@@ -230,8 +236,8 @@ export default async function AdminUsersPage({
   const canWriteRoles = currentUser.permissions.includes("role:write");
   const canWriteScopes = currentUser.permissions.includes("scope:write");
   const canOpenEditDialog = canWriteUsers || canWriteRoles || canWriteScopes;
-  const deliveryMode = getCurrentDeliveryMode();
-  const users = filterVisibleUsers(authService.listUsers(), deliveryMode, currentUser);
+  const deliveryMode = await getCurrentDeliveryMode();
+  const users = filterVisibleUsers(await authService.listUsers(), deliveryMode, currentUser);
   const availableRoleCodes = roleCodes.filter((code) => code !== "admin");
   const resolvedSearchParams = await searchParams;
   const dialog = normalizeQueryValue(resolvedSearchParams.dialog);
@@ -241,10 +247,10 @@ export default async function AdminUsersPage({
   const editingUser = Number.isInteger(editingUserId) ? users.find((user) => user.id === editingUserId) ?? null : null;
   const isCreateDialogOpen = dialog === "create" && canWriteUsers;
   const isEditDialogOpen = dialog === "edit" && !!editingUser && canOpenEditDialog;
-  const securityPolicy = systemSettingsService.getAuthSecurityPolicy();
-  const enterprises = masterDataService.listEnterprises(currentUser);
-  const organizationTreeGroups = buildOrganizationTreeGroups(currentUser, enterprises);
-  const enterpriseLabelMap = new Map(
+  const securityPolicy = await systemSettingsService.getAuthSecurityPolicy();
+  const enterprises = await masterDataService.listEnterprises(currentUser);
+  const organizationTreeGroups = await buildOrganizationTreeGroups(currentUser, enterprises);
+  const enterpriseLabelMap = new Map<string, string>(
     enterpriseSummariesFromContext(currentUser, enterprises).map((enterprise) => [enterprise.value, enterprise.label])
   );
   const organizationLabelMap = buildOrganizationLabelMap(organizationTreeGroups);

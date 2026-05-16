@@ -7,7 +7,7 @@ Target host:
 
 1. Upload repository to `/srv/report-system`
 2. Ensure Linux user/group `report` exists
-3. Ensure commands exist: `node`, `npm`, `sqlite3`, `curl`, `systemctl`
+3. Ensure commands exist: `node`, `npm`, `psql / pg_dump / pg_restore`, `curl`, `systemctl`
 
 ## 2) First-time initialization
 
@@ -39,9 +39,11 @@ cd /srv/report-system
 ## 5) Operations
 
 ```bash
+./deploy/staging/start.sh
+./deploy/staging/stop.sh
 ./deploy/staging/status.sh
 ./deploy/staging/restart.sh
 ./deploy/staging/backup-db.sh
-./deploy/staging/restore-db.sh /var/backups/report-system/staging/staging-YYYYMMDD-HHMMSS.sqlite3
+./deploy/staging/restore-db.sh /var/backups/report-system/staging/staging-YYYYMMDD-HHMMSS.dump
 ./deploy/staging/healthcheck.sh
 ```

@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
 
 const reportService = createReportService();
 
-export async function GET(request: NextRequest): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+export async function GET(request: NextRequest): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "report:read")) {
     return Response.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     endDate: searchParams.get("endDate") ?? ""
   };
 
-  const reports = reportService.listReports(filters, buildRequestContext(currentUser));
+  const reports = await reportService.listReports(filters, buildRequestContext(currentUser));
 
   return Response.json({
     success: true,

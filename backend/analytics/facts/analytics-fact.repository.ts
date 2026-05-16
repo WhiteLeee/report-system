@@ -12,12 +12,12 @@ import type {
 } from "@/backend/database/schema";
 
 export interface AnalyticsFactRepository {
-  replaceResultFacts(rows: Array<typeof analyticsResultFactTable.$inferInsert>): number;
-  replaceIssueFacts(rows: Array<typeof analyticsIssueFactTable.$inferInsert>): number;
-  replaceReviewFacts(rows: Array<typeof analyticsReviewFactTable.$inferInsert>): number;
-  replaceRectificationFacts(rows: Array<typeof analyticsRectificationFactTable.$inferInsert>): number;
-  listResultFacts(): AnalyticsResultFactRecord[];
-  listIssueFacts(): AnalyticsIssueFactRecord[];
-  listReviewFacts(): AnalyticsReviewFactRecord[];
-  listRectificationFacts(): AnalyticsRectificationFactRecord[];
+  replaceResultFacts(rows: Array<typeof analyticsResultFactTable.$inferInsert>): any;
+  replaceIssueFacts(rows: Array<typeof analyticsIssueFactTable.$inferInsert>): any;
+  replaceReviewFacts(rows: Array<typeof analyticsReviewFactTable.$inferInsert>): any;
+  replaceRectificationFacts(rows: Array<typeof analyticsRectificationFactTable.$inferInsert>): any;
+  listResultFacts(): any;
+  listIssueFacts(): any;
+  listReviewFacts(): any;
+  listRectificationFacts(): any;
 }

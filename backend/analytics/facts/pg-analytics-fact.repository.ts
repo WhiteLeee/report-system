@@ -15,7 +15,7 @@ import type {
 } from "@/backend/analytics/facts/analytics-fact.types";
 import type { AnalyticsFactRepository } from "@/backend/analytics/facts/analytics-fact.repository";
 
-function safeParseRecord(json: string): Record<string, unknown> {
+function safeParseRecord(json: string): any {
   try {
     const parsed = JSON.parse(json) as unknown;
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
@@ -24,7 +24,7 @@ function safeParseRecord(json: string): Record<string, unknown> {
   }
 }
 
-function toAnalyticsResultFactRecord(row: typeof analyticsResultFactTable.$inferSelect): AnalyticsResultFactRecord {
+function toAnalyticsResultFactRecord(row: typeof analyticsResultFactTable.$inferSelect): any {
   return {
     id: row.id,
     report_id: row.reportId,
@@ -56,7 +56,7 @@ function toAnalyticsResultFactRecord(row: typeof analyticsResultFactTable.$infer
   };
 }
 
-function toAnalyticsIssueFactRecord(row: typeof analyticsIssueFactTable.$inferSelect): AnalyticsIssueFactRecord {
+function toAnalyticsIssueFactRecord(row: typeof analyticsIssueFactTable.$inferSelect): any {
   return {
     id: row.id,
     report_id: row.reportId,
@@ -87,7 +87,7 @@ function toAnalyticsIssueFactRecord(row: typeof analyticsIssueFactTable.$inferSe
   };
 }
 
-function toAnalyticsReviewFactRecord(row: typeof analyticsReviewFactTable.$inferSelect): AnalyticsReviewFactRecord {
+function toAnalyticsReviewFactRecord(row: typeof analyticsReviewFactTable.$inferSelect): any {
   return {
     id: row.id,
     report_id: row.reportId,
@@ -123,7 +123,7 @@ function toAnalyticsReviewFactRecord(row: typeof analyticsReviewFactTable.$infer
 
 function toAnalyticsRectificationFactRecord(
   row: typeof analyticsRectificationFactTable.$inferSelect
-): AnalyticsRectificationFactRecord {
+): any {
   return {
     id: row.id,
     order_id: row.orderId,
@@ -157,115 +157,110 @@ function toAnalyticsRectificationFactRecord(
   };
 }
 
-export class SqliteAnalyticsFactRepository implements AnalyticsFactRepository {
+export class PgAnalyticsFactRepository implements AnalyticsFactRepository {
   private static readonly INSERT_BATCH_SIZE = 20;
 
-  private insertResultFactsInBatches(
+  private async insertResultFactsInBatches(
     tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
     rows: Array<typeof analyticsResultFactTable.$inferInsert>
-  ): void {
-    for (let index = 0; index < rows.length; index += SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE) {
-      tx.insert(analyticsResultFactTable)
-        .values(rows.slice(index, index + SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE))
-        .run();
+  ): Promise<any> {
+    for (let index = 0; index < rows.length; index += PgAnalyticsFactRepository.INSERT_BATCH_SIZE) {
+      await tx.insert(analyticsResultFactTable)
+                .values(rows.slice(index, index + PgAnalyticsFactRepository.INSERT_BATCH_SIZE));
     }
   }
 
-  private insertIssueFactsInBatches(
+  private async insertIssueFactsInBatches(
     tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
     rows: Array<typeof analyticsIssueFactTable.$inferInsert>
-  ): void {
-    for (let index = 0; index < rows.length; index += SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE) {
-      tx.insert(analyticsIssueFactTable)
-        .values(rows.slice(index, index + SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE))
-        .run();
+  ): Promise<any> {
+    for (let index = 0; index < rows.length; index += PgAnalyticsFactRepository.INSERT_BATCH_SIZE) {
+      await tx.insert(analyticsIssueFactTable)
+                .values(rows.slice(index, index + PgAnalyticsFactRepository.INSERT_BATCH_SIZE));
     }
   }
 
-  private insertReviewFactsInBatches(
+  private async insertReviewFactsInBatches(
     tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
     rows: Array<typeof analyticsReviewFactTable.$inferInsert>
-  ): void {
-    for (let index = 0; index < rows.length; index += SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE) {
-      tx.insert(analyticsReviewFactTable)
-        .values(rows.slice(index, index + SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE))
-        .run();
+  ): Promise<any> {
+    for (let index = 0; index < rows.length; index += PgAnalyticsFactRepository.INSERT_BATCH_SIZE) {
+      await tx.insert(analyticsReviewFactTable)
+                .values(rows.slice(index, index + PgAnalyticsFactRepository.INSERT_BATCH_SIZE));
     }
   }
 
-  private insertRectificationFactsInBatches(
+  private async insertRectificationFactsInBatches(
     tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
     rows: Array<typeof analyticsRectificationFactTable.$inferInsert>
-  ): void {
-    for (let index = 0; index < rows.length; index += SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE) {
-      tx.insert(analyticsRectificationFactTable)
-        .values(rows.slice(index, index + SqliteAnalyticsFactRepository.INSERT_BATCH_SIZE))
-        .run();
+  ): Promise<any> {
+    for (let index = 0; index < rows.length; index += PgAnalyticsFactRepository.INSERT_BATCH_SIZE) {
+      await tx.insert(analyticsRectificationFactTable)
+                .values(rows.slice(index, index + PgAnalyticsFactRepository.INSERT_BATCH_SIZE));
     }
   }
 
-  replaceResultFacts(rows: Array<typeof analyticsResultFactTable.$inferInsert>): number {
-    return db.transaction((tx) => {
-      tx.delete(analyticsResultFactTable).run();
+  replaceResultFacts(rows: Array<typeof analyticsResultFactTable.$inferInsert>): any {
+    return db.transaction(async (tx): Promise<any> => {
+      await tx.delete(analyticsResultFactTable);
       if (rows.length === 0) {
         return 0;
       }
-      this.insertResultFactsInBatches(tx, rows);
+      await this.insertResultFactsInBatches(tx, rows);
       return rows.length;
     });
   }
 
-  replaceIssueFacts(rows: Array<typeof analyticsIssueFactTable.$inferInsert>): number {
-    return db.transaction((tx) => {
-      tx.delete(analyticsIssueFactTable).run();
+  replaceIssueFacts(rows: Array<typeof analyticsIssueFactTable.$inferInsert>): any {
+    return db.transaction(async (tx): Promise<any> => {
+      await tx.delete(analyticsIssueFactTable);
       if (rows.length === 0) {
         return 0;
       }
-      this.insertIssueFactsInBatches(tx, rows);
+      await this.insertIssueFactsInBatches(tx, rows);
       return rows.length;
     });
   }
 
-  replaceReviewFacts(rows: Array<typeof analyticsReviewFactTable.$inferInsert>): number {
-    return db.transaction((tx) => {
-      tx.delete(analyticsReviewFactTable).run();
+  replaceReviewFacts(rows: Array<typeof analyticsReviewFactTable.$inferInsert>): any {
+    return db.transaction(async (tx): Promise<any> => {
+      await tx.delete(analyticsReviewFactTable);
       if (rows.length === 0) {
         return 0;
       }
-      this.insertReviewFactsInBatches(tx, rows);
+      await this.insertReviewFactsInBatches(tx, rows);
       return rows.length;
     });
   }
 
-  replaceRectificationFacts(rows: Array<typeof analyticsRectificationFactTable.$inferInsert>): number {
-    return db.transaction((tx) => {
-      tx.delete(analyticsRectificationFactTable).run();
+  replaceRectificationFacts(rows: Array<typeof analyticsRectificationFactTable.$inferInsert>): any {
+    return db.transaction(async (tx): Promise<any> => {
+      await tx.delete(analyticsRectificationFactTable);
       if (rows.length === 0) {
         return 0;
       }
-      this.insertRectificationFactsInBatches(tx, rows);
+      await this.insertRectificationFactsInBatches(tx, rows);
       return rows.length;
     });
   }
 
-  listResultFacts(): AnalyticsResultFactRecord[] {
-    return db.select().from(analyticsResultFactTable).orderBy(asc(analyticsResultFactTable.id)).all().map(toAnalyticsResultFactRecord);
+  async listResultFacts(): Promise<any> {
+    return (await db.select().from(analyticsResultFactTable).orderBy(asc(analyticsResultFactTable.id))).map(toAnalyticsResultFactRecord);
   }
 
-  listIssueFacts(): AnalyticsIssueFactRecord[] {
-    return db.select().from(analyticsIssueFactTable).orderBy(asc(analyticsIssueFactTable.id)).all().map(toAnalyticsIssueFactRecord);
+  async listIssueFacts(): Promise<any> {
+    return (await db.select().from(analyticsIssueFactTable).orderBy(asc(analyticsIssueFactTable.id))).map(toAnalyticsIssueFactRecord);
   }
 
-  listReviewFacts(): AnalyticsReviewFactRecord[] {
-    return db.select().from(analyticsReviewFactTable).orderBy(asc(analyticsReviewFactTable.id)).all().map(toAnalyticsReviewFactRecord);
+  async listReviewFacts(): Promise<any> {
+    return (await db.select().from(analyticsReviewFactTable).orderBy(asc(analyticsReviewFactTable.id))).map(toAnalyticsReviewFactRecord);
   }
 
-  listRectificationFacts(): AnalyticsRectificationFactRecord[] {
-    return db
-      .select()
-      .from(analyticsRectificationFactTable)
-      .orderBy(asc(analyticsRectificationFactTable.id))
-      .all()
+  async listRectificationFacts(): Promise<any> {
+    return (await db
+          .select()
+          .from(analyticsRectificationFactTable)
+          .orderBy(asc(analyticsRectificationFactTable.id)))
       .map(toAnalyticsRectificationFactRecord);
   }
 }

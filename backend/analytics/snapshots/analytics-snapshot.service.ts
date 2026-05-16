@@ -9,12 +9,9 @@ export class AnalyticsSnapshotService {
     private readonly snapshotRepository: AnalyticsSnapshotRepository
   ) {}
 
-  rebuildDailySnapshots(): {
-    overview_row_count: number;
-    semantic_row_count: number;
-  } {
-    const facts = this.factRepository.listResultFacts();
-    const rectificationFacts = this.factRepository.listRectificationFacts();
+  async rebuildDailySnapshots(): Promise<any> {
+    const facts = await this.factRepository.listResultFacts();
+    const rectificationFacts = await this.factRepository.listRectificationFacts();
     const rectificationRowsByDateAndEnterprise = new Map<string, typeof rectificationFacts>();
 
     rectificationFacts.forEach((row) => {
@@ -151,8 +148,8 @@ export class AnalyticsSnapshotService {
     }));
 
     return {
-      overview_row_count: this.snapshotRepository.replaceDailyOverviewSnapshots(overviewRows),
-      semantic_row_count: this.snapshotRepository.replaceDailySemanticSnapshots(semanticRows)
+      overview_row_count: await this.snapshotRepository.replaceDailyOverviewSnapshots(overviewRows),
+      semantic_row_count: await this.snapshotRepository.replaceDailySemanticSnapshots(semanticRows)
     };
   }
 }

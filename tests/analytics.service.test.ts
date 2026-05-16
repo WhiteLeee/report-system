@@ -1,17 +1,22 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { eq } from "drizzle-orm";
+import { Client } from "pg";
+import { resolveTestAdminDbUrl, resolveTestDbUrl, shouldManageIsolatedDatabase } from "./postgres-test-env";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "report-analytics-"));
 const dataDir = join(tempRoot, "data");
-const dbPath = join(dataDir, "report-system.sqlite");
+const isolatedDbName = `report_test_analytics_${randomUUID().replace(/-/g, "_")}`;
+const dbUrl = resolveTestDbUrl(isolatedDbName);
+const adminDbUrl = resolveTestAdminDbUrl();
 mkdirSync(dataDir, { recursive: true });
 
 process.env.REPORT_SYSTEM_DATA_DIR = dataDir;
-process.env.REPORT_SYSTEM_DB_PATH = dbPath;
+process.env.REPORT_SYSTEM_DB_URL = dbUrl;
 process.env.REPORT_SYSTEM_TENANT_ID = "demo";
 process.env.REPORT_SYSTEM_TENANT_NAME = "示例客户";
 process.env.REPORT_SYSTEM_BRAND_NAME = "示例报告系统";
@@ -26,6 +31,33 @@ let analyticsModule: typeof import("../backend/analytics/analytics.module");
 let rectificationModule: typeof import("../backend/rectification/rectification.module");
 let databaseClient: typeof import("../backend/database/client");
 let databaseSchema: typeof import("../backend/database/schema");
+
+async function createIsolatedDatabase(): Promise<void> {
+  if (!shouldManageIsolatedDatabase()) {
+    return;
+  }
+  const client = new Client({ connectionString: adminDbUrl });
+  await client.connect();
+  try {
+    await client.query(`create database "${isolatedDbName}"`);
+  } finally {
+    await client.end();
+  }
+}
+
+async function dropIsolatedDatabase(): Promise<void> {
+  if (!shouldManageIsolatedDatabase()) {
+    return;
+  }
+  const client = new Client({ connectionString: adminDbUrl });
+  await client.connect();
+  try {
+    await client.query("select pg_terminate_backend(pid) from pg_stat_activity where datname = $1 and pid <> pg_backend_pid()", [isolatedDbName]);
+    await client.query(`drop database if exists "${isolatedDbName}"`);
+  } finally {
+    await client.end();
+  }
+}
 
 function buildPublishPayload(input: {
   key: string;
@@ -145,8 +177,10 @@ function buildPublishPayload(input: {
   };
 }
 
-before(async () => {
-  await import("../backend/database/migrate");
+before(async (): Promise<any> => {
+  await createIsolatedDatabase();
+  const migrateModule = await import("../backend/database/migrate");
+  await migrateModule.runMigrations();
   const [publishRouteModule, importedAnalyticsModule, importedRectificationModule, importedDatabaseClient, importedDatabaseSchema] =
     await Promise.all([
       import("../app/api/reports/publish/route"),
@@ -162,11 +196,15 @@ before(async () => {
   databaseSchema = importedDatabaseSchema;
 });
 
-after(() => {
+after(async (): Promise<any> => {
+  if (databaseClient) {
+    await databaseClient.closeDatabasePool();
+  }
+  await dropIsolatedDatabase();
   rmSync(tempRoot, { recursive: true, force: true });
 });
 
-test("analytics dashboard aggregates report facts and respects scope filters", async () => {
+test("analytics dashboard aggregates report facts and respects scope filters", async (): Promise<any> => {
   const issuePublishResp = await publishRoute.POST(
     new Request("http://127.0.0.1:3000/api/reports/publish", {
       method: "POST",
@@ -244,14 +282,14 @@ test("analytics dashboard aggregates report facts and respects scope filters", a
   assert.equal(repeatIssuePublishResp.status, 201);
   const repeatIssuePublishJson = (await repeatIssuePublishResp.json()) as { report_id: number };
 
-  const factRebuild = analyticsModule.createAnalyticsFactService().rebuildAllFacts();
+  const factRebuild = await analyticsModule.createAnalyticsFactService().rebuildAllFacts();
   assert.equal(factRebuild.result_row_count, 3);
   assert.equal(factRebuild.issue_row_count, 2);
   assert.equal(factRebuild.review_row_count, 0);
   assert.equal(factRebuild.rectification_row_count, 0);
 
-  const factRows = analyticsModule.createAnalyticsFactRepository().listResultFacts();
-  const issueFactRows = analyticsModule.createAnalyticsFactRepository().listIssueFacts();
+  const factRows = await analyticsModule.createAnalyticsFactRepository().listResultFacts();
+  const issueFactRows = await analyticsModule.createAnalyticsFactRepository().listIssueFacts();
   const issueFact = factRows.find((row) => row.source_enterprise_id === "enterprise-a");
   const repeatIssueFact = factRows.find(
     (row) => row.source_enterprise_id === "enterprise-a" && row.result_id !== issueFact?.result_id
@@ -271,7 +309,7 @@ test("analytics dashboard aggregates report facts and respects scope filters", a
   assert.equal(passFact?.result_semantic_state, "pass");
   assert.equal(passFact?.auto_completed, true);
 
-  rectificationModule.createRectificationOrderRepository().create({
+  await rectificationModule.createRectificationOrderRepository().create({
     report_id: issuePublishJson.report_id,
     result_id: issueFact!.result_id,
     store_id: "store-a",
@@ -289,67 +327,67 @@ test("analytics dashboard aggregates report facts and respects scope filters", a
     created_by: "system"
   });
 
-  databaseClient.db
-    .update(databaseSchema.reportImageTable)
-    .set({
-      reviewState: "completed",
-      reviewedBy: "系统管理员",
-      reviewedAt: "2026-04-02 11:00:00",
-      reviewNote: "人工复核完成",
-      reviewPayloadJson: JSON.stringify({ auto_completed: false })
-    })
-    .where(eq(databaseSchema.reportImageTable.id, issueFact!.result_id))
-    .run();
+  await databaseClient.db
+        .update(databaseSchema.reportImageTable)
+        .set({
+          reviewState: "completed",
+          reviewedBy: "系统管理员",
+          reviewedAt: "2026-04-02 11:00:00",
+          reviewNote: "人工复核完成",
+          reviewPayloadJson: JSON.stringify({ auto_completed: false })
+        })
+        .where(eq(databaseSchema.reportImageTable.id, issueFact!.result_id));
 
-  databaseClient.db.insert(databaseSchema.reportReviewLogTable).values({
-    reportId: issuePublishJson.report_id,
-    resultId: issueFact!.result_id,
-    storeId: "store-a",
-    storeName: "门店A",
-    fromStatus: "pending",
-    toStatus: "completed",
-    operatorName: "系统管理员",
-    note: "人工复核完成",
-    metadataJson: JSON.stringify({ source: "analytics-test" }),
-    createdAt: "2026-04-02 11:00:00"
-  }).run();
+  await databaseClient.db.insert(databaseSchema.reportReviewLogTable).values({
+        reportId: issuePublishJson.report_id,
+        resultId: issueFact!.result_id,
+        storeId: "store-a",
+        storeName: "门店A",
+        fromStatus: "pending",
+        toStatus: "completed",
+        reviewAction: "complete",
+        operatorName: "系统管理员",
+        note: "人工复核完成",
+        metadataJson: JSON.stringify({ source: "analytics-test" }),
+        createdAt: "2026-04-02 11:00:00"
+      });
 
-  const factRebuildAfterActions = analyticsModule.createAnalyticsFactService().rebuildAllFacts();
+  const factRebuildAfterActions = await analyticsModule.createAnalyticsFactService().rebuildAllFacts();
   assert.equal(factRebuildAfterActions.result_row_count, 3);
   assert.equal(factRebuildAfterActions.issue_row_count, 2);
   assert.equal(factRebuildAfterActions.review_row_count, 1);
   assert.equal(factRebuildAfterActions.rectification_row_count, 1);
 
-  const snapshotRebuild = analyticsModule.createAnalyticsSnapshotService().rebuildDailySnapshots();
+  const snapshotRebuild = await analyticsModule.createAnalyticsSnapshotService().rebuildDailySnapshots();
   assert.equal(snapshotRebuild.overview_row_count, 3);
   assert.equal(snapshotRebuild.semantic_row_count, 3);
 
-  const overviewSnapshots = analyticsModule.createAnalyticsSnapshotRepository().listDailyOverviewSnapshots();
+  const overviewSnapshots = await analyticsModule.createAnalyticsSnapshotRepository().listDailyOverviewSnapshots();
   assert.equal(overviewSnapshots.length, 3);
   const issueOverviewSnapshot = overviewSnapshots.find((row) => row.source_enterprise_id === "enterprise-a");
   assert.ok(issueOverviewSnapshot);
   assert.equal(issueOverviewSnapshot?.rectification_order_count, 1);
   assert.equal(issueOverviewSnapshot?.rectification_pending_count, 1);
 
-  const semanticSnapshots = analyticsModule.createAnalyticsSnapshotRepository().listDailySemanticSnapshots();
+  const semanticSnapshots = await analyticsModule.createAnalyticsSnapshotRepository().listDailySemanticSnapshots();
   assert.equal(semanticSnapshots.length, 3);
 
-  const reviewFactRows = analyticsModule.createAnalyticsFactRepository().listReviewFacts();
-  const rectificationFactRows = analyticsModule.createAnalyticsFactRepository().listRectificationFacts();
+  const reviewFactRows = await analyticsModule.createAnalyticsFactRepository().listReviewFacts();
+  const rectificationFactRows = await analyticsModule.createAnalyticsFactRepository().listRectificationFacts();
   assert.equal(reviewFactRows.length, 1);
   assert.equal(reviewFactRows[0]?.review_action, "complete");
   assert.equal(rectificationFactRows.length, 1);
   assert.equal(rectificationFactRows[0]?.overdue, true);
 
-  const jobRunResult = analyticsModule.createAnalyticsJobService().runDailySnapshotRebuild();
+  const jobRunResult = await analyticsModule.createAnalyticsJobService().runDailySnapshotRebuild();
   assert.ok(jobRunResult.job_key);
   assert.equal(jobRunResult.overview_row_count, 3);
-  const jobRuns = analyticsModule.createAnalyticsJobRepository().listRuns();
+  const jobRuns = await analyticsModule.createAnalyticsJobRepository().listRuns();
   assert.ok(jobRuns.length >= 1);
   assert.equal(jobRuns[0]?.status, "completed");
 
   const analyticsService = analyticsModule.createAnalyticsService();
-  const dashboard = analyticsService.getDashboard(
+  const dashboard = await analyticsService.getDashboard(
     {
       startDate: "2026-04-01",
       endDate: "2026-04-03",
@@ -446,7 +484,7 @@ test("analytics dashboard aggregates report facts and respects scope filters", a
   assert.equal(dashboard.rectification_overview.overdue_count, 1);
   assert.equal(dashboard.rectification_overview.average_rectification_duration_days, 0);
 
-  const scopedDashboard = analyticsService.getDashboard(
+  const scopedDashboard = await analyticsService.getDashboard(
     {
       startDate: "2026-04-01",
       endDate: "2026-04-03"
@@ -473,7 +511,7 @@ test("analytics dashboard aggregates report facts and respects scope filters", a
   assert.equal(scopedDashboard.review_efficiency.review_action_count, 1);
   assert.equal(scopedDashboard.rectification_overdue_ranking.length, 1);
 
-  const franchiseeDashboard = analyticsService.getDashboard(
+  const franchiseeDashboard = await analyticsService.getDashboard(
     {
       startDate: "2026-04-01",
       endDate: "2026-04-03",
@@ -490,7 +528,7 @@ test("analytics dashboard aggregates report facts and respects scope filters", a
   assert.equal(franchiseeDashboard.recurring_stores.length, 1);
   assert.equal(franchiseeDashboard.recurring_franchisees.length, 1);
 
-  rectificationModule.createRectificationOrderRepository().create({
+  await rectificationModule.createRectificationOrderRepository().create({
     report_id: repeatIssuePublishJson.report_id,
     result_id: repeatIssueFact!.result_id,
     store_id: "store-a",
@@ -508,20 +546,19 @@ test("analytics dashboard aggregates report facts and respects scope filters", a
     created_by: "system"
   });
 
-  databaseClient.db
-    .update(databaseSchema.reportRectificationOrderTable)
-    .set({
-      ifCorrected: "1",
-      status: "completed",
-      createdAt: "2026-04-02 08:00:00",
-      updatedAt: "2026-04-04 08:00:00",
-      realCorrectedTime: "2026-04-04 08:00:00"
-    })
-    .where(eq(databaseSchema.reportRectificationOrderTable.huiYunYingOrderId, "HYY-002"))
-    .run();
+  await databaseClient.db
+        .update(databaseSchema.reportRectificationOrderTable)
+        .set({
+          ifCorrected: "1",
+          status: "completed",
+          createdAt: "2026-04-02 08:00:00",
+          updatedAt: "2026-04-04 08:00:00",
+          realCorrectedTime: "2026-04-04 08:00:00"
+        })
+        .where(eq(databaseSchema.reportRectificationOrderTable.huiYunYingOrderId, "HYY-002"));
 
-  analyticsModule.createAnalyticsFactService().rebuildAllFacts();
-  const durationDashboard = analyticsService.getDashboard(
+  await analyticsModule.createAnalyticsFactService().rebuildAllFacts();
+  const durationDashboard = await analyticsService.getDashboard(
     {
       startDate: "2026-04-01",
       endDate: "2026-04-03",

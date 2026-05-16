@@ -1,6 +1,10 @@
 import type { RequestContext } from "@/backend/auth/request-context";
 import type { AnalyticsFilters } from "@/backend/analytics/contracts/analytics.filters";
-import type { AnalyticsDashboard, AnalyticsFilterOptions } from "@/backend/analytics/contracts/analytics.types";
+import type {
+  AnalyticsDashboard,
+  AnalyticsDashboardPageData,
+  AnalyticsFilterOptions
+} from "@/backend/analytics/contracts/analytics.types";
 import type {
   AnalyticsDailyTrendItem,
   AnalyticsFranchiseeCloseRateItem,
@@ -24,37 +28,38 @@ import type {
 } from "@/backend/analytics/contracts/analytics.metrics";
 
 export interface AnalyticsRepository {
-  getOverview(filters: AnalyticsFilters, context: RequestContext): AnalyticsOverviewMetrics;
-  getResultSemanticDistribution(filters: AnalyticsFilters, context: RequestContext): AnalyticsSemanticDistributionItem[];
-  getDailyTrend(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsDailyTrendItem[];
-  getIssueTypeRanking(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsIssueTypeRankingItem[];
-  getSkillDistribution(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsSkillDistributionItem[];
-  getSeverityDistribution(filters: AnalyticsFilters, context: RequestContext): AnalyticsSeverityDistributionItem[];
-  getOrganizationRanking(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsOrganizationRankingItem[];
+  getOverview(filters: AnalyticsFilters, context: RequestContext): any;
+  getResultSemanticDistribution(filters: AnalyticsFilters, context: RequestContext): any;
+  getDailyTrend(filters: AnalyticsFilters, context: RequestContext, limit?: number): any;
+  getIssueTypeRanking(filters: AnalyticsFilters, context: RequestContext, limit?: number): any;
+  getSkillDistribution(filters: AnalyticsFilters, context: RequestContext, limit?: number): any;
+  getSeverityDistribution(filters: AnalyticsFilters, context: RequestContext): any;
+  getOrganizationRanking(filters: AnalyticsFilters, context: RequestContext, limit?: number): any;
   getOrganizationGovernanceRanking(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit?: number
-  ): AnalyticsOrganizationGovernanceItem[];
-  getFranchiseeRanking(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsFranchiseeRankingItem[];
+  ): any;
+  getFranchiseeRanking(filters: AnalyticsFilters, context: RequestContext, limit?: number): any;
   getFranchiseeCloseRateRanking(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit?: number
-  ): AnalyticsFranchiseeCloseRateItem[];
-  getHighRiskFranchisees(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsHighRiskFranchiseeItem[];
-  getRecurringStores(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsRecurringStoreItem[];
-  getRecurringFranchisees(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsRecurringFranchiseeItem[];
-  getStoreRanking(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsStoreRankingItem[];
-  getReviewEfficiency(filters: AnalyticsFilters, context: RequestContext): AnalyticsReviewEfficiencyMetrics;
-  getReviewStatusDistribution(filters: AnalyticsFilters, context: RequestContext): AnalyticsReviewStatusDistributionItem[];
+  ): any;
+  getHighRiskFranchisees(filters: AnalyticsFilters, context: RequestContext, limit?: number): any;
+  getRecurringStores(filters: AnalyticsFilters, context: RequestContext, limit?: number): any;
+  getRecurringFranchisees(filters: AnalyticsFilters, context: RequestContext, limit?: number): any;
+  getStoreRanking(filters: AnalyticsFilters, context: RequestContext, limit?: number): any;
+  getReviewEfficiency(filters: AnalyticsFilters, context: RequestContext): any;
+  getReviewStatusDistribution(filters: AnalyticsFilters, context: RequestContext): any;
   getRectificationOverdueRanking(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit?: number
-  ): AnalyticsRectificationOverdueRankingItem[];
-  getOverdueFranchisees(filters: AnalyticsFilters, context: RequestContext, limit?: number): AnalyticsOverdueFranchiseeItem[];
-  getRectificationOverview(filters: AnalyticsFilters, context: RequestContext): AnalyticsRectificationOverviewMetrics;
-  getDashboard(filters: AnalyticsFilters, context: RequestContext, issueTypeLimit?: number): AnalyticsDashboard;
-  getFilterOptions(filters: AnalyticsFilters, context: RequestContext): AnalyticsFilterOptions;
+  ): any;
+  getOverdueFranchisees(filters: AnalyticsFilters, context: RequestContext, limit?: number): any;
+  getRectificationOverview(filters: AnalyticsFilters, context: RequestContext): any;
+  getDashboard(filters: AnalyticsFilters, context: RequestContext, issueTypeLimit?: number): any;
+  getFilterOptions(filters: AnalyticsFilters, context: RequestContext): any;
+  getDashboardPageData(filters: AnalyticsFilters, context: RequestContext, issueTypeLimit?: number): any;
 }

@@ -91,7 +91,7 @@ type SourceRectificationOrderRow = {
   updatedAt: string;
 };
 
-function safeParseRecord(json: string): Record<string, unknown> {
+function safeParseRecord(json: string): any {
   try {
     const parsed = JSON.parse(json) as unknown;
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
@@ -100,7 +100,7 @@ function safeParseRecord(json: string): Record<string, unknown> {
   }
 }
 
-function safeParseArray(json: string): unknown[] {
+function safeParseArray(json: string): any {
   try {
     const parsed = JSON.parse(json) as unknown;
     return Array.isArray(parsed) ? parsed : [];
@@ -109,16 +109,16 @@ function safeParseArray(json: string): unknown[] {
   }
 }
 
-function readString(record: Record<string, unknown>, key: string): string {
+function readString(record: Record<string, unknown>, key: string): any {
   const value = record[key];
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeDate(value: string | null | undefined): string {
+function normalizeDate(value: string | null | undefined): any {
   return String(value || "").slice(0, 10);
 }
 
-function computeMinutesDiff(start: string | null | undefined, end: string | null | undefined): number {
+function computeMinutesDiff(start: string | null | undefined, end: string | null | undefined): any {
   const startTs = Date.parse(String(start || ""));
   const endTs = Date.parse(String(end || ""));
   if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs < startTs) {
@@ -127,7 +127,7 @@ function computeMinutesDiff(start: string | null | undefined, end: string | null
   return Math.round((endTs - startTs) / 60000);
 }
 
-function inferReviewAction(fromStatus: string, toStatus: string): string {
+function inferReviewAction(fromStatus: string, toStatus: string): any {
   if (toStatus === "completed") {
     return "complete";
   }
@@ -137,7 +137,7 @@ function inferReviewAction(fromStatus: string, toStatus: string): string {
   return "transition";
 }
 
-function isAutoCompleted(reviewPayloadJson: string): boolean {
+function isAutoCompleted(reviewPayloadJson: string): any {
   const payload = safeParseRecord(reviewPayloadJson);
   return payload.auto_completed === true;
 }
@@ -148,11 +148,11 @@ export function buildAnalyticsResultFact(input: {
   storeRow: SourceStoreRow | null;
   issueRows: SourceIssueRow[];
   inspectionRows: SourceInspectionRow[];
-}): AnalyticsResultFactInsert {
+}): any {
   const extensions = safeParseRecord(input.reportRow.extensionsJson);
   const metadata = safeParseRecord(input.resultRow.metadataJson);
   const semanticState = classifyReportResultSemantics(
-    input.issueRows,
+    input.issueRows.length,
     input.inspectionRows.map((inspection) => ({
       status: inspection.status,
       raw_result: inspection.rawResult,
@@ -207,7 +207,7 @@ export function buildAnalyticsIssueFact(input: {
     metadataJson: string;
   };
   storeRow: SourceStoreRow | null;
-}): AnalyticsIssueFactInsert {
+}): any {
   const extensions = safeParseRecord(input.reportRow.extensionsJson);
   const metadata = safeParseRecord(input.issueRow.metadataJson);
   const issueType = input.issueRow.category || input.issueRow.title || "未分类问题";
@@ -246,7 +246,7 @@ export function buildAnalyticsReviewFact(input: {
   reportRow: SourceReportRow;
   reviewLogRow: SourceReviewLogRow;
   storeRow: SourceStoreRow | null;
-}): AnalyticsReviewFactInsert {
+}): any {
   const extensions = safeParseRecord(input.reportRow.extensionsJson);
   const metadata = safeParseRecord(input.reviewLogRow.metadataJson);
   const reviewDate = normalizeDate(input.reviewLogRow.createdAt);
@@ -290,7 +290,7 @@ export function buildAnalyticsRectificationFact(input: {
   reportRow: SourceReportRow;
   rectificationRow: SourceRectificationOrderRow;
   storeRow: SourceStoreRow | null;
-}): AnalyticsRectificationFactInsert {
+}): any {
   const extensions = safeParseRecord(input.reportRow.extensionsJson);
   const requestPayload = safeParseRecord(input.rectificationRow.requestPayloadJson);
   const responsePayload = safeParseRecord(input.rectificationRow.responsePayloadJson);

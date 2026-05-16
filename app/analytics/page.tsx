@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 const analyticsService = createAnalyticsService();
 const masterDataService = createMasterDataService();
 
-function buildFilters(searchParams: Record<string, string | string[] | undefined>): AnalyticsFilters {
+function buildFilters(searchParams: Record<string, string | string[] | undefined>): any {
   return {
     startDate: typeof searchParams.startDate === "string" ? searchParams.startDate.trim() : "",
     endDate: typeof searchParams.endDate === "string" ? searchParams.endDate.trim() : "",
@@ -38,7 +38,7 @@ function buildFilters(searchParams: Record<string, string | string[] | undefined
   };
 }
 
-function buildQueryString(filters: AnalyticsFilters): string {
+function buildQueryString(filters: AnalyticsFilters): any {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
     if (value) {
@@ -49,7 +49,7 @@ function buildQueryString(filters: AnalyticsFilters): string {
   return text ? `?${text}` : "";
 }
 
-function buildViewHref(filters: AnalyticsFilters, view: string): string {
+function buildViewHref(filters: AnalyticsFilters, view: string): any {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
     if (value) {
@@ -64,11 +64,11 @@ function buildAnalyticsDrilldownHref(
   filters: AnalyticsFilters,
   patch: Partial<AnalyticsFilters>,
   view: string
-): string {
+): any {
   return buildViewHref({ ...filters, ...patch }, view);
 }
 
-function buildRectificationDrilldownHref(filters: AnalyticsFilters, keyword: string): string {
+function buildRectificationDrilldownHref(filters: AnalyticsFilters, keyword: string): any {
   const params = new URLSearchParams();
   if (filters.startDate) {
     params.set("startDate", filters.startDate);
@@ -80,11 +80,11 @@ function buildRectificationDrilldownHref(filters: AnalyticsFilters, keyword: str
   return `/rectifications?${params.toString()}`;
 }
 
-function hasAdvancedFilters(filters: AnalyticsFilters): boolean {
+function hasAdvancedFilters(filters: AnalyticsFilters): any {
   return Boolean(filters.topic || filters.planId);
 }
 
-function flattenOrganizations(nodes: MasterDataOrganization[]): Array<{ value: string; label: string }> {
+function flattenOrganizations(nodes: MasterDataOrganization[]): any {
   const items: Array<{ value: string; label: string }> = [];
   const walk = (rows: MasterDataOrganization[]) => {
     rows.forEach((row) => {
@@ -110,7 +110,7 @@ export default async function AnalyticsPage({
   searchParams
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("analytics:read", "/analytics");
   const resolvedSearchParams = await searchParams;
   const filters = buildFilters(resolvedSearchParams);
@@ -121,19 +121,18 @@ export default async function AnalyticsPage({
   const hasActiveFilters = Object.values(filters).some((value) => Boolean(value));
   const hasAdvancedFilterValues = hasAdvancedFilters(filters);
   const requestContext = buildRequestContext(currentUser);
-  const masterDataEnterprises = masterDataService.listEnterprises(requestContext);
+  const masterDataEnterprises = await masterDataService.listEnterprises(requestContext);
   const activeEnterpriseId = masterDataEnterprises[0]?.enterprise_id || "";
   const organizationFilterOptions = activeEnterpriseId
-    ? flattenOrganizations(masterDataService.listOrganizations(activeEnterpriseId, requestContext))
+    ? flattenOrganizations(await masterDataService.listOrganizations(activeEnterpriseId, requestContext))
     : [];
   const storeFilterOptions = activeEnterpriseId
-    ? masterDataService
-        .listStores(
-          {
-            enterpriseId: activeEnterpriseId
-          },
-          requestContext
-        )
+    ? (await masterDataService.listStores(
+        {
+          enterpriseId: activeEnterpriseId
+        },
+        requestContext
+      ))
         .map((item) => ({
           value: item.store_id,
           label: item.store_name || item.store_id,
@@ -145,25 +144,10 @@ export default async function AnalyticsPage({
             left.value.localeCompare(right.value, "en")
         )
     : [];
-  const dashboard = analyticsService.getDashboard(filters, requestContext, 10);
-  const baseFilterOptions = analyticsService.getFilterOptions(
-    {
-      ...filters,
-      organizationId: "",
-      storeId: "",
-      topic: "",
-      planId: ""
-    },
-    requestContext
-  );
-  const advancedFilterOptions = analyticsService.getFilterOptions(
-    {
-      ...filters,
-      topic: "",
-      planId: ""
-    },
-    requestContext
-  );
+  const pageData = await analyticsService.getDashboardPageData(filters, requestContext, 10);
+  const dashboard = pageData.dashboard;
+  const baseFilterOptions = pageData.base_filter_options;
+  const advancedFilterOptions = pageData.advanced_filter_options;
   const queryString = buildQueryString(filters);
   const canManageUsers = currentUser.permissions.includes("system:settings:write");
 

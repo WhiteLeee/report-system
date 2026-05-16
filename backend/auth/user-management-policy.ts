@@ -5,23 +5,23 @@ import type { SessionUser, UserAccount } from "@/backend/auth/auth.types";
 
 const systemSettingsService = createSystemSettingsService();
 
-export function getCurrentDeliveryMode(): DeliveryMode {
-  return systemSettingsService.getDeliveryMode();
+export async function getCurrentDeliveryMode(): Promise<any> {
+  return await systemSettingsService.getDeliveryMode();
 }
 
-function isAdminActor(actor: SessionUser | null | undefined): boolean {
+function isAdminActor(actor: SessionUser | null | undefined): any {
   return Boolean(actor?.roles.includes("admin"));
 }
 
-function isReservedAdminUsername(username: string): boolean {
+function isReservedAdminUsername(username: string): any {
   return username === getReportSystemConfig().adminUsername;
 }
 
 export function isProtectedPlatformUser(
   username: string,
-  deliveryMode = getCurrentDeliveryMode(),
+  deliveryMode: DeliveryMode,
   actor?: SessionUser | null
-): boolean {
+): any {
   if (!isReservedAdminUsername(username)) {
     return false;
   }
@@ -33,9 +33,9 @@ export function isProtectedPlatformUser(
 
 export function filterVisibleUsers(
   users: UserAccount[],
-  deliveryMode = getCurrentDeliveryMode(),
+  deliveryMode: DeliveryMode,
   actor?: SessionUser | null
-): UserAccount[] {
+): any {
   if (deliveryMode !== "customer" && isAdminActor(actor)) {
     return users;
   }
@@ -44,9 +44,9 @@ export function filterVisibleUsers(
 
 export function assertTargetUserManageable(
   user: UserAccount | null | undefined,
-  deliveryMode = getCurrentDeliveryMode(),
+  deliveryMode: DeliveryMode,
   actor?: SessionUser | null
-): UserAccount {
+): any {
   if (!user) {
     throw new Error("User not found.");
   }

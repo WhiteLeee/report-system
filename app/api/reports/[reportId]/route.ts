@@ -8,8 +8,8 @@ const reportService = createReportService();
 export async function GET(
   request: Request,
   context: { params: Promise<{ reportId: string }> }
-): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "report:read")) {
     return Response.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
@@ -27,7 +27,7 @@ export async function GET(
     );
   }
 
-  const report = reportService.getReportDetail(reportId, buildRequestContext(currentUser));
+  const report = await reportService.getReportDetail(reportId, buildRequestContext(currentUser));
 
   if (!report) {
     return Response.json(

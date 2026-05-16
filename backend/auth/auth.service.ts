@@ -27,66 +27,64 @@ export class AuthService {
     private readonly systemSettingsService: SystemSettingsService
   ) {}
 
-  ensureBootstrap(): void {
+  async ensureBootstrap(): Promise<any> {
     const config = getReportSystemConfig();
-    this.repository.ensureBootstrap(config.adminUsername, config.adminPassword, config.adminDisplayName);
+    await this.repository.ensureBootstrap(config.adminUsername, config.adminPassword, config.adminDisplayName);
   }
 
-  authenticate(
+  async authenticate(
     username: string,
     password: string
-  ):
-    | { ok: true; sessionToken: string; expiresAt: string; user: SessionUser }
-    | { ok: false; reason: AuthFailureReason; lockedUntil?: string } {
-    this.ensureBootstrap();
-    const securityPolicy = this.systemSettingsService.getAuthSecurityPolicy();
-    const authResult = this.repository.authenticate(username, password, securityPolicy);
+  ): Promise<any> {
+    await this.ensureBootstrap();
+    const securityPolicy = await this.systemSettingsService.getAuthSecurityPolicy();
+    const authResult = await this.repository.authenticate(username, password, securityPolicy);
     if (!authResult.ok) {
       return authResult;
     }
     const expiresAt = new Date(Date.now() + SESSION_LIFETIME_MS).toISOString();
-    const sessionToken = this.repository.createSession(authResult.user.id, expiresAt);
+    const sessionToken = await this.repository.createSession(authResult.user.id, expiresAt);
     return { ok: true, sessionToken, expiresAt, user: authResult.user };
   }
 
-  getSessionUser(sessionToken: string): SessionUser | null {
-    this.ensureBootstrap();
-    const user = this.repository.findSessionUser(sessionToken);
+  async getSessionUser(sessionToken: string): Promise<any> {
+    await this.ensureBootstrap();
+    const user = await this.repository.findSessionUser(sessionToken);
     if (user) {
-      this.repository.touchSession(sessionToken);
+      await this.repository.touchSession(sessionToken);
     }
     return user;
   }
 
-  logout(sessionToken: string): void {
+  async logout(sessionToken: string): Promise<any> {
     if (!sessionToken.trim()) {
       return;
     }
-    this.repository.deleteSession(sessionToken);
+    await this.repository.deleteSession(sessionToken);
   }
 
-  revokeUserSessions(userId: number): void {
-    this.ensureBootstrap();
-    this.repository.deleteSessionsByUserId(userId);
+  async revokeUserSessions(userId: number): Promise<any> {
+    await this.ensureBootstrap();
+    await this.repository.deleteSessionsByUserId(userId);
   }
 
-  listUsers(): UserAccount[] {
-    this.ensureBootstrap();
-    return this.repository.listUsers();
+  async listUsers(): Promise<any> {
+    await this.ensureBootstrap();
+    return await this.repository.listUsers();
   }
 
-  createUser(input: CreateUserInput): UserAccount {
-    this.ensureBootstrap();
+  async createUser(input: CreateUserInput): Promise<any> {
+    await this.ensureBootstrap();
     if (input.roleCode === "admin") {
       throw new Error("Admin role is reserved for bootstrap admin user.");
     }
-    assertPasswordWithPolicy(input.password, this.systemSettingsService.getAuthSecurityPolicy());
-    return this.repository.createUser(input);
+    assertPasswordWithPolicy(input.password, await this.systemSettingsService.getAuthSecurityPolicy());
+    return await this.repository.createUser(input);
   }
 
-  updateUserProfile(input: UpdateUserProfileInput): void {
-    this.ensureBootstrap();
-    const targetUser = this.listUsers().find((item) => item.id === input.userId);
+  async updateUserProfile(input: UpdateUserProfileInput): Promise<any> {
+    await this.ensureBootstrap();
+    const targetUser = (await this.listUsers()).find((item): any => item.id === input.userId);
     if (!targetUser) {
       throw new Error("User not found.");
     }
@@ -105,19 +103,19 @@ export class AuthService {
 
     const normalizedPassword = (input.password || "").trim();
     if (normalizedPassword) {
-      assertPasswordWithPolicy(normalizedPassword, this.systemSettingsService.getAuthSecurityPolicy());
+      assertPasswordWithPolicy(normalizedPassword, await this.systemSettingsService.getAuthSecurityPolicy());
     }
 
-    this.repository.updateUserProfile({
+    await this.repository.updateUserProfile({
       ...input,
       roleCode: normalizedRoleCode,
       password: normalizedPassword || undefined
     });
   }
 
-  updateUserRole(userId: number, roleCode: RoleCode): void {
-    this.ensureBootstrap();
-    const targetUser = this.listUsers().find((item) => item.id === userId);
+  async updateUserRole(userId: number, roleCode: RoleCode): Promise<any> {
+    await this.ensureBootstrap();
+    const targetUser = (await this.listUsers()).find((item): any => item.id === userId);
     if (!targetUser) {
       throw new Error("User not found.");
     }
@@ -129,42 +127,47 @@ export class AuthService {
     if (isBootstrapAdminUser && roleCode !== "admin") {
       throw new Error("Bootstrap admin user role cannot be changed.");
     }
-    this.repository.updateUserRole(userId, roleCode);
+    await this.repository.updateUserRole(userId, roleCode);
   }
 
-  replaceUserScopes(userId: number, enterpriseScopeIds: string[], organizationScopeIds: string[], storeScopeIds: string[]): void {
-    this.ensureBootstrap();
-    this.repository.replaceUserScopes(userId, enterpriseScopeIds, organizationScopeIds, storeScopeIds);
+  async replaceUserScopes(
+    userId: number,
+    enterpriseScopeIds: string[],
+    organizationScopeIds: string[],
+    storeScopeIds: string[]
+  ): Promise<any> {
+    await this.ensureBootstrap();
+    await this.repository.replaceUserScopes(userId, enterpriseScopeIds, organizationScopeIds, storeScopeIds);
   }
 
-  updateUserPassword(userId: number, nextPassword: string): void {
-    this.ensureBootstrap();
-    assertPasswordWithPolicy(nextPassword, this.systemSettingsService.getAuthSecurityPolicy());
-    this.repository.updateUserPassword(userId, nextPassword);
+  async updateUserPassword(userId: number, nextPassword: string): Promise<any> {
+    await this.ensureBootstrap();
+    assertPasswordWithPolicy(nextPassword, await this.systemSettingsService.getAuthSecurityPolicy());
+    await this.repository.updateUserPassword(userId, nextPassword);
   }
 
-  updateUserStatus(userId: number, status: "active" | "disabled"): void {
-    this.ensureBootstrap();
-    this.repository.updateUserStatus(userId, status);
+  async updateUserStatus(userId: number, status: "active" | "disabled"): Promise<any> {
+    await this.ensureBootstrap();
+    await this.repository.updateUserStatus(userId, status);
   }
 
-  listRolePermissionMatrix(): RolePermissionMatrixItem[] {
-    this.ensureBootstrap();
-    return this.repository.listRolePermissionMatrix();
+  async listRolePermissionMatrix(): Promise<any> {
+    await this.ensureBootstrap();
+    return await this.repository.listRolePermissionMatrix();
   }
 
-  replaceRolePermissions(roleCode: RoleCode, permissionCodes: PermissionCode[]): void {
-    this.ensureBootstrap();
-    this.repository.replaceRolePermissions(roleCode, permissionCodes);
+  async replaceRolePermissions(roleCode: RoleCode, permissionCodes: PermissionCode[]): Promise<any> {
+    await this.ensureBootstrap();
+    await this.repository.replaceRolePermissions(roleCode, permissionCodes);
   }
 
-  listManagedNavigationMenus(): ManagedNavigationMenuItem[] {
-    this.ensureBootstrap();
-    return this.repository.listManagedNavigationMenus();
+  async listManagedNavigationMenus(): Promise<any> {
+    await this.ensureBootstrap();
+    return await this.repository.listManagedNavigationMenus();
   }
 
-  saveManagedNavigationMenus(items: ManagedNavigationMenuItem[]): void {
-    this.ensureBootstrap();
+  async saveManagedNavigationMenus(items: ManagedNavigationMenuItem[]): Promise<any> {
+    await this.ensureBootstrap();
     const blockedMenus = new Set(["system"]);
     const normalizedItems = items.map((item) => {
       const nextRoleCodes = Array.from(new Set(item.roleCodes))
@@ -175,25 +178,25 @@ export class AuthService {
         roleCodes: nextRoleCodes
       };
     });
-    this.repository.saveManagedNavigationMenus(normalizedItems);
+    await this.repository.saveManagedNavigationMenus(normalizedItems);
   }
 
-  createAuditLog(input: AuthAuditLogInput): void {
-    this.ensureBootstrap();
-    this.repository.createAuditLog(input);
+  async createAuditLog(input: AuthAuditLogInput): Promise<any> {
+    await this.ensureBootstrap();
+    await this.repository.createAuditLog(input);
   }
 
-  listAuditLogs(limit = 100): AuthAuditLogRecord[] {
-    this.ensureBootstrap();
-    return this.repository.listAuditLogs(limit);
+  async listAuditLogs(limit = 100): Promise<any> {
+    await this.ensureBootstrap();
+    return await this.repository.listAuditLogs(limit);
   }
 
-  queryAuditLogs(query: AuthAuditLogQuery): AuthAuditLogPage {
-    this.ensureBootstrap();
-    return this.repository.queryAuditLogs(query);
+  async queryAuditLogs(query: AuthAuditLogQuery): Promise<any> {
+    await this.ensureBootstrap();
+    return await this.repository.queryAuditLogs(query);
   }
 
-  hasPermission(user: SessionUser | null, permissionCode: PermissionCode): boolean {
+  hasPermission(user: SessionUser | null, permissionCode: PermissionCode): any {
     return this.repository.hasPermission(user, permissionCode);
   }
 }

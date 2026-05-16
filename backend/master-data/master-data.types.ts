@@ -115,9 +115,9 @@ export interface MasterDataStoreFilters {
 }
 
 export interface MasterDataRepository {
-  publishSnapshot(payload: MasterDataPublishPayload, context?: RequestContext): MasterDataPublishReceipt;
-  listEnterprises(context?: RequestContext): MasterDataEnterpriseSummary[];
-  listOrganizations(enterpriseId: string, context?: RequestContext): MasterDataOrganization[];
-  listStores(filters: MasterDataStoreFilters, context?: RequestContext): MasterDataStore[];
-  listSyncLogs(enterpriseId: string, limit?: number, context?: RequestContext): MasterDataSyncLog[];
+  publishSnapshot(payload: MasterDataPublishPayload, context?: RequestContext): any;
+  listEnterprises(context?: RequestContext): any;
+  listOrganizations(enterpriseId: string, context?: RequestContext): any;
+  listStores(filters: MasterDataStoreFilters, context?: RequestContext): any;
+  listSyncLogs(enterpriseId: string, limit?: number, context?: RequestContext): any;
 }

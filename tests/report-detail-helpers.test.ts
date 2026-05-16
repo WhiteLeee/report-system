@@ -4,7 +4,7 @@ import { test } from "node:test";
 import type { ReportInspection, ReportIssue, ReportResult } from "../backend/report/report.types";
 import { readIssueRectificationImageUrls, resolveResultImageState } from "../ui/report/report-detail-helpers";
 
-function createResult(): ReportResult {
+function createResult(): any {
   return {
     id: 1,
     report_id: 1,
@@ -33,7 +33,7 @@ function createResult(): ReportResult {
   };
 }
 
-function createInspection(overrides: Partial<ReportInspection> = {}): ReportInspection {
+function createInspection(overrides: Partial<ReportInspection> = {}): any {
   return {
     id: 1,
     report_id: 1,
@@ -58,7 +58,7 @@ function createInspection(overrides: Partial<ReportInspection> = {}): ReportInsp
   };
 }
 
-function createIssue(overrides: Partial<ReportIssue> = {}): ReportIssue {
+function createIssue(overrides: Partial<ReportIssue> = {}): any {
   return {
     id: 1,
     report_id: 1,

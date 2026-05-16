@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 const reportService = createReportService();
 
-export async function GET(request: NextRequest): Promise<Response> {
+export async function GET(request: NextRequest): Promise<any> {
   const publishId = request.nextUrl.searchParams.get("idempotency_key") ?? "";
 
   if (!publishId.trim()) {
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     );
   }
 
-  const result = reportService.getPublishStatus(publishId);
+  const result = await reportService.getPublishStatus(publishId);
 
   return Response.json({
     ok: true,

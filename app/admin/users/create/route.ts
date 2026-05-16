@@ -9,7 +9,7 @@ import { getCurrentDeliveryMode, isProtectedPlatformUser } from "@/backend/auth/
 
 const authService = createAuthService();
 
-function roleCodeFromForm(value: string): RoleCode | null {
+function roleCodeFromForm(value: string): any {
   if (value === "manage" || value === "reviewer") {
     return value;
   }
@@ -19,7 +19,7 @@ function roleCodeFromForm(value: string): RoleCode | null {
   return null;
 }
 
-function readScopeList(formData: FormData, fieldName: string): string[] {
+function readScopeList(formData: FormData, fieldName: string): any {
   const values = formData
     .getAll(fieldName)
     .map((item) => String(item || "").trim())
@@ -35,7 +35,7 @@ function readScopeList(formData: FormData, fieldName: string): string[] {
     .filter(Boolean);
 }
 
-function redirectToUserList(request: Request, errorMessage?: string): Response {
+function redirectToUserList(request: Request, errorMessage?: string): any {
   const url = buildRequestUrl(request, "/admin/users");
   if (errorMessage) {
     url.searchParams.set("error", encodeURIComponent(errorMessage));
@@ -43,14 +43,14 @@ function redirectToUserList(request: Request, errorMessage?: string): Response {
   return NextResponse.redirect(url, 303);
 }
 
-export async function POST(request: Request): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+export async function POST(request: Request): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "user:write")) {
     return redirectToUserList(request, "Forbidden");
   }
   const auditMeta = readAuditRequestMeta(request);
   const auditActor = toAuditActor(currentUser);
-  const deliveryMode = getCurrentDeliveryMode();
+  const deliveryMode = await getCurrentDeliveryMode();
 
   const formData = await request.formData().catch(() => new FormData());
   const username = String(formData.get("username") || "").trim();
@@ -63,7 +63,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!roleCode) {
       return redirectToUserList(request, "Invalid role code.");
     }
-    const createdUser = authService.createUser({
+    const createdUser = await authService.createUser({
       username,
       displayName: String(formData.get("displayName") || "").trim(),
       password: String(formData.get("password") || "").trim(),
@@ -72,7 +72,7 @@ export async function POST(request: Request): Promise<Response> {
       organizationScopeIds: readScopeList(formData, "organizationScopeIds"),
       storeScopeIds: readScopeList(formData, "storeScopeIds")
     });
-    authService.createAuditLog({
+    await authService.createAuditLog({
       ...auditActor,
       targetUserId: createdUser.id,
       targetUsername: createdUser.username,

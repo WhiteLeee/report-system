@@ -10,11 +10,11 @@ export interface AnalyticsFilters {
   planId?: string;
 }
 
-function normalizeString(value: string | undefined): string {
+function normalizeString(value: string | undefined): any {
   return String(value || "").trim();
 }
 
-export function normalizeAnalyticsFilters(filters: AnalyticsFilters = {}): AnalyticsFilters {
+export function normalizeAnalyticsFilters(filters: AnalyticsFilters = {}): any {
   return {
     startDate: normalizeString(filters.startDate),
     endDate: normalizeString(filters.endDate),

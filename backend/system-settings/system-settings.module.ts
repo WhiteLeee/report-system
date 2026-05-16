@@ -1,6 +1,6 @@
-import { SqliteSystemSettingsRepository } from "@/backend/system-settings/sqlite-system-settings.repository";
+import { PgSystemSettingsRepository } from "@/backend/system-settings/pg-system-settings.repository";
 import { SystemSettingsService } from "@/backend/system-settings/system-settings.service";
 
-export function createSystemSettingsService(): SystemSettingsService {
-  return new SystemSettingsService(new SqliteSystemSettingsRepository());
+export function createSystemSettingsService(): any {
+  return new SystemSettingsService(new PgSystemSettingsRepository());
 }

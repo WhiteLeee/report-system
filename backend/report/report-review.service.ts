@@ -14,10 +14,10 @@ import type { ReportRepository } from "@/backend/report/report.repository";
 export class ReportReviewService {
   constructor(private readonly repository: ReportRepository) {}
 
-  createManualIssue(
+  async createManualIssue(
     input: CreateManualReportIssueInput,
     context: RequestContext = {}
-  ): ReportIssue | null {
+  ): Promise<any> {
     const title = input.title.trim();
     const operatorName = input.operator_name.trim();
     if (
@@ -30,7 +30,7 @@ export class ReportReviewService {
     ) {
       return null;
     }
-    return this.repository.createManualIssue(
+    return await this.repository.createManualIssue(
       {
         ...input,
         title,
@@ -42,7 +42,7 @@ export class ReportReviewService {
     );
   }
 
-  updateImageReviewStatus(
+  async updateImageReviewStatus(
     reportId: number,
     imageId: number,
     reviewStatus: ResultReviewState,
@@ -52,7 +52,7 @@ export class ReportReviewService {
     selectedIssues: ReviewSelectedIssue[] = [],
     reviewAction: ReviewAction = "transition",
     reviewDisposition: ReviewDisposition = ""
-  ): ReviewResultUpdateResult | null {
+  ): Promise<any> {
     if (!Number.isInteger(reportId) || reportId <= 0 || !Number.isInteger(imageId) || imageId <= 0) {
       return null;
     }
@@ -60,7 +60,7 @@ export class ReportReviewService {
     if (!normalizedOperator) {
       return null;
     }
-    return this.repository.updateImageReviewStatus(reportId, imageId, {
+    return await this.repository.updateImageReviewStatus(reportId, imageId, {
       review_status: reviewStatus,
       operator_name: normalizedOperator,
       note: note.trim(),
@@ -70,17 +70,17 @@ export class ReportReviewService {
     }, context);
   }
 
-  listRecentReviewLogs(
+  async listRecentReviewLogs(
     reportId: number,
     limit = 20,
     imageId = 0,
     context: RequestContext = {}
-  ): ReportReviewLog[] {
+  ): Promise<any> {
     if (!Number.isInteger(reportId) || reportId <= 0) {
       return [];
     }
     const normalizedLimit = Math.min(Math.max(1, Math.trunc(Number.isFinite(limit) ? limit : 20)), 100);
     const normalizedImageId = Number.isInteger(imageId) && imageId > 0 ? imageId : 0;
-    return this.repository.listReviewLogs(reportId, normalizedLimit, normalizedImageId || undefined, context);
+    return await this.repository.listReviewLogs(reportId, normalizedLimit, normalizedImageId || undefined, context);
   }
 }

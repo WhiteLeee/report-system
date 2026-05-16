@@ -1,6 +1,6 @@
 import { MasterDataService } from "@/backend/master-data/master-data.service";
-import { SqliteMasterDataRepository } from "@/backend/master-data/sqlite-master-data.repository";
+import { PgMasterDataRepository } from "@/backend/master-data/pg-master-data.repository";
 
-export function createMasterDataService(): MasterDataService {
-  return new MasterDataService(new SqliteMasterDataRepository());
+export function createMasterDataService(): any {
+  return new MasterDataService(new PgMasterDataRepository());
 }

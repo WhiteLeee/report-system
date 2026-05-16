@@ -1,11 +1,11 @@
 import type { HuiYunYingApiSettings } from "@/backend/system-settings/system-settings.types";
 import type { HuiYunYingResolvedSettings } from "@/backend/integrations/huiyunying/huiyunying.types";
 
-function normalizeRouteSegment(value: string): string {
+function normalizeRouteSegment(value: string): any {
   return String(value || "").trim().replace(/^\/+|\/+$/g, "");
 }
 
-function normalizePath(value: string): string {
+function normalizePath(value: string): any {
   const trimmed = String(value || "").trim();
   if (!trimmed) {
     return "";
@@ -13,7 +13,7 @@ function normalizePath(value: string): string {
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }
 
-function resolveRouteTemplate(template: string, routeValue: string): string {
+function resolveRouteTemplate(template: string, routeValue: string): any {
   const normalizedTemplate = normalizePath(template);
   const normalizedRoute = normalizeRouteSegment(routeValue);
 
@@ -24,7 +24,7 @@ function resolveRouteTemplate(template: string, routeValue: string): string {
   return normalizedTemplate.replace(/^\/route(?=\/|$)/, `/${normalizedRoute}`).replace(/\{route\}/g, normalizedRoute);
 }
 
-export function resolveHuiYunYingSettings(settings: HuiYunYingApiSettings): HuiYunYingResolvedSettings {
+export function resolveHuiYunYingSettings(settings: HuiYunYingApiSettings): any {
   return {
     baseUri: settings.uri.trim(),
     signPath: "/sign",

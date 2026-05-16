@@ -10,16 +10,16 @@ import type { PermissionCode, RoleCode } from "@/backend/auth/auth.types";
 const authService = createAuthService();
 const editableRoleCodes: RoleCode[] = ["manage", "viewer", "reviewer"];
 
-function readPermissionCodes(formData: FormData, roleCode: RoleCode): PermissionCode[] {
+function readPermissionCodes(formData: FormData, roleCode: RoleCode): any {
   const allowed = new Set<PermissionCode>(permissionCodes);
   return formData
     .getAll(`permissions_${roleCode}`)
     .map((item) => String(item || "").trim())
-    .filter((item): item is PermissionCode => allowed.has(item as PermissionCode));
+    .filter((item): any => allowed.has(item as PermissionCode));
 }
 
-export async function POST(request: Request): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+export async function POST(request: Request): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   if (!hasPermission(currentUser, "role:write")) {
     return Response.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
@@ -27,14 +27,14 @@ export async function POST(request: Request): Promise<Response> {
   const auditMeta = readAuditRequestMeta(request);
   const actor = toAuditActor(currentUser);
   const formData = await request.formData().catch(() => new FormData());
-  const beforeMatrix = authService.listRolePermissionMatrix();
+  const beforeMatrix = await authService.listRolePermissionMatrix();
 
-  editableRoleCodes.forEach((roleCode) => {
-    authService.replaceRolePermissions(roleCode, readPermissionCodes(formData, roleCode));
-  });
+  for (const roleCode of editableRoleCodes) {
+    await authService.replaceRolePermissions(roleCode, readPermissionCodes(formData, roleCode));
+  }
 
-  const afterMatrix = authService.listRolePermissionMatrix();
-  authService.createAuditLog({
+  const afterMatrix = await authService.listRolePermissionMatrix();
+  await authService.createAuditLog({
     ...actor,
     targetUserId: null,
     targetUsername: "role_permission_matrix",

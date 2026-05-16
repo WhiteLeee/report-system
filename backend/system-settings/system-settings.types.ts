@@ -40,12 +40,12 @@ export interface EnterpriseBrandingSettings {
 }
 
 export interface SystemSettingsRepository {
-  getHuiYunYingApiSettings(): HuiYunYingApiSettings;
-  saveHuiYunYingApiSettings(settings: HuiYunYingApiSettings): void;
-  getDeliveryMode(): DeliveryMode;
-  saveDeliveryMode(mode: DeliveryMode): void;
-  getAuthSecurityPolicy(): AuthSecurityPolicy;
-  saveAuthSecurityPolicy(policy: AuthSecurityPolicy): void;
-  getEnterpriseBrandingSettings(): EnterpriseBrandingSettings;
-  saveEnterpriseBrandingSettings(settings: EnterpriseBrandingSettings): void;
+  getHuiYunYingApiSettings(): any;
+  saveHuiYunYingApiSettings(settings: HuiYunYingApiSettings): any;
+  getDeliveryMode(): any;
+  saveDeliveryMode(mode: DeliveryMode): any;
+  getAuthSecurityPolicy(): any;
+  saveAuthSecurityPolicy(policy: AuthSecurityPolicy): any;
+  getEnterpriseBrandingSettings(): any;
+  saveEnterpriseBrandingSettings(settings: EnterpriseBrandingSettings): any;
 }

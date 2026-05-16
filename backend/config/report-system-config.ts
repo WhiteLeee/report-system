@@ -11,7 +11,9 @@ export type ReportSystemConfig = {
   primaryColorStrong: string;
   defaultTimezone: string;
   dataDir: string;
-  dbPath: string;
+  dbUrl: string;
+  dbMigrationsSchema: string;
+  dbMigrationsTable: string;
   tenantConfigPath: string;
   adminUsername: string;
   adminPassword: string;
@@ -29,14 +31,16 @@ type PartialTenantConfig = Partial<{
   primaryColorStrong: string;
   defaultTimezone: string;
   dataDir: string;
-  dbPath: string;
+  dbUrl: string;
+  dbMigrationsSchema: string;
+  dbMigrationsTable: string;
   adminUsername: string;
   adminPassword: string;
   adminDisplayName: string;
   supportedPayloadVersions: number[];
 }>;
 
-function normalizeVersionList(values: unknown, fallback: number[]): number[] {
+function normalizeVersionList(values: unknown, fallback: number[]): any {
   if (Array.isArray(values)) {
     const normalized = Array.from(
       new Set(
@@ -65,7 +69,7 @@ function normalizeVersionList(values: unknown, fallback: number[]): number[] {
   return normalized.length > 0 ? normalized : fallback;
 }
 
-function normalizeDir(value: string): string {
+function normalizeDir(value: string): any {
   const raw = value.trim();
   if (!raw) {
     return path.join(/* turbopackIgnore: true */ process.cwd(), "data");
@@ -73,15 +77,23 @@ function normalizeDir(value: string): string {
   return path.isAbsolute(raw) ? raw : path.resolve(/* turbopackIgnore: true */ process.cwd(), raw);
 }
 
-function normalizeDbPath(value: string, dataDir: string): string {
+function normalizeDbUrl(value: string): any {
   const raw = value.trim();
   if (!raw) {
-    return path.join(dataDir, "report-system.sqlite");
+    return "postgres://postgres:postgres@127.0.0.1:5432/report_system";
   }
-  return path.isAbsolute(raw) ? raw : path.resolve(/* turbopackIgnore: true */ process.cwd(), raw);
+  return raw;
 }
 
-function normalizeConfigPath(value: string): string {
+function normalizeIdentifier(value: string, fallback: string): any {
+  const raw = value.trim();
+  if (!raw) {
+    return fallback;
+  }
+  return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(raw) ? raw : fallback;
+}
+
+function normalizeConfigPath(value: string): any {
   const raw = value.trim();
   if (!raw) {
     return path.join(/* turbopackIgnore: true */ process.cwd(), "config", "tenant.json");
@@ -89,7 +101,7 @@ function normalizeConfigPath(value: string): string {
   return path.isAbsolute(raw) ? raw : path.resolve(/* turbopackIgnore: true */ process.cwd(), raw);
 }
 
-function readTenantConfigFile(configPath: string): PartialTenantConfig {
+function readTenantConfigFile(configPath: string): any {
   if (!fs.existsSync(configPath)) {
     return {};
   }
@@ -105,7 +117,9 @@ function readTenantConfigFile(configPath: string): PartialTenantConfig {
       primaryColorStrong: typeof raw.primaryColorStrong === "string" ? raw.primaryColorStrong.trim() : "",
       defaultTimezone: typeof raw.defaultTimezone === "string" ? raw.defaultTimezone.trim() : "",
       dataDir: typeof raw.dataDir === "string" ? raw.dataDir.trim() : "",
-      dbPath: typeof raw.dbPath === "string" ? raw.dbPath.trim() : "",
+      dbUrl: typeof raw.dbUrl === "string" ? raw.dbUrl.trim() : "",
+      dbMigrationsSchema: typeof raw.dbMigrationsSchema === "string" ? raw.dbMigrationsSchema.trim() : "",
+      dbMigrationsTable: typeof raw.dbMigrationsTable === "string" ? raw.dbMigrationsTable.trim() : "",
       adminUsername: typeof raw.adminUsername === "string" ? raw.adminUsername.trim() : "",
       adminPassword: typeof raw.adminPassword === "string" ? raw.adminPassword.trim() : "",
       adminDisplayName: typeof raw.adminDisplayName === "string" ? raw.adminDisplayName.trim() : "",
@@ -116,7 +130,7 @@ function readTenantConfigFile(configPath: string): PartialTenantConfig {
   }
 }
 
-export function getReportSystemConfig(): ReportSystemConfig {
+export function getReportSystemConfig(): any {
   const tenantConfigPath = normalizeConfigPath(process.env.REPORT_SYSTEM_TENANT_CONFIG_PATH || "");
   const fileConfig = readTenantConfigFile(tenantConfigPath);
   const dataDir = normalizeDir(process.env.REPORT_SYSTEM_DATA_DIR || fileConfig.dataDir || "");
@@ -138,7 +152,15 @@ export function getReportSystemConfig(): ReportSystemConfig {
       "Asia/Shanghai"
     ).trim(),
     dataDir,
-    dbPath: normalizeDbPath(process.env.REPORT_SYSTEM_DB_PATH || fileConfig.dbPath || "", dataDir),
+    dbUrl: normalizeDbUrl(process.env.REPORT_SYSTEM_DB_URL || fileConfig.dbUrl || ""),
+    dbMigrationsSchema: normalizeIdentifier(
+      process.env.REPORT_SYSTEM_DB_MIGRATIONS_SCHEMA || fileConfig.dbMigrationsSchema || "",
+      "public"
+    ),
+    dbMigrationsTable: normalizeIdentifier(
+      process.env.REPORT_SYSTEM_DB_MIGRATIONS_TABLE || fileConfig.dbMigrationsTable || "",
+      "__drizzle_migrations"
+    ),
     tenantConfigPath,
     adminUsername: (
       process.env.REPORT_SYSTEM_ADMIN_USERNAME ||

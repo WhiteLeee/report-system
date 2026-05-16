@@ -13,11 +13,11 @@ import type {
   HuiYunYingRectificationOrderItem
 } from "@/backend/integrations/huiyunying/huiyunying.types";
 
-function joinUrl(baseUri: string, path: string): string {
+function joinUrl(baseUri: string, path: string): any {
   return new URL(path.replace(/^\//, ""), `${baseUri.replace(/\/+$/, "")}/`).toString();
 }
 
-function safeParseJsonObject(rawBody: string): Record<string, unknown> {
+function safeParseJsonObject(rawBody: string): any {
   if (!rawBody) {
     return {};
   }
@@ -32,15 +32,15 @@ function safeParseJsonObject(rawBody: string): Record<string, unknown> {
   return {};
 }
 
-function isBusinessSuccessStatus(status: unknown): boolean {
+function isBusinessSuccessStatus(status: unknown): any {
   return status === undefined || status === null || status === 0 || status === "0" || status === 200 || status === "200";
 }
 
-function readBusinessMessage(payload: Record<string, unknown>): string {
+function readBusinessMessage(payload: Record<string, unknown>): any {
   return String(payload.message || payload.error_msg || payload.error || "").trim();
 }
 
-function isAbortError(error: unknown): boolean {
+function isAbortError(error: unknown): any {
   return error instanceof Error && error.name === "AbortError";
 }
 
@@ -54,7 +54,7 @@ export class HuiYunYingClient {
     this.rateLimiter = new HuiYunYingRateLimiter(settings.rateLimitCount, settings.rateLimitWindowMs);
   }
 
-  ensureConfigured(): void {
+  ensureConfigured(): any {
     if (!this.settings.baseUri || !this.settings.appid || !this.settings.secret) {
       throw new Error("慧运营 API 配置不完整。");
     }
@@ -66,7 +66,7 @@ export class HuiYunYingClient {
     token: string,
     body: unknown,
     extraHeaders: Record<string, string> = {}
-  ): Promise<Response> {
+  ): Promise<any> {
     const url = `${joinUrl(this.settings.baseUri, path)}?version=1`;
     const headers = {
       "content-type": "application/json",
@@ -116,8 +116,8 @@ export class HuiYunYingClient {
   private async executeWithTokenRetry<T>(
     send: (token: string) => Promise<Response>,
     parse: (response: Response) => Promise<T>
-  ): Promise<T> {
-    const attempt = async (forceRefresh = false): Promise<Response> => {
+  ): Promise<any> {
+    const attempt = async (forceRefresh = false): Promise<any> => {
       const token = await this.authService.getToken(forceRefresh);
       return send(token);
     };
@@ -130,14 +130,14 @@ export class HuiYunYingClient {
     return parse(response);
   }
 
-  async createRectificationOrder(input: HuiYunYingCreateRectificationInput): Promise<unknown> {
+  async createRectificationOrder(input: HuiYunYingCreateRectificationInput): Promise<any> {
     this.ensureConfigured();
     return this.executeWithTokenRetry(
-      async (token) => {
+      async (token): Promise<any> => {
         await this.rateLimiter.acquire();
         return this.sendJsonRequest("rectification.create", this.settings.rectificationCreateRoute, token, input);
       },
-      async (response) => {
+      async (response): Promise<any> => {
         const url = `${joinUrl(this.settings.baseUri, this.settings.rectificationCreateRoute)}?version=1`;
         const rawBody = (await response.text().catch(() => "")).trim();
         logHuiYunYingResponse({
@@ -182,16 +182,16 @@ export class HuiYunYingClient {
     );
   }
 
-  async listRectificationOrders(input: HuiYunYingListRectificationInput): Promise<HuiYunYingRectificationOrderItem[]> {
+  async listRectificationOrders(input: HuiYunYingListRectificationInput): Promise<any> {
     this.ensureConfigured();
     return this.executeWithTokenRetry(
-      async (token) => {
+      async (token): Promise<any> => {
         await this.rateLimiter.acquire();
         return this.sendJsonRequest("rectification.list", this.settings.rectificationListRoute, token, input, {
           ent: this.settings.appid
         });
       },
-      async (response) => {
+      async (response): Promise<any> => {
         const url = `${joinUrl(this.settings.baseUri, this.settings.rectificationListRoute)}?version=1`;
         const rawBody = (await response.text().catch(() => "")).trim();
         logHuiYunYingResponse({

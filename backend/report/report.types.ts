@@ -213,6 +213,21 @@ export interface ReportFilters {
   endDate?: string;
 }
 
+export interface ReportListPage {
+  page: number;
+  page_size: number;
+  total: number;
+  items: ReportSummary[];
+}
+
+export interface ReportListOverview {
+  total_reports: number;
+  pending_reports: number;
+  total_issues: number;
+  total_images: number;
+  report_types: string[];
+}
+
 export interface ReportSummary extends ReviewProgressSummary {
   id: number;
   publish_id: string;
@@ -272,6 +287,8 @@ export interface ReportResult {
   review_disposition: ReviewDisposition | string;
   review_payload: JsonValue;
   metadata: JsonValue;
+  semantic_state?: "issue_found" | "pass" | "inconclusive" | "inspection_failed";
+  semantic_issue_count?: number;
   display_order: number;
   created_at: string;
 }
@@ -321,6 +338,18 @@ export interface ReportDetail extends ReportSummary {
   issues: ReportIssue[];
   inspections: ReportInspection[];
   review_logs: ReportReviewLog[];
+  semantic_counts?: {
+    issue_found: number;
+    pass: number;
+    inconclusive: number;
+    inspection_failed: number;
+  };
+  filtered_result_count?: number;
+  filtered_pending_result_count?: number;
+  filtered_reviewed_result_count?: number;
+  current_page?: number;
+  page_size?: number;
+  total_pages?: number;
   raw_payload: ReportPublishPayload;
 }
 

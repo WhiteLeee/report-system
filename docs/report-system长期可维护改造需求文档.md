@@ -116,7 +116,7 @@
    - `listReports`
    - `getReportDetail`
 5. 提供 SQLite 版本 repository 实现
-6. 页面和 API 不能直接依赖 `better-sqlite3`
+6. 页面和 API 不能直接依赖具体数据库驱动实现（应走仓储抽象）
 
 验收标准：
 

@@ -13,19 +13,19 @@ import type {
 export class MasterDataService {
   constructor(private readonly repository: MasterDataRepository) {}
 
-  publishSnapshot(payload: MasterDataPublishPayload, context: RequestContext = {}): MasterDataPublishReceipt {
+  publishSnapshot(payload: MasterDataPublishPayload, context: RequestContext = {}): any {
     return this.repository.publishSnapshot(payload, context);
   }
 
-  listEnterprises(context: RequestContext = {}): MasterDataEnterpriseSummary[] {
+  listEnterprises(context: RequestContext = {}): any {
     return this.repository.listEnterprises(context);
   }
 
-  listOrganizations(enterpriseId: string, context: RequestContext = {}): MasterDataOrganization[] {
+  listOrganizations(enterpriseId: string, context: RequestContext = {}): any {
     return this.repository.listOrganizations(enterpriseId.trim(), context);
   }
 
-  listStores(filters: MasterDataStoreFilters, context: RequestContext = {}): MasterDataStore[] {
+  listStores(filters: MasterDataStoreFilters, context: RequestContext = {}): any {
     return this.repository.listStores(
       {
         enterpriseId: filters.enterpriseId.trim(),
@@ -37,7 +37,7 @@ export class MasterDataService {
     );
   }
 
-  listSyncLogs(enterpriseId: string, limit = 10, context: RequestContext = {}): MasterDataSyncLog[] {
+  listSyncLogs(enterpriseId: string, limit = 10, context: RequestContext = {}): any {
     return this.repository.listSyncLogs(enterpriseId.trim(), limit, context);
   }
 }

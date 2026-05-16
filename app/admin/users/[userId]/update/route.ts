@@ -9,21 +9,21 @@ import { assertTargetUserManageable, filterVisibleUsers, getCurrentDeliveryMode 
 
 const authService = createAuthService();
 
-function roleCodeFromForm(value: string): RoleCode | null {
+function roleCodeFromForm(value: string): any {
   if (value === "manage" || value === "reviewer" || value === "viewer") {
     return value;
   }
   return null;
 }
 
-function readScopeList(formData: FormData, fieldName: string): string[] {
+function readScopeList(formData: FormData, fieldName: string): any {
   return formData
     .getAll(fieldName)
     .map((item) => String(item || "").trim())
     .filter(Boolean);
 }
 
-function redirectToUsers(request: Request, errorMessage?: string): Response {
+function redirectToUsers(request: Request, errorMessage?: string): any {
   const url = buildRequestUrl(request, "/admin/users");
   if (errorMessage) {
     url.searchParams.set("error", encodeURIComponent(errorMessage));
@@ -34,8 +34,8 @@ function redirectToUsers(request: Request, errorMessage?: string): Response {
 export async function POST(
   request: Request,
   context: { params: Promise<{ userId: string }> }
-): Promise<Response> {
-  const currentUser = getSessionUserFromRequest(request);
+): Promise<any> {
+  const currentUser = await getSessionUserFromRequest(request);
   const canWriteUsers = hasPermission(currentUser, "user:write");
   const canWriteRoles = hasPermission(currentUser, "role:write");
   const canWriteScopes = hasPermission(currentUser, "scope:write");
@@ -45,7 +45,7 @@ export async function POST(
 
   const auditMeta = readAuditRequestMeta(request);
   const auditActor = toAuditActor(currentUser);
-  const deliveryMode = getCurrentDeliveryMode();
+  const deliveryMode = await getCurrentDeliveryMode();
 
   const { userId } = await context.params;
   const numericUserId = Number(userId);
@@ -56,7 +56,7 @@ export async function POST(
   const formData = await request.formData().catch(() => new FormData());
   try {
     const beforeUser = assertTargetUserManageable(
-      filterVisibleUsers(authService.listUsers(), deliveryMode, currentUser).find((user) => user.id === numericUserId),
+      filterVisibleUsers(await authService.listUsers(), deliveryMode, currentUser).find((user) => user.id === numericUserId),
       deliveryMode,
       currentUser
     );
@@ -69,7 +69,7 @@ export async function POST(
     const normalizedStatus = nextStatus === "active" || nextStatus === "disabled" ? nextStatus : undefined;
     const nextPassword = canWriteUsers ? String(formData.get("password") || "").trim() : "";
 
-    authService.updateUserProfile({
+    await authService.updateUserProfile({
       userId: numericUserId,
       roleCode: roleCode && roleCode !== beforeUser.roles[0] ? roleCode : undefined,
       status: normalizedStatus && normalizedStatus !== beforeUser.status ? normalizedStatus : undefined,
@@ -85,11 +85,11 @@ export async function POST(
     });
 
     const afterUser = assertTargetUserManageable(
-      filterVisibleUsers(authService.listUsers(), deliveryMode, currentUser).find((user) => user.id === numericUserId),
+      filterVisibleUsers(await authService.listUsers(), deliveryMode, currentUser).find((user) => user.id === numericUserId),
       deliveryMode,
       currentUser
     );
-    authService.createAuditLog({
+    await authService.createAuditLog({
       ...auditActor,
       targetUserId: afterUser.id,
       targetUsername: afterUser.username,

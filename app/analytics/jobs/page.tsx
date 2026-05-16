@@ -18,7 +18,7 @@ const analyticsJobRepository = createAnalyticsJobRepository();
 const analyticsJobService = createAnalyticsJobService();
 const systemSettingsService = createSystemSettingsService();
 
-function jobTypeLabel(jobType: string): string {
+function jobTypeLabel(jobType: string): any {
   if (jobType === "result_fact_rebuild") {
     return "分析事实刷新";
   }
@@ -28,7 +28,7 @@ function jobTypeLabel(jobType: string): string {
   return jobType;
 }
 
-function healthStatusLabel(status: string): string {
+function healthStatusLabel(status: string): any {
   if (status === "healthy") {
     return "健康";
   }
@@ -47,7 +47,7 @@ function healthStatusLabel(status: string): string {
   return status;
 }
 
-function runStatusLabel(status: string): string {
+function runStatusLabel(status: string): any {
   if (status === "running") {
     return "执行中";
   }
@@ -60,7 +60,7 @@ function runStatusLabel(status: string): string {
   return status;
 }
 
-function metricLabel(key: string): string {
+function metricLabel(key: string): any {
   const dict: Record<string, string> = {
     result_count: "结果数",
     issue_count: "问题数",
@@ -76,7 +76,7 @@ function metricLabel(key: string): string {
   return dict[key] || key;
 }
 
-function statusTone(status: string): "default" | "secondary" | "outline" {
+function statusTone(status: string): any {
   if (status === "completed") {
     return "secondary";
   }
@@ -86,7 +86,7 @@ function statusTone(status: string): "default" | "secondary" | "outline" {
   return "default";
 }
 
-function pipelineTone(status: string): "default" | "secondary" | "outline" {
+function pipelineTone(status: string): any {
   if (status === "healthy") {
     return "secondary";
   }
@@ -96,13 +96,13 @@ function pipelineTone(status: string): "default" | "secondary" | "outline" {
   return "outline";
 }
 
-export default async function AnalyticsJobsPage() {
+export default async function AnalyticsJobsPage(): Promise<any> {
   const currentUser = await requirePermission("analytics:job:manage", "/analytics/jobs");
 
-  const runs = analyticsJobRepository.listRuns(30);
-  const checkpoints = analyticsJobRepository.listCheckpoints();
-  const settings = systemSettingsService.getHuiYunYingApiSettings();
-  const healthItems = analyticsJobService.getHealthSummary({
+  const runs = await analyticsJobRepository.listRuns(30);
+  const checkpoints = await analyticsJobRepository.listCheckpoints();
+  const settings = await systemSettingsService.getHuiYunYingApiSettings();
+  const healthItems = await analyticsJobService.getHealthSummary({
     result_fact_rebuild: settings.analyticsFactRefreshIntervalMs,
     daily_snapshot_rebuild: settings.analyticsSnapshotRefreshIntervalMs
   });

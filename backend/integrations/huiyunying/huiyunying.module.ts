@@ -4,8 +4,8 @@ import { resolveHuiYunYingSettings } from "@/backend/integrations/huiyunying/hui
 import { HuiYunYingRectificationService } from "@/backend/integrations/huiyunying/huiyunying-rectification.service";
 import { createSystemSettingsService } from "@/backend/system-settings/system-settings.module";
 
-export function createHuiYunYingRectificationService(): HuiYunYingRectificationService {
-  const settings = createSystemSettingsService().getHuiYunYingApiSettings();
+export async function createHuiYunYingRectificationService(): Promise<any> {
+  const settings = await createSystemSettingsService().getHuiYunYingApiSettings();
   const resolvedSettings = resolveHuiYunYingSettings(settings);
   const authService = new HuiYunYingAuthService(resolvedSettings);
   return new HuiYunYingRectificationService(new HuiYunYingClient(resolvedSettings, authService));

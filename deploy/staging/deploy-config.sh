@@ -13,7 +13,9 @@ export HEALTHCHECK_URL="http://127.0.0.1:${APP_PORT}/login"
 export HEALTHCHECK_TIMEOUT_SEC="10"
 
 export DATA_DIR="/var/lib/report-system/staging"
-export DB_PATH="${DATA_DIR}/report-system.sqlite"
+export DB_URL="${DB_URL:-postgres://report:CHANGE_ME@127.0.0.1:5432/report_system_staging}"
+export DB_MIGRATIONS_SCHEMA="${DB_MIGRATIONS_SCHEMA:-public}"
+export DB_MIGRATIONS_TABLE="${DB_MIGRATIONS_TABLE:-__drizzle_migrations}"
 export BACKUP_DIR="/var/backups/report-system/staging"
 export BACKUP_RETENTION_DAYS="14"
 

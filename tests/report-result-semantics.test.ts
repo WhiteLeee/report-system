@@ -8,7 +8,7 @@ import {
   getReportResultSemanticSummaryLabel
 } from "../ui/report/report-result-semantics";
 
-function createInspection(overrides: Partial<ReportInspection> = {}): ReportInspection {
+function createInspection(overrides: Partial<ReportInspection> = {}): any {
   return {
     id: 1,
     report_id: 1,
@@ -28,7 +28,7 @@ function createInspection(overrides: Partial<ReportInspection> = {}): ReportInsp
   };
 }
 
-function createIssue(overrides: Partial<ReportIssue> = {}): ReportIssue {
+function createIssue(overrides: Partial<ReportIssue> = {}): any {
   return {
     id: 1,
     report_id: 1,

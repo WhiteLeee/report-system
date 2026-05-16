@@ -7,8 +7,12 @@ const config = getReportSystemConfig();
 export default defineConfig({
   schema: "./backend/database/schema.ts",
   out: "./drizzle",
-  dialect: "sqlite",
+  dialect: "postgresql",
+  migrations: {
+    table: config.dbMigrationsTable,
+    schema: config.dbMigrationsSchema
+  },
   dbCredentials: {
-    url: config.dbPath
+    url: config.dbUrl
   }
 });

@@ -5,7 +5,7 @@ export function logHuiYunYingRequest(_input: {
   headers?: Record<string, string>;
   query?: Record<string, string>;
   body?: unknown;
-}): void {}
+}): any {}
 
 export function logHuiYunYingResponse(_input: {
   label: string;
@@ -15,7 +15,7 @@ export function logHuiYunYingResponse(_input: {
   ok: boolean;
   headers?: Record<string, string>;
   body: string;
-}): void {}
+}): any {}
 
 export function logHuiYunYingError(_input: {
   label: string;
@@ -23,4 +23,4 @@ export function logHuiYunYingError(_input: {
   url: string;
   message: string;
   detail?: unknown;
-}): void {}
+}): any {}

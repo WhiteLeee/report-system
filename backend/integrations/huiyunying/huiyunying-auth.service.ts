@@ -18,25 +18,25 @@ declare global {
 const TOKEN_TTL_MS = 22 * 60 * 60 * 1000;
 const TOKEN_REFRESH_BUFFER_MS = 3 * 60 * 1000;
 
-function joinUrl(baseUri: string, path: string): string {
+function joinUrl(baseUri: string, path: string): any {
   return new URL(path.replace(/^\//, ""), `${baseUri.replace(/\/+$/, "")}/`).toString();
 }
 
-function getTokenCache(): Map<string, HuiYunYingTokenCacheEntry> {
+function getTokenCache(): any {
   if (!globalThis.__reportSystemHuiYunYingTokenCache) {
     globalThis.__reportSystemHuiYunYingTokenCache = new Map<string, HuiYunYingTokenCacheEntry>();
   }
   return globalThis.__reportSystemHuiYunYingTokenCache;
 }
 
-function buildCacheKey(settings: HuiYunYingResolvedSettings): string {
+function buildCacheKey(settings: HuiYunYingResolvedSettings): any {
   return [settings.baseUri, settings.appid, settings.secret].join("|");
 }
 
 function parseTokenFromPayload(
   rawBody: string,
   payload: HuiYunYingSignResponse | null
-): { token: string; errorMessage: string } {
+): any {
   const plainTextToken = rawBody.startsWith("{") ? "" : rawBody;
   const structuredToken = String(payload?.token || payload?.data?.token || "").trim();
   const token = structuredToken || plainTextToken;
@@ -58,13 +58,13 @@ export class HuiYunYingAuthService {
     this.rateLimiter = new HuiYunYingRateLimiter(settings.rateLimitCount, settings.rateLimitWindowMs);
   }
 
-  ensureConfigured(): void {
+  ensureConfigured(): any {
     if (!this.settings.baseUri || !this.settings.appid || !this.settings.secret) {
       throw new Error("慧运营 API 配置不完整。");
     }
   }
 
-  isTokenValid(): boolean {
+  isTokenValid(): any {
     const cached = getTokenCache().get(buildCacheKey(this.settings));
     if (!cached?.token) {
       return false;
@@ -72,11 +72,11 @@ export class HuiYunYingAuthService {
     return cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS;
   }
 
-  invalidateToken(): void {
+  invalidateToken(): any {
     getTokenCache().delete(buildCacheKey(this.settings));
   }
 
-  async getToken(forceRefresh = false): Promise<string> {
+  async getToken(forceRefresh = false): Promise<any> {
     this.ensureConfigured();
     const cacheKey = buildCacheKey(this.settings);
     const cached = getTokenCache().get(cacheKey);

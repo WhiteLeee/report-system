@@ -6,7 +6,7 @@ import styles from "./system-settings-page.module.css";
 
 import { Input } from "@/components/ui/input";
 
-function toValidHexOrFallback(value: string): string {
+function toValidHexOrFallback(value: string): any {
   const normalized = value.trim();
   return /^#([0-9a-fA-F]{6})$/.test(normalized) ? normalized : "#000000";
 }

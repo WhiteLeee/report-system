@@ -14,6 +14,7 @@ import {
 import type { AnalyticsFilters } from "@/backend/analytics/contracts/analytics.filters";
 import type {
   AnalyticsDashboard,
+  AnalyticsDashboardPageData,
   AnalyticsFilterOption,
   AnalyticsFilterOptions,
   AnalyticsStoreFilterOption
@@ -65,7 +66,7 @@ type LoadedSnapshotDataset = {
   semanticRows: AnalyticsDailySemanticSnapshotRow[];
 };
 
-function safeParseRecord(json: string): Record<string, unknown> {
+function safeParseRecord(json: string ): any {
   try {
     const parsed = JSON.parse(json) as unknown;
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
@@ -74,20 +75,20 @@ function safeParseRecord(json: string): Record<string, unknown> {
   }
 }
 
-function readString(record: Record<string, unknown>, key: string): string {
+function readString(record: Record<string, unknown>, key: string ): any {
   const value = record[key];
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeDateBoundaryStart(value: string): string {
+function normalizeDateBoundaryStart(value: string ): any {
   return `${value} 00:00:00`;
 }
 
-function normalizeDateBoundaryEnd(value: string): string {
+function normalizeDateBoundaryEnd(value: string ): any {
   return `${value} 23:59:59`;
 }
 
-function normalizeSeverityLabel(severity: string): { key: string; label: string; priority: number } {
+function normalizeSeverityLabel(severity: string ): any {
   const normalized = String(severity || "").trim().toLowerCase();
   switch (normalized) {
     case "critical":
@@ -103,7 +104,7 @@ function normalizeSeverityLabel(severity: string): { key: string; label: string;
   }
 }
 
-function computeDurationDays(start: string | null | undefined, end: string | null | undefined): number {
+function computeDurationDays(start: string | null | undefined, end: string | null | undefined ): any {
   const startTs = Date.parse(String(start || ""));
   const endTs = Date.parse(String(end || ""));
   if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs < startTs) {
@@ -112,11 +113,11 @@ function computeDurationDays(start: string | null | undefined, end: string | nul
   return (endTs - startTs) / 86400000;
 }
 
-function canUseDailySnapshots(filters: AnalyticsFilters): boolean {
+function canUseDailySnapshots(filters: AnalyticsFilters ): any {
   return !filters.organizationId && !filters.franchiseeName && !filters.storeId && !filters.reportType && !filters.topic && !filters.planId;
 }
 
-function sortOptions<T extends AnalyticsFilterOption>(items: T[]): T[] {
+function sortOptions<T extends AnalyticsFilterOption>(items: T[] ): any {
   return items.sort(
     (left, right) =>
       left.label.localeCompare(right.label, "zh-Hans-CN") ||
@@ -127,7 +128,7 @@ function sortOptions<T extends AnalyticsFilterOption>(items: T[]): T[] {
 function buildFilterOptions(
   reportRows: AnalyticsReportRow[],
   resultRows: AnalyticsResultFactRow[]
-): AnalyticsFilterOptions {
+ ): any {
   const reportTypeMap = new Map<string, AnalyticsFilterOption>();
   const topicMap = new Map<string, AnalyticsFilterOption>();
   const planMap = new Map<string, AnalyticsFilterOption>();
@@ -190,9 +191,28 @@ function buildFilterOptions(
   };
 }
 
+function deriveFilterOptionRows(
+  dataset: LoadedAnalyticsDataset,
+  filters: Pick<AnalyticsFilters, "organizationId" | "storeId" | "franchiseeName">
+): { reportRows: AnalyticsReportRow[]; resultRows: AnalyticsResultFactRow[] } {
+  const filteredResultRows = dataset.resultFactRows
+    .filter((row) => !filters.franchiseeName || row.franchiseeName === filters.franchiseeName)
+    .filter((row) => !filters.organizationId || row.organizationCode === filters.organizationId)
+    .filter((row) => !filters.storeId || row.storeId === filters.storeId);
+
+  if (filteredResultRows.length === 0) {
+    return { reportRows: [], resultRows: [] };
+  }
+  const visibleReportIds = new Set(filteredResultRows.map((row) => row.reportId));
+  return {
+    reportRows: dataset.reportRows.filter((row) => visibleReportIds.has(row.id)),
+    resultRows: filteredResultRows
+  };
+}
+
 function buildSemanticDistribution(
   resultRows: AnalyticsResultFactRow[]
-): AnalyticsSemanticDistributionItem[] {
+ ): any {
   const stats = new Map<ReportResultSemanticState, { count: number; issueCount: number }>();
   resultRows.forEach((row) => {
     const state = row.resultSemanticState as ReportResultSemanticState;
@@ -213,7 +233,7 @@ function buildSemanticDistribution(
 
 function buildSemanticDistributionFromSnapshots(
   snapshotRows: AnalyticsDailySemanticSnapshotRow[]
-): AnalyticsSemanticDistributionItem[] {
+ ): any {
   const stats = new Map<ReportResultSemanticState, { count: number; issueCount: number }>();
   snapshotRows.forEach((row) => {
     const state = row.resultSemanticState as ReportResultSemanticState;
@@ -237,7 +257,7 @@ function buildOverview(
   resultRows: AnalyticsResultFactRow[],
   issueRows: AnalyticsIssueFactRow[],
   rectificationRows: AnalyticsRectificationFactRow[]
-): AnalyticsOverviewMetrics {
+ ): any {
   const completedReviewCount = resultRows.filter((row) => row.reviewState === "completed").length;
   const autoCompletedReviewCount = resultRows.filter((row) => row.reviewState === "completed" && row.autoCompleted === 1).length;
   const rectificationCompletedCount = rectificationRows.filter(
@@ -264,7 +284,7 @@ function buildOverview(
   };
 }
 
-function buildOverviewFromSnapshots(rows: AnalyticsDailyOverviewSnapshotRow[]): AnalyticsOverviewMetrics {
+function buildOverviewFromSnapshots(rows: AnalyticsDailyOverviewSnapshotRow[] ): any {
   const totals = rows.reduce(
     (acc, row) => {
       acc.report_count += row.reportCount;
@@ -306,7 +326,7 @@ function buildOverviewFromSnapshots(rows: AnalyticsDailyOverviewSnapshotRow[]): 
   };
 }
 
-function buildRectificationOverview(rectificationRows: AnalyticsRectificationFactRow[]): AnalyticsRectificationOverviewMetrics {
+function buildRectificationOverview(rectificationRows: AnalyticsRectificationFactRow[] ): any {
   const completedCount = rectificationRows.filter((row) => normalizeRemoteIfCorrected(row.remoteIfCorrected) === "1").length;
   const syncFailedCount = rectificationRows.filter((row) => row.syncFailed === 1).length;
   const overdueCount = rectificationRows.filter((row) => row.overdue === 1).length;
@@ -330,7 +350,7 @@ function buildRectificationOverview(rectificationRows: AnalyticsRectificationFac
   };
 }
 
-function buildReviewEfficiency(reviewRows: AnalyticsReviewFactRow[]): AnalyticsReviewEfficiencyMetrics {
+function buildReviewEfficiency(reviewRows: AnalyticsReviewFactRow[] ): any {
   const manualCompletedRows = reviewRows.filter((row) => row.reviewAction === "complete");
   const reopenedRows = reviewRows.filter((row) => row.reviewAction === "reopen");
   const operatorCount = new Set(
@@ -350,7 +370,7 @@ function buildReviewEfficiency(reviewRows: AnalyticsReviewFactRow[]): AnalyticsR
   };
 }
 
-function buildReviewStatusDistribution(resultRows: AnalyticsResultFactRow[]): AnalyticsReviewStatusDistributionItem[] {
+function buildReviewStatusDistribution(resultRows: AnalyticsResultFactRow[] ): any {
   const pendingCount = resultRows.filter((row) => row.reviewState !== "completed").length;
   const autoCompletedCount = resultRows.filter((row) => row.reviewState === "completed" && row.autoCompleted === 1).length;
   const manualCompletedCount = resultRows.filter((row) => row.reviewState === "completed" && row.autoCompleted !== 1).length;
@@ -362,7 +382,7 @@ function buildReviewStatusDistribution(resultRows: AnalyticsResultFactRow[]): An
   ];
 }
 
-function buildIssueTypeRanking(issueRows: AnalyticsIssueFactRow[], limit: number): AnalyticsIssueTypeRankingItem[] {
+function buildIssueTypeRanking(issueRows: AnalyticsIssueFactRow[], limit: number ): any {
   const stats = new Map<string, { count: number; storeIds: Set<string>; resultIds: Set<number> }>();
   issueRows.forEach((row) => {
     const key = String(row.issueType || row.title || "未分类问题").trim() || "未分类问题";
@@ -388,7 +408,7 @@ function buildIssueTypeRanking(issueRows: AnalyticsIssueFactRow[], limit: number
     .slice(0, Math.max(1, limit));
 }
 
-function buildSkillDistribution(issueRows: AnalyticsIssueFactRow[], limit: number): AnalyticsSkillDistributionItem[] {
+function buildSkillDistribution(issueRows: AnalyticsIssueFactRow[], limit: number ): any {
   const stats = new Map<string, { skillId: string; skillName: string; count: number; storeIds: Set<string>; resultIds: Set<number> }>();
 
   issueRows.forEach((row) => {
@@ -429,7 +449,7 @@ function buildSkillDistribution(issueRows: AnalyticsIssueFactRow[], limit: numbe
     .slice(0, Math.max(1, limit));
 }
 
-function buildSeverityDistribution(issueRows: AnalyticsIssueFactRow[]): AnalyticsSeverityDistributionItem[] {
+function buildSeverityDistribution(issueRows: AnalyticsIssueFactRow[] ): any {
   const stats = new Map<string, { key: string; label: string; priority: number; count: number; storeIds: Set<string>; resultIds: Set<number> }>();
 
   issueRows.forEach((row) => {
@@ -472,7 +492,7 @@ function buildDailyTrendFromFacts(
   resultRows: AnalyticsResultFactRow[],
   rectificationRows: AnalyticsRectificationFactRow[],
   limit: number
-): AnalyticsDailyTrendItem[] {
+ ): any {
   const reportIdsByDate = new Map<string, Set<number>>();
   const storeIdsByDate = new Map<string, Set<string>>();
   const rectificationRowsByDate = new Map<string, AnalyticsRectificationFactRow[]>();
@@ -560,7 +580,7 @@ function buildDailyTrendFromFacts(
 function buildDailyTrendFromSnapshots(
   rows: AnalyticsDailyOverviewSnapshotRow[],
   limit: number
-): AnalyticsDailyTrendItem[] {
+ ): any {
   const grouped = new Map<string, AnalyticsDailyTrendItem>();
   rows.forEach((row) => {
     const bucket =
@@ -601,7 +621,7 @@ function buildOrganizationRanking(
   resultRows: AnalyticsResultFactRow[],
   issueRows: AnalyticsIssueFactRow[],
   limit: number
-): AnalyticsOrganizationRankingItem[] {
+ ): any {
   const stats = new Map<
     string,
     {
@@ -685,7 +705,7 @@ function buildFranchiseeRanking(
   resultRows: AnalyticsResultFactRow[],
   issueRows: AnalyticsIssueFactRow[],
   limit: number
-): AnalyticsFranchiseeRankingItem[] {
+ ): any {
   const stats = new Map<
     string,
     {
@@ -763,7 +783,7 @@ function buildFranchiseeCloseRateRanking(
   resultRows: AnalyticsResultFactRow[],
   rectificationRows: AnalyticsRectificationFactRow[],
   limit: number
-): AnalyticsFranchiseeCloseRateItem[] {
+ ): any {
   const stats = new Map<
     string,
     {
@@ -823,7 +843,7 @@ function buildOrganizationGovernanceRanking(
   resultRows: AnalyticsResultFactRow[],
   rectificationRows: AnalyticsRectificationFactRow[],
   limit: number
-): AnalyticsOrganizationGovernanceItem[] {
+ ): any {
   const stats = new Map<
     string,
     {
@@ -925,7 +945,7 @@ function buildHighRiskFranchisees(
   issueRows: AnalyticsIssueFactRow[],
   rectificationRows: AnalyticsRectificationFactRow[],
   limit: number
-): AnalyticsHighRiskFranchiseeItem[] {
+ ): any {
   const stats = new Map<
     string,
     {
@@ -1011,7 +1031,7 @@ function buildHighRiskFranchisees(
 function buildRecurringStores(
   resultRows: AnalyticsResultFactRow[],
   limit: number
-): AnalyticsRecurringStoreItem[] {
+ ): any {
   const stats = new Map<
     string,
     {
@@ -1082,7 +1102,7 @@ function buildRecurringFranchisees(
   resultRows: AnalyticsResultFactRow[],
   rectificationRows: AnalyticsRectificationFactRow[],
   limit: number
-): AnalyticsRecurringFranchiseeItem[] {
+ ): any {
   const recurringStores = buildRecurringStores(resultRows, Number.MAX_SAFE_INTEGER);
   const overdueByFranchisee = new Map<string, number>();
 
@@ -1148,7 +1168,7 @@ function buildStoreRanking(
   resultRows: AnalyticsResultFactRow[],
   issueRows: AnalyticsIssueFactRow[],
   limit: number
-): AnalyticsStoreRankingItem[] {
+ ): any {
   const stats = new Map<
     string,
     {
@@ -1239,7 +1259,7 @@ function buildStoreRanking(
 function buildRectificationOverdueRanking(
   rectificationRows: AnalyticsRectificationFactRow[],
   limit: number
-): AnalyticsRectificationOverdueRankingItem[] {
+ ): any {
   const stats = new Map<
     string,
     {
@@ -1301,7 +1321,7 @@ function buildRectificationOverdueRanking(
 function buildOverdueFranchisees(
   rectificationRows: AnalyticsRectificationFactRow[],
   limit: number
-): AnalyticsOverdueFranchiseeItem[] {
+ ): any {
   const stats = new Map<
     string,
     {
@@ -1358,8 +1378,8 @@ function buildOverdueFranchisees(
     .slice(0, Math.max(1, limit));
 }
 
-export class SqliteAnalyticsRepository implements AnalyticsRepository {
-  private loadSnapshotDataset(filters: AnalyticsFilters, context: RequestContext): LoadedSnapshotDataset {
+export class PgAnalyticsRepository implements AnalyticsRepository {
+  private async loadSnapshotDataset(filters: AnalyticsFilters, context: RequestContext): Promise<any> {
     if (!canUseDailySnapshots(filters)) {
       return {
         overviewRows: [],
@@ -1367,30 +1387,28 @@ export class SqliteAnalyticsRepository implements AnalyticsRepository {
       };
     }
 
-    const overviewRows = db
-      .select()
-      .from(analyticsDailyOverviewSnapshotTable)
-      .where(
-        and(
-          filters.startDate ? gte(analyticsDailyOverviewSnapshotTable.snapshotDate, filters.startDate) : undefined,
-          filters.endDate ? lte(analyticsDailyOverviewSnapshotTable.snapshotDate, filters.endDate) : undefined,
-          filters.enterpriseId ? eq(analyticsDailyOverviewSnapshotTable.sourceEnterpriseId, filters.enterpriseId) : undefined
-        )
-      )
-      .all()
+    const overviewRows = (await db
+          .select()
+          .from(analyticsDailyOverviewSnapshotTable)
+          .where(
+            and(
+              filters.startDate ? gte(analyticsDailyOverviewSnapshotTable.snapshotDate, filters.startDate) : undefined,
+              filters.endDate ? lte(analyticsDailyOverviewSnapshotTable.snapshotDate, filters.endDate) : undefined,
+              filters.enterpriseId ? eq(analyticsDailyOverviewSnapshotTable.sourceEnterpriseId, filters.enterpriseId) : undefined
+            )
+          ))
       .filter((row) => canAccessEnterprise(context, row.sourceEnterpriseId));
 
-    const semanticRows = db
-      .select()
-      .from(analyticsDailySemanticSnapshotTable)
-      .where(
-        and(
-          filters.startDate ? gte(analyticsDailySemanticSnapshotTable.snapshotDate, filters.startDate) : undefined,
-          filters.endDate ? lte(analyticsDailySemanticSnapshotTable.snapshotDate, filters.endDate) : undefined,
-          filters.enterpriseId ? eq(analyticsDailySemanticSnapshotTable.sourceEnterpriseId, filters.enterpriseId) : undefined
-        )
-      )
-      .all()
+    const semanticRows = (await db
+          .select()
+          .from(analyticsDailySemanticSnapshotTable)
+          .where(
+            and(
+              filters.startDate ? gte(analyticsDailySemanticSnapshotTable.snapshotDate, filters.startDate) : undefined,
+              filters.endDate ? lte(analyticsDailySemanticSnapshotTable.snapshotDate, filters.endDate) : undefined,
+              filters.enterpriseId ? eq(analyticsDailySemanticSnapshotTable.sourceEnterpriseId, filters.enterpriseId) : undefined
+            )
+          ))
       .filter((row) => canAccessEnterprise(context, row.sourceEnterpriseId));
 
     return {
@@ -1399,7 +1417,7 @@ export class SqliteAnalyticsRepository implements AnalyticsRepository {
     };
   }
 
-  private loadDataset(filters: AnalyticsFilters, context: RequestContext): LoadedAnalyticsDataset {
+  private async loadDataset(filters: AnalyticsFilters, context: RequestContext): Promise<any> {
     const reportWhere = [];
     if (filters.enterpriseId) {
       if (!canAccessEnterprise(context, filters.enterpriseId)) {
@@ -1423,11 +1441,10 @@ export class SqliteAnalyticsRepository implements AnalyticsRepository {
       reportWhere.push(lte(reportTable.publishedAt, normalizeDateBoundaryEnd(filters.endDate)));
     }
 
-    const rawReportRows = db
-      .select()
-      .from(reportTable)
-      .where(reportWhere.length > 0 ? and(...reportWhere) : undefined)
-      .all()
+    const rawReportRows = (await db
+          .select()
+          .from(reportTable)
+          .where(reportWhere.length > 0 ? and(...reportWhere) : undefined))
       .filter((row) => canAccessEnterprise(context, row.sourceEnterpriseId));
 
     const reportRows = rawReportRows.filter((row) => {
@@ -1452,8 +1469,8 @@ export class SqliteAnalyticsRepository implements AnalyticsRepository {
     }
 
     const reportIds = reportRows.map((row) => row.id);
-    const userScopedStoreIds = resolveScopedStoreIds(context, filters.enterpriseId);
-    const requestedScopedStoreIds = resolveStoreIdsFromScope(
+    const userScopedStoreIds = (await resolveScopedStoreIds(context, filters.enterpriseId)) as any;
+    const requestedScopedStoreIds = await resolveStoreIdsFromScope(
       {
         enterpriseScopeIds: filters.enterpriseId ? [filters.enterpriseId] : [],
         organizationScopeIds: filters.organizationId ? [filters.organizationId] : [],
@@ -1463,11 +1480,10 @@ export class SqliteAnalyticsRepository implements AnalyticsRepository {
     );
     const effectiveStoreIds = intersectScopedIds(userScopedStoreIds, requestedScopedStoreIds);
 
-    const resultFactRows = db
-      .select()
-      .from(analyticsResultFactTable)
-      .where(inArray(analyticsResultFactTable.reportId, reportIds))
-      .all()
+    const resultFactRows = (await db
+          .select()
+          .from(analyticsResultFactTable)
+          .where(inArray(analyticsResultFactTable.reportId, reportIds)))
       .filter((row) => (!effectiveStoreIds || (row.storeId ? effectiveStoreIds.includes(row.storeId) : false)))
       .filter((row) => !filters.franchiseeName || row.franchiseeName === filters.franchiseeName)
       .filter((row) => !filters.organizationId || row.organizationCode === filters.organizationId);
@@ -1483,31 +1499,28 @@ export class SqliteAnalyticsRepository implements AnalyticsRepository {
       };
     }
 
-    const issueFactRows = db
-      .select()
-      .from(analyticsIssueFactTable)
-      .where(inArray(analyticsIssueFactTable.reportId, visibleReportIds))
-      .all()
+    const issueFactRows = (await db
+          .select()
+          .from(analyticsIssueFactTable)
+          .where(inArray(analyticsIssueFactTable.reportId, visibleReportIds)))
       .filter((row) => (!effectiveStoreIds || (row.storeId ? effectiveStoreIds.includes(row.storeId) : false)))
       .filter((row) => !filters.franchiseeName || row.franchiseeName === filters.franchiseeName)
       .filter((row) => !filters.organizationId || row.organizationCode === filters.organizationId);
 
-    const reviewFactRows = db
-      .select()
-      .from(analyticsReviewFactTable)
-      .where(inArray(analyticsReviewFactTable.reportId, visibleReportIds))
-      .all()
+    const reviewFactRows = (await db
+          .select()
+          .from(analyticsReviewFactTable)
+          .where(inArray(analyticsReviewFactTable.reportId, visibleReportIds)))
       .filter((row) => (!effectiveStoreIds || (row.storeId ? effectiveStoreIds.includes(row.storeId) : false)))
       .filter((row) => !filters.franchiseeName || row.franchiseeName === filters.franchiseeName)
       .filter((row) => !filters.organizationId || row.organizationCode === filters.organizationId);
 
     const resultIds = resultFactRows.map((row) => row.resultId);
     const rectificationFactRows = resultIds.length
-      ? db
-          .select()
-          .from(analyticsRectificationFactTable)
-          .where(inArray(analyticsRectificationFactTable.resultId, resultIds))
-          .all()
+      ? (await db
+                  .select()
+                  .from(analyticsRectificationFactTable)
+                  .where(inArray(analyticsRectificationFactTable.resultId, resultIds)))
           .filter((row) => !filters.franchiseeName || row.franchiseeName === filters.franchiseeName)
           .filter((row) => !filters.organizationId || row.organizationCode === filters.organizationId)
       : [];
@@ -1521,153 +1534,153 @@ export class SqliteAnalyticsRepository implements AnalyticsRepository {
     };
   }
 
-  getOverview(filters: AnalyticsFilters, context: RequestContext): AnalyticsOverviewMetrics {
-    const dataset = this.loadDataset(filters, context);
+  async getOverview(filters: AnalyticsFilters, context: RequestContext): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildOverview(dataset.reportRows, dataset.resultFactRows, dataset.issueFactRows, dataset.rectificationFactRows);
   }
 
-  getResultSemanticDistribution(filters: AnalyticsFilters, context: RequestContext): AnalyticsSemanticDistributionItem[] {
-    const snapshotDataset = this.loadSnapshotDataset(filters, context);
+  async getResultSemanticDistribution(filters: AnalyticsFilters, context: RequestContext): Promise<any> {
+    const snapshotDataset: any = await this.loadSnapshotDataset(filters, context);
     if (snapshotDataset.semanticRows.length > 0) {
       return buildSemanticDistributionFromSnapshots(snapshotDataset.semanticRows);
     }
-    const dataset = this.loadDataset(filters, context);
+    const dataset: any = await this.loadDataset(filters, context);
     return buildSemanticDistribution(dataset.resultFactRows);
   }
 
-  getDailyTrend(filters: AnalyticsFilters, context: RequestContext, limit = 14): AnalyticsDailyTrendItem[] {
-    const snapshotDataset = this.loadSnapshotDataset(filters, context);
+  async getDailyTrend(filters: AnalyticsFilters, context: RequestContext, limit = 14): Promise<any> {
+    const snapshotDataset: any = await this.loadSnapshotDataset(filters, context);
     if (snapshotDataset.overviewRows.length > 0) {
       return buildDailyTrendFromSnapshots(snapshotDataset.overviewRows, limit);
     }
-    const dataset = this.loadDataset(filters, context);
+    const dataset: any = await this.loadDataset(filters, context);
     return buildDailyTrendFromFacts(dataset.reportRows, dataset.resultFactRows, dataset.rectificationFactRows, limit);
   }
 
-  getIssueTypeRanking(filters: AnalyticsFilters, context: RequestContext, limit = 10): AnalyticsIssueTypeRankingItem[] {
-    const dataset = this.loadDataset(filters, context);
+  async getIssueTypeRanking(filters: AnalyticsFilters, context: RequestContext, limit = 10): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildIssueTypeRanking(dataset.issueFactRows, limit);
   }
 
-  getSkillDistribution(filters: AnalyticsFilters, context: RequestContext, limit = 10): AnalyticsSkillDistributionItem[] {
-    const dataset = this.loadDataset(filters, context);
+  async getSkillDistribution(filters: AnalyticsFilters, context: RequestContext, limit = 10): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildSkillDistribution(dataset.issueFactRows, limit);
   }
 
-  getSeverityDistribution(filters: AnalyticsFilters, context: RequestContext): AnalyticsSeverityDistributionItem[] {
-    const dataset = this.loadDataset(filters, context);
+  async getSeverityDistribution(filters: AnalyticsFilters, context: RequestContext): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildSeverityDistribution(dataset.issueFactRows);
   }
 
-  getOrganizationRanking(
+  async getOrganizationRanking(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit = 10
-  ): AnalyticsOrganizationRankingItem[] {
-    const dataset = this.loadDataset(filters, context);
+   ): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildOrganizationRanking(dataset.resultFactRows, dataset.issueFactRows, limit);
   }
 
-  getOrganizationGovernanceRanking(
+  async getOrganizationGovernanceRanking(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit = 10
-  ): AnalyticsOrganizationGovernanceItem[] {
-    const dataset = this.loadDataset(filters, context);
+   ): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildOrganizationGovernanceRanking(dataset.resultFactRows, dataset.rectificationFactRows, limit);
   }
 
-  getFranchiseeRanking(
+  async getFranchiseeRanking(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit = 10
-  ): AnalyticsFranchiseeRankingItem[] {
-    const dataset = this.loadDataset(filters, context);
+   ): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildFranchiseeRanking(dataset.resultFactRows, dataset.issueFactRows, limit);
   }
 
-  getFranchiseeCloseRateRanking(
+  async getFranchiseeCloseRateRanking(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit = 10
-  ): AnalyticsFranchiseeCloseRateItem[] {
-    const dataset = this.loadDataset(filters, context);
+   ): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildFranchiseeCloseRateRanking(dataset.resultFactRows, dataset.rectificationFactRows, limit);
   }
 
-  getHighRiskFranchisees(
+  async getHighRiskFranchisees(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit = 10
-  ): AnalyticsHighRiskFranchiseeItem[] {
-    const dataset = this.loadDataset(filters, context);
+   ): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildHighRiskFranchisees(dataset.resultFactRows, dataset.issueFactRows, dataset.rectificationFactRows, limit);
   }
 
-  getRecurringStores(
+  async getRecurringStores(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit = 10
-  ): AnalyticsRecurringStoreItem[] {
-    const dataset = this.loadDataset(filters, context);
+   ): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildRecurringStores(dataset.resultFactRows, limit);
   }
 
-  getRecurringFranchisees(
+  async getRecurringFranchisees(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit = 10
-  ): AnalyticsRecurringFranchiseeItem[] {
-    const dataset = this.loadDataset(filters, context);
+   ): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildRecurringFranchisees(dataset.resultFactRows, dataset.rectificationFactRows, limit);
   }
 
-  getStoreRanking(filters: AnalyticsFilters, context: RequestContext, limit = 10): AnalyticsStoreRankingItem[] {
-    const dataset = this.loadDataset(filters, context);
+  async getStoreRanking(filters: AnalyticsFilters, context: RequestContext, limit = 10): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildStoreRanking(dataset.resultFactRows, dataset.issueFactRows, limit);
   }
 
-  getReviewEfficiency(filters: AnalyticsFilters, context: RequestContext): AnalyticsReviewEfficiencyMetrics {
-    const dataset = this.loadDataset(filters, context);
+  async getReviewEfficiency(filters: AnalyticsFilters, context: RequestContext): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildReviewEfficiency(dataset.reviewFactRows);
   }
 
-  getReviewStatusDistribution(filters: AnalyticsFilters, context: RequestContext): AnalyticsReviewStatusDistributionItem[] {
-    const dataset = this.loadDataset(filters, context);
+  async getReviewStatusDistribution(filters: AnalyticsFilters, context: RequestContext): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildReviewStatusDistribution(dataset.resultFactRows);
   }
 
-  getRectificationOverdueRanking(
+  async getRectificationOverdueRanking(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit = 10
-  ): AnalyticsRectificationOverdueRankingItem[] {
-    const dataset = this.loadDataset(filters, context);
+   ): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildRectificationOverdueRanking(dataset.rectificationFactRows, limit);
   }
 
-  getOverdueFranchisees(
+  async getOverdueFranchisees(
     filters: AnalyticsFilters,
     context: RequestContext,
     limit = 10
-  ): AnalyticsOverdueFranchiseeItem[] {
-    const dataset = this.loadDataset(filters, context);
+   ): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildOverdueFranchisees(dataset.rectificationFactRows, limit);
   }
 
-  getRectificationOverview(filters: AnalyticsFilters, context: RequestContext): AnalyticsRectificationOverviewMetrics {
-    const dataset = this.loadDataset(filters, context);
+  async getRectificationOverview(filters: AnalyticsFilters, context: RequestContext): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildRectificationOverview(dataset.rectificationFactRows);
   }
 
-  getFilterOptions(filters: AnalyticsFilters, context: RequestContext): AnalyticsFilterOptions {
-    const dataset = this.loadDataset(filters, context);
+  async getFilterOptions(filters: AnalyticsFilters, context: RequestContext): Promise<any> {
+    const dataset: any = await this.loadDataset(filters, context);
     return buildFilterOptions(dataset.reportRows, dataset.resultFactRows);
   }
 
-  getDashboard(filters: AnalyticsFilters, context: RequestContext, issueTypeLimit = 10): AnalyticsDashboard {
-    const snapshotDataset = this.loadSnapshotDataset(filters, context);
-    const dataset = this.loadDataset(filters, context);
+  async getDashboard(filters: AnalyticsFilters, context: RequestContext, issueTypeLimit = 10): Promise<any> {
+    const snapshotDataset: any = await this.loadSnapshotDataset(filters, context);
+    const dataset: any = await this.loadDataset(filters, context);
     return {
       overview: buildOverview(dataset.reportRows, dataset.resultFactRows, dataset.issueFactRows, dataset.rectificationFactRows),
       semantic_distribution:
@@ -1707,6 +1720,97 @@ export class SqliteAnalyticsRepository implements AnalyticsRepository {
       rectification_overdue_ranking: buildRectificationOverdueRanking(dataset.rectificationFactRows, 10),
       overdue_franchisees: buildOverdueFranchisees(dataset.rectificationFactRows, 10),
       rectification_overview: buildRectificationOverview(dataset.rectificationFactRows)
+    };
+  }
+
+  async getDashboardPageData(
+    filters: AnalyticsFilters,
+    context: RequestContext,
+    issueTypeLimit = 10
+  ): Promise<any> {
+    const normalizedIssueTypeLimit = Math.max(1, issueTypeLimit);
+    const [snapshotDataset, dashboardDataset, baseFilterDataset] = await Promise.all([
+      this.loadSnapshotDataset(filters, context),
+      this.loadDataset(filters, context),
+      this.loadDataset(
+        {
+          ...filters,
+          organizationId: "",
+          storeId: "",
+          topic: "",
+          planId: ""
+        },
+        context
+      )
+    ]);
+
+    const advancedFilterRows = deriveFilterOptionRows(baseFilterDataset, {
+      organizationId: filters.organizationId,
+      storeId: filters.storeId,
+      franchiseeName: filters.franchiseeName
+    });
+
+    return {
+      dashboard: {
+        overview: buildOverview(
+          dashboardDataset.reportRows,
+          dashboardDataset.resultFactRows,
+          dashboardDataset.issueFactRows,
+          dashboardDataset.rectificationFactRows
+        ),
+        semantic_distribution:
+          snapshotDataset.semanticRows.length > 0
+            ? buildSemanticDistributionFromSnapshots(snapshotDataset.semanticRows)
+            : buildSemanticDistribution(dashboardDataset.resultFactRows),
+        daily_trend:
+          snapshotDataset.overviewRows.length > 0
+            ? buildDailyTrendFromSnapshots(snapshotDataset.overviewRows, 14)
+            : buildDailyTrendFromFacts(
+                dashboardDataset.reportRows,
+                dashboardDataset.resultFactRows,
+                dashboardDataset.rectificationFactRows,
+                14
+              ),
+        issue_type_ranking: buildIssueTypeRanking(dashboardDataset.issueFactRows, normalizedIssueTypeLimit),
+        skill_distribution: buildSkillDistribution(dashboardDataset.issueFactRows, normalizedIssueTypeLimit),
+        severity_distribution: buildSeverityDistribution(dashboardDataset.issueFactRows),
+        organization_ranking: buildOrganizationRanking(
+          dashboardDataset.resultFactRows,
+          dashboardDataset.issueFactRows,
+          10
+        ),
+        organization_governance_ranking: buildOrganizationGovernanceRanking(
+          dashboardDataset.resultFactRows,
+          dashboardDataset.rectificationFactRows,
+          10
+        ),
+        franchisee_ranking: buildFranchiseeRanking(dashboardDataset.resultFactRows, dashboardDataset.issueFactRows, 10),
+        franchisee_close_rate_ranking: buildFranchiseeCloseRateRanking(
+          dashboardDataset.resultFactRows,
+          dashboardDataset.rectificationFactRows,
+          10
+        ),
+        high_risk_franchisees: buildHighRiskFranchisees(
+          dashboardDataset.resultFactRows,
+          dashboardDataset.issueFactRows,
+          dashboardDataset.rectificationFactRows,
+          10
+        ),
+        recurring_stores: buildRecurringStores(dashboardDataset.resultFactRows, 10),
+        recurring_franchisees: buildRecurringFranchisees(
+          dashboardDataset.resultFactRows,
+          dashboardDataset.rectificationFactRows,
+          10
+        ),
+        store_ranking: buildStoreRanking(dashboardDataset.resultFactRows, dashboardDataset.issueFactRows, 10),
+        review_efficiency: buildReviewEfficiency(dashboardDataset.reviewFactRows),
+        review_status_distribution: buildReviewStatusDistribution(dashboardDataset.resultFactRows),
+        rectification_overdue_ranking: buildRectificationOverdueRanking(dashboardDataset.rectificationFactRows, 10),
+        overdue_franchisees: buildOverdueFranchisees(dashboardDataset.rectificationFactRows, 10),
+        rectification_overview: buildRectificationOverview(dashboardDataset.rectificationFactRows)
+      },
+      base_filter_options: buildFilterOptions(baseFilterDataset.reportRows, baseFilterDataset.resultFactRows),
+      advanced_filter_options: buildFilterOptions(advancedFilterRows.reportRows, advancedFilterRows.resultRows)
     };
   }
 }

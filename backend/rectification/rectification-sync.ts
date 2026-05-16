@@ -1,28 +1,28 @@
 import type { HuiYunYingRectificationOrderItem } from "@/backend/integrations/huiyunying/huiyunying.types";
 import type { RectificationOrderRecord, RectificationOrderStatus } from "@/backend/rectification/rectification.types";
 
-function normalizeText(value: unknown): string | null {
+function normalizeText(value: unknown): any {
   const normalized = String(value || "").trim();
   return normalized || null;
 }
 
-function buildReplySegments(item: HuiYunYingRectificationOrderItem): string[] {
+function buildReplySegments(item: HuiYunYingRectificationOrderItem): any {
   const contentParts = [
     normalizeText(item.inspectionPointsStr),
     normalizeText(item.markNames),
     normalizeText(item.contentTitle)
-  ].filter((value): value is string => Boolean(value));
+  ].filter((value): any => Boolean(value));
   const reviewParts = [
     normalizeText(item.examiner) ? `审核人：${normalizeText(item.examiner)}` : null,
     normalizeText(item.examineTime) ? `审核时间：${normalizeText(item.examineTime)}` : null,
     normalizeText(item.realCorrectedTime || item.realCorrected)
       ? `完成时间：${normalizeText(item.realCorrectedTime || item.realCorrected)}`
       : null
-  ].filter((value): value is string => Boolean(value));
+  ].filter((value): any => Boolean(value));
   return [...contentParts, ...reviewParts];
 }
 
-export function normalizeRemoteIfCorrected(ifCorrected: unknown): string | null {
+export function normalizeRemoteIfCorrected(ifCorrected: unknown): any {
   const normalized = String(ifCorrected || "").trim();
   if (!normalized) {
     return null;
@@ -39,7 +39,7 @@ export function normalizeRemoteIfCorrected(ifCorrected: unknown): string | null 
   return normalized;
 }
 
-export function mapRemoteRectificationStatus(ifCorrected: unknown): RectificationOrderStatus {
+export function mapRemoteRectificationStatus(ifCorrected: unknown): any {
   const normalized = normalizeRemoteIfCorrected(ifCorrected);
   if (normalized === "1") {
     return "corrected";
@@ -50,7 +50,7 @@ export function mapRemoteRectificationStatus(ifCorrected: unknown): Rectificatio
   return "created";
 }
 
-export function getRectificationStateLabel(order: Pick<RectificationOrderRecord, "if_corrected" | "status">): string {
+export function getRectificationStateLabel(order: Pick<RectificationOrderRecord, "if_corrected" | "status">): any {
   const normalized = normalizeRemoteIfCorrected(order.if_corrected);
   if (normalized === "1") {
     return "已整改";
@@ -75,7 +75,7 @@ export function getRectificationStateLabel(order: Pick<RectificationOrderRecord,
 
 export function buildRectificationReplyContent(
   item: HuiYunYingRectificationOrderItem
-): string | null {
+): any {
   const segments = buildReplySegments(item);
   return segments.length > 0 ? segments.join("；") : null;
 }
@@ -83,15 +83,7 @@ export function buildRectificationReplyContent(
 export function buildRectificationSyncPatch(
   order: RectificationOrderRecord,
   item: HuiYunYingRectificationOrderItem
-): Pick<
-  RectificationOrderRecord,
-  | "huiyunying_order_id"
-  | "status"
-  | "if_corrected"
-  | "real_corrected_time"
-  | "rectification_reply_content"
-  | "response_payload"
-> {
+): any {
   return {
     huiyunying_order_id: normalizeText(item.disqualifiedId) || order.huiyunying_order_id,
     status: mapRemoteRectificationStatus(item.ifCorrected),
@@ -105,7 +97,7 @@ export function buildRectificationSyncPatch(
 export function isRemoteRectificationSnapshotUnchanged(
   order: RectificationOrderRecord,
   item: HuiYunYingRectificationOrderItem
-): boolean {
+): any {
   const currentPayload =
     order.response_payload && typeof order.response_payload === "object" && !Array.isArray(order.response_payload)
       ? (order.response_payload as Record<string, unknown>)

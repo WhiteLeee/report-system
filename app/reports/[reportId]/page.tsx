@@ -11,22 +11,22 @@ export const dynamic = "force-dynamic";
 
 const reportService = createReportService();
 
-function normalizeReviewStatus(value: string): ReviewFilterState {
+function normalizeReviewStatus(value: string): any {
   return value === "pending" || value === "in_progress" || value === "completed" ? value : "";
 }
 
-function normalizePage(value: string | string[] | undefined): number {
+function normalizePage(value: string | string[] | undefined): any {
   const page = typeof value === "string" ? Number(value) : NaN;
   return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
-function normalizeSemanticState(value: string): ReportResultSemanticState | "" {
+function normalizeSemanticState(value: string): any {
   return value === "issue_found" || value === "pass" || value === "inconclusive" || value === "inspection_failed"
     ? value
     : "";
 }
 
-function normalizePageSize(value: string | string[] | undefined): DetailFilters["pageSize"] {
+function normalizePageSize(value: string | string[] | undefined): any {
   const pageSize = typeof value === "string" ? Number(value) : NaN;
   return DETAIL_PAGE_SIZE_OPTIONS.includes(pageSize as DetailFilters["pageSize"]) ? (pageSize as DetailFilters["pageSize"]) : 30;
 }
@@ -37,19 +37,13 @@ export default async function ReportDetailPage({
 }: {
   params: Promise<{ reportId: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<any> {
   const currentUser = await requirePermission("report:read");
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
   const reportId = Number(resolvedParams.reportId);
 
   if (!Number.isInteger(reportId) || reportId <= 0) {
-    notFound();
-  }
-
-  const report = reportService.getReportDetail(reportId, buildRequestContext(currentUser));
-
-  if (!report) {
     notFound();
   }
 
@@ -65,6 +59,22 @@ export default async function ReportDetailPage({
     page: normalizePage(resolvedSearchParams.page),
     pageSize: normalizePageSize(resolvedSearchParams.pageSize)
   };
+  const report = await reportService.getReportDetailPage(
+    reportId,
+    {
+      organization: filters.organization,
+      storeId: filters.storeId,
+      reviewStatus: filters.reviewStatus,
+      semanticState: filters.semanticState,
+      page: filters.page,
+      pageSize: filters.pageSize
+    },
+    buildRequestContext(currentUser)
+  );
+
+  if (!report) {
+    notFound();
+  }
   const showCollaboration = typeof resolvedSearchParams.collaboration === "string" && resolvedSearchParams.collaboration === "1";
 
   return <ReportDetailView currentUser={currentUser} filters={filters} report={report} showCollaboration={showCollaboration} />;

@@ -293,19 +293,19 @@ backend/
       rectification-analytics.adapter.ts
     facts/
       analytics-fact.repository.ts
-      sqlite-analytics-fact.repository.ts
+      pg-analytics-fact.repository.ts
       analytics-fact.service.ts
     snapshots/
       analytics-snapshot.repository.ts
-      sqlite-analytics-snapshot.repository.ts
+      pg-analytics-snapshot.repository.ts
       analytics-snapshot.service.ts
     queries/
       analytics.repository.ts
-      sqlite-analytics.repository.ts
+      pg-analytics.repository.ts
       analytics.service.ts
     jobs/
       analytics-job.repository.ts
-      sqlite-analytics-job.repository.ts
+      pg-analytics-job.repository.ts
       analytics-job.service.ts
       analytics-job.manager.ts
     analytics.module.ts
